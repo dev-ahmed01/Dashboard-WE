@@ -35,7 +35,7 @@ Do not publish ports 5432 or 9000 to the internet. Configure off-host backups fo
 
 ## Team access
 
-The first admin is bootstrapped from environment variables. Administrators can create distinct editor/admin accounts under **Team Access**; editors cannot publish, alter template field permissions, manage redirects or create users. Passwords use Argon2id hashes. Users can change their passwords in the admin UI; password changes, administrator resets and account deactivation invalidate prior access tokens. Existing Administrator and Editor permissions are unchanged. Login requests are rate-limited in the provided Nginx configuration.
+The first admin is bootstrapped from environment variables. For local testing only, setting `ADMIN_USERNAME=admin` in `.env` adds an optional login alias for the configured first administrator; existing editor accounts continue to sign in with email. Updating `.env` does not reset a password already stored in PostgreSQL. Keep demo credentials off any internet-exposed deployment. Administrators can create distinct editor/admin accounts under **Team Access**; editors cannot publish, alter template field permissions, manage redirects or create users. Passwords use Argon2id hashes. Users can change their passwords in the admin UI; password changes, administrator resets and account deactivation invalidate prior access tokens. Existing Administrator and Editor permissions are unchanged. Login requests are rate-limited in the provided Nginx configuration.
 
 ## What is intentionally not yet connected
 
