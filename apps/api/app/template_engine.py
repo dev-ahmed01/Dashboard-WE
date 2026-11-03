@@ -173,15 +173,23 @@ def extract(source: str):
     sections, fields = [], []
     used_sections, used_fields = set(), set()
     # Reserve previously annotated keys before producing any new ones on re-scan.
+    # A newly discovered hero appearing before six old sections must not steal
+    # "section_1" and shift every old section's identity and mapping.
+    reserved_sections = {str(node.get('data-we-section')) for node in soup.find_all(True)
+                         if node.get('data-we-section')}
     reserved_fields = {str(tag.get(attr)) for tag in soup.find_all(True)
                        for attr in ('data-we-field', 'data-we-link-field')
                        if tag.get(attr)}
 
     for i, node in enumerate(nodes[:60]):
         annotated = str(node.get('data-we-section') or '').strip()
-        sec_key = annotated if re.fullmatch(r'[a-z][a-z0-9_-]{1,70}', annotated) and annotated not in used_sections else f'section_{i+1}'
-        while sec_key in used_sections:
-            sec_key += '_copy'
+        if re.fullmatch(r'[a-z][a-z0-9_-]{1,70}', annotated) and annotated not in used_sections:
+            sec_key = annotated
+        else:
+            number = i + 1
+            while f'section_{number}' in used_sections or f'section_{number}' in reserved_sections:
+                number += 1
+            sec_key = f'section_{number}'
         used_sections.add(sec_key)
         node['data-we-section'] = sec_key
         sections.append({'id': sec_key, 'name': label(node, i), 'order': i+1})
