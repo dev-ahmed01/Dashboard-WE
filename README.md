@@ -31,6 +31,10 @@ Do not publish ports 5432 or 9000 to the internet. Configure off-host backups fo
 5. **Publish**: An admin explicitly creates an immutable local publication snapshot. Future draft edits do not change that snapshot. URL changes can produce a 301 redirect.
 6. **SEO**: Published eligible pages appear in `sitemap.xml`. Previews are not indexed. Breadcrumb JSON-LD and canonical/robots tags are generated automatically.
 
+## Team access
+
+The first admin is bootstrapped from environment variables. Administrators can create distinct editor/admin accounts under **Team Access**; editors cannot publish, alter template field permissions, manage redirects or create users. Passwords use Argon2id hashes. Users can rotate passwords through `POST /api/auth/change-password` (a UI flow can be added later). Login requests are rate-limited in the provided Nginx configuration.
+
 ## What is intentionally not yet connected
 
 - **WordPress production deployment**: Publishing here creates a local `/site/...` snapshot only. It does not update `workspacebyemlen.co.in`.

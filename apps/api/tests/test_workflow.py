@@ -93,3 +93,26 @@ def test_importer_does_not_execute_scripts():
     safe,sects,fields=extract(src)
     assert len(sects)==1 and len(fields)>=1
     assert 'window.evil' not in safe and 'onclick=' not in safe and 'javascript:' not in safe
+
+
+def test_team_account_permissions_and_password_change(monkeypatch):
+    monkeypatch.setattr(main,'ObjectStore',FakeStore)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    with TestClient(main.app) as client:
+        primary=client.post('/api/auth/login',json={'email':'owner@example.test','password':'local_test_only_password_12345'}).json()['access_token']
+        admin_headers={'Authorization':'Bearer '+primary}
+        new=client.post('/api/users',json={'email':'writer@example.test','password':'editor_password_very_long','role':'editor'},headers=admin_headers)
+        assert new.status_code==201,new.text
+        assert len(client.get('/api/users',headers=admin_headers).json())==2
+        auth=client.post('/api/auth/login',json={'email':'writer@example.test','password':'editor_password_very_long'})
+        assert auth.status_code==200
+        editor_headers={'Authorization':'Bearer '+auth.json()['access_token']}
+        assert client.get('/api/users',headers=editor_headers).status_code==403
+        assert client.post('/api/users',json={'email':'other@example.test','password':'long_enough_password_123','role':'admin'},headers=editor_headers).status_code==403
+        wrong=client.post('/api/auth/change-password',json={'old_password':'wrong','new_password':'different_password_123'},headers=editor_headers)
+        assert wrong.status_code==403
+        good=client.post('/api/auth/change-password',json={'old_password':'editor_password_very_long','new_password':'different_password_123'},headers=editor_headers)
+        assert good.status_code==200
+        assert client.post('/api/auth/login',json={'email':'writer@example.test','password':'editor_password_very_long'}).status_code==401
+        assert client.post('/api/auth/login',json={'email':'writer@example.test','password':'different_password_123'}).status_code==200

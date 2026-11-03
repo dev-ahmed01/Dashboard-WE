@@ -96,6 +96,46 @@ def me(user:User=Depends(current_user)):
     return {'email':user.email,'role':user.role}
 
 
+
+class NewTeamUser(BaseModel):
+    email: str = Field(min_length=5,max_length=255)
+    password: str = Field(min_length=12,max_length=256)
+    role: str = Field(pattern='^(admin|editor)$')
+
+
+@app.get('/api/users')
+def list_team(db:Session=Depends(get_db),_:User=Depends(admin)):
+    return [{'id':u.id,'email':u.email,'role':u.role,'active':u.active} for u in db.scalars(select(User).order_by(User.id)).all()]
+
+
+@app.post('/api/users', status_code=201)
+def create_team_user(payload:NewTeamUser,db:Session=Depends(get_db),actor:User=Depends(admin)):
+    from .security import hash_password
+    email=payload.email.strip().lower()
+    if '@' not in email or email.startswith('@') or email.endswith('@'): fail(422,'Enter a valid email address')
+    if db.scalar(select(User.id).where(User.email==email)):fail(409,'Email already exists')
+    user=User(email=email,password_hash=hash_password(payload.password),role=payload.role)
+    db.add(user);db.flush()
+    audit(db,actor,'user_create',str(user.id),{'role':user.role})
+    db.commit()
+    return {'id':user.id,'email':user.email,'role':user.role,'active':True}
+
+
+class ChangePassword(BaseModel):
+    old_password:str
+    new_password:str = Field(min_length=12,max_length=256)
+
+
+@app.post('/api/auth/change-password')
+def change_password(payload:ChangePassword,db:Session=Depends(get_db),user:User=Depends(current_user)):
+    from .security import hash_password,verify_password
+    if not verify_password(payload.old_password,user.password_hash):fail(403,'Current password is incorrect')
+    user.password_hash=hash_password(payload.new_password)
+    audit(db,user,'password_changed',str(user.id))
+    db.commit()
+    return {'ok':True}
+
+
 @app.get('/api/overview')
 def overview(db:Session=Depends(get_db),_:User=Depends(current_user)):
     return {'templates':db.scalar(select(func.count()).select_from(Template)),
