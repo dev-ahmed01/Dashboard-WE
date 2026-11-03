@@ -29,7 +29,7 @@ const label=(k:string)=>k.replaceAll('_',' ')
 
 export default function App(){
   const [user,setUser]=useState<{email:string;role:string}|null>(null)
-  const [loginEmail,setLoginEmail]=useState('')
+  const [loginIdentifier,setLoginIdentifier]=useState('')
   const [loginPassword,setLoginPassword]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -104,7 +104,7 @@ export default function App(){
   function notify(msg:string){setMessage(msg);setError('')}
   function logout(){if(!mayLeave())return;accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null);setPublicationInfo(null);setSelectedTemplate(null);setUploaded(null);setMappingId(null);setNewName('');setNav('Category');setTab('All Pages')}
   async function login(){await action(async()=>{
-    const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({email:loginEmail,password:loginPassword})})
+    const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
   async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([])})}
@@ -158,7 +158,7 @@ export default function App(){
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
 
-  if(!user)return <div className="login-bg"><div className="login-card"><div className="logo dark"><span className="logo-dot"/>workspace<span className="by-emlen">BY EMLEN</span></div><div className="login-icon"><LockKeyhole size={28}/></div><h1>Welcome back.</h1><p>Sign in to manage pages, templates and SEO.</p><form onSubmit={e=>{e.preventDefault();login()}}><label>Admin email</label><input type="email" placeholder="admin@workspacebyemlen.co.in" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required/><label>Password</label><input type="password" placeholder="Your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required/><button className="primary fill" disabled={busy}>Sign in <ArrowUpRight size={18}/></button></form>{error&&<div className="alert error">{error}</div>}<small>Secure sign-in · Access configured during deployment</small></div></div>
+  if(!user)return <div className="login-bg"><div className="login-card"><div className="logo dark"><span className="logo-dot"/>workspace<span className="by-emlen">BY EMLEN</span></div><div className="login-icon"><LockKeyhole size={28}/></div><h1>Welcome back.</h1><p>Sign in to manage pages, templates and SEO.</p><form onSubmit={e=>{e.preventDefault();login()}}><label>Username or email</label><input type="text" placeholder="Enter username or email" autoComplete="username" value={loginIdentifier} onChange={e=>setLoginIdentifier(e.target.value)} required/><label>Password</label><input type="password" placeholder="Your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required/><button className="primary fill" disabled={busy}>Sign in <ArrowUpRight size={18}/></button></form>{error&&<div className="alert error">{error}</div>}<small>Secure sign-in · Access configured during deployment</small></div></div>
 
   return <div className="shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"/> <div><strong>workspace</strong><small>BY EMLEN</small></div></div><div className="side-label">WORKSPACE</div><div className="navigation">
     {([['Category',LayoutTemplate],['Templates',FileCode2],['Saved Drafts',FilePenLine],['Published',Globe2],['Archived',FilePenLine],['Shared Content',Copy],['SEO',Search],['Team Access',ShieldCheck],['Media Library',Settings2]] as const)
