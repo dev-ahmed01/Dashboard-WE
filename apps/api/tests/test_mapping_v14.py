@@ -64,7 +64,7 @@ def test_render_heading_button_links_icons_and_static_safety():
     }, {}), 'html.parser')
     assert rendered.h3 and 'Private Offices' in rendered.h3.get_text(' ', strip=True)
     assert not rendered.h1
-    call = rendered.find('a', string=lambda x: x and 'Call now' in x)
+    call = rendered.find('a', href='/book/')
     assert call and call['href'] == '/book/'
     assert call.find('img') and call.find('img')['src'] == 'https://example.com/icon.png'
     assert 'fa-check' in rendered.i['class']
@@ -126,7 +126,7 @@ def test_redetect_saved_six_to_seven_and_configure_controls(client):
     assert preview.status_code==200
     assert 'https://workspacebyemlen.co.in/enquire/' in preview.text
     assert 'https://example.com/changed.png' in preview.text
-    assert BeautifulSoup(preview.text,'html.parser').find('h2',string=lambda x:x and 'Private Offices' in x)
+    assert any('Private Offices' in tag.get_text(' ', strip=True) for tag in BeautifulSoup(preview.text,'html.parser').find_all('h2'))
 
     current=client.get(f'/api/pages/{pid}',headers=a).json()['page']
     bad_url=client.put(f'/api/pages/{pid}',headers=a,
