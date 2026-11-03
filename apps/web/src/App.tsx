@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null}
