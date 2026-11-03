@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null}
@@ -74,6 +74,10 @@ export default function App(){
   const [teamRole,setTeamRole]=useState<'admin'|'editor'>('editor')
   const [media,setMedia]=useState<{id:number;filename:string;alt_text:string;url:string}[]>([])
   const [filter,setFilter]=useState<'All'|'Published'|'Draft'>('All')
+  const [pageSearch,setPageSearch]=useState('')
+  const [selectedPageIds,setSelectedPageIds]=useState<number[]>([])
+  const [selectedTemplatePreview,setSelectedTemplatePreview]=useState('')
+  const [templateDragActive,setTemplateDragActive]=useState(false)
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
@@ -91,6 +95,14 @@ export default function App(){
     },450)
     return()=>{cancelled=true;window.clearTimeout(timer)}
   },[editor?.page.id,previewPayload,previewRefresh])
+  useEffect(()=>{
+    let active=true
+    if(!selectedTemplate){setSelectedTemplatePreview('');return}
+    html('/api/templates/'+selectedTemplate+'/preview')
+      .then(content=>{if(active)setSelectedTemplatePreview(content)})
+      .catch(()=>{if(active)setSelectedTemplatePreview('')})
+    return()=>{active=false}
+  },[selectedTemplate])
   useEffect(()=>{if(!mappingId)return;let active=true;const query=focusField?'?focus_field='+encodeURIComponent(focusField):'';html(`/api/templates/${mappingId}/preview${query}`).then(r=>{if(active)setMapPreview(r)}).catch(e=>{if(active)showError(e)});return()=>{active=false}},[mappingId,focusField])
 
   async function refresh(){
@@ -158,6 +170,40 @@ export default function App(){
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
+  const categoryPages=visiblePages.filter(p=>{
+    const search=pageSearch.trim().toLowerCase()
+    return !search||[p.title,p.slug,templates.find(t=>t.id===p.template_id)?.name||''].some(value=>value.toLowerCase().includes(search))
+  })
+  const approvedTemplates=templates.filter(t=>t.approved)
+  const selectedApprovedTemplate=approvedTemplates.find(t=>t.id===selectedTemplate)
+  const allVisibleSelected=categoryPages.length>0&&categoryPages.every(p=>selectedPageIds.includes(p.id))
+  const selectedHasPublished=pages.some(p=>selectedPageIds.includes(p.id)&&!!p.published_version)
+  function chooseTemplateFile(file:File|null){
+    if(file&&(!file.name.toLowerCase().endsWith('.html')||file.size>8*1024*1024)){
+      setTemplateFile(null);showError('Choose an HTML file (.html) up to 8 MB.');return
+    }
+    setTemplateFile(file);setError('')
+    if(file)setUploadName(file.name.replace(/\.html$/i,''))
+  }
+  async function archiveDraft(p:Page){
+    if(p.published_version)return
+    if(!window.confirm('Archive '+p.title+'? You can restore it later.'))return
+    await action(async()=>{
+      await api('/api/pages/'+p.id+'/archive',{method:'POST'})
+      setSelectedPageIds(ids=>ids.filter(id=>id!==p.id))
+      await refresh();notify('Draft archived')
+    })
+  }
+  async function archiveSelectedDrafts(){
+    const drafts=pages.filter(p=>selectedPageIds.includes(p.id)&&!p.published_version)
+    if(!drafts.length||selectedHasPublished)return
+    if(!window.confirm('Archive '+drafts.length+' selected drafts?'))return
+    await action(async()=>{
+      for(const p of drafts)await api('/api/pages/'+p.id+'/archive',{method:'POST'})
+      setSelectedPageIds([])
+      await refresh();notify('Selected drafts archived')
+    })
+  }
 
   if (!user) return (
     <div className="login-bg">
@@ -218,10 +264,8 @@ export default function App(){
     </div>
   )
 
-  return <div className="shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"/> <div><strong>workspace</strong><small>BY EMLEN</small></div></div><div className="side-label">WORKSPACE</div><div className="navigation">
-    {([['Category',LayoutTemplate],['Templates',FileCode2],['Saved Drafts',FilePenLine],['Published',Globe2],['Archived',FilePenLine],['Shared Content',Copy],['SEO',Search],['Team Access',ShieldCheck],['Media Library',Settings2]] as const)
-      .filter(([name])=>user.role==='admin'||!['Templates','Team Access','Archived'].includes(name))
-      .map(([name,Icon])=><button key={name} className={`nav-item ${nav===name?'active':''}`} onClick={()=>navigate(name as Nav)}><Icon size={18}/>{name}<ChevronRight className="right-chevron" size={15}/></button>)}
+  return <div className="shell category-shell"><aside className="sidebar category-sidebar"><div className="brand"><span className="brand-mark"/> <div><strong>workspace</strong><small>BY EMLEN</small></div></div><div className="navigation">
+    <button className="nav-item active" type="button" onClick={()=>navigate('Category')} aria-current="page"><LayoutTemplate size={19}/>Category<ChevronRight className="right-chevron" size={16}/></button>
   </div><button className="logout" onClick={logout}><LogOut size={17}/> Sign out</button></aside>
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
