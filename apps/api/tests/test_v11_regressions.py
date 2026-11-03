@@ -119,3 +119,36 @@ def test_template_annotations_and_highlight_preview(client):
     preview=client.get(f'/api/templates/{t["id"]}/preview?focus_field=hero_heading',headers=auth)
     assert preview.status_code==200 and 'data-we-qa-focus' in preview.text
     assert 'Office spaces' in preview.text and 'Frequently asked questions' not in preview.text
+
+
+def test_media_alt_flows_into_variable_image_preview_and_shared_usage(client):
+    auth=login(client)
+    img=b'\x89PNG\r\n\x1a\nsynthetic-image'
+    media=client.post('/api/media',headers=auth,files={'file':('office.png',img,'image/png')},data={'alt_text':'Shared meeting room'}).json()
+    html=b'''<html><head></head><body><main><section id="hero"><h1>Office space</h1><img src="https://example.com/original.png" alt="Old default alt" /></section></main></body></html>'''
+    t=imported(client,auth,html,'Office photo')
+    t=approve(client,auth,t,{'https://example.com/original.png':'page'})
+    p=page(client,auth,t)
+    imagefield=next(f for f in t['fields'] if f['kind']=='image')
+    update=put_page(client,p['id'],auth,{'values':{imagefield['key']:media['url']}})
+    assert update.status_code==200
+    preview=client.get(f'/api/pages/{p["id"]}/preview',headers=auth)
+    assert preview.status_code==200 and 'alt="Shared meeting room"' in preview.text
+    client.patch(f'/api/media/{media["id"]}',headers=auth,json={'alt_text':'Updated team meeting room'})
+    assert 'alt="Updated team meeting room"' in client.get(f'/api/pages/{p["id"]}/preview',headers=auth).text
+    assert client.get('/api/shared/usage',headers=auth).status_code==200
+
+
+def test_shared_usage_counts_affected_pages_not_immediate_public_rewrites(client):
+    auth=login(client)
+    t=approve(client,auth,imported(client,auth),{'Shared company benefit':'global'})
+    p=page(client,auth,t)
+    usage=client.get('/api/shared/usage',headers=auth).json()
+    assert {'key':'company_benefit','pages':1,'published_pages':0} in usage
+    seo(client,auth,p);publish(client,auth,p)
+    usage=client.get('/api/shared/usage',headers=auth).json()
+    assert {'key':'company_benefit','pages':1,'published_pages':1} in usage
+    old=client.get('/site/bengaluru-office/').text
+    changed=client.put('/api/shared',headers=auth,json={'items':{'company_benefit':'New copy requires republishing'}})
+    assert changed.status_code==200
+    assert client.get('/site/bengaluru-office/').text==old
