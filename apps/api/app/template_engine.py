@@ -38,16 +38,25 @@ def sanitize(source: str) -> BeautifulSoup:
         if tag.name == 'a':
             tag['rel'] = 'noopener noreferrer'
     if soup.head:
-        charset = soup.new_tag('meta',charset='utf-8'); soup.head.append(charset)
-        viewport = soup.new_tag('meta'); viewport.attrs={'name':'viewport','content':'width=device-width,initial-scale=1'}; soup.head.append(viewport)
+        charset=soup.new_tag('meta',charset='utf-8');soup.head.append(charset)
+        viewport=soup.new_tag('meta');viewport.attrs={'name':'viewport','content':'width=device-width,initial-scale=1'};soup.head.append(viewport)
     return soup
 
 
 def label(node, i):
+    explicit = (node.get('data-we-name') or '').strip()
+    if explicit: return explicit[:120]
+    annotated = str(node.get('data-we-section') or '').strip()
+    if annotated and not re.fullmatch(r'section_[0-9]+', annotated):
+        return annotated.replace('_', ' ').replace('-', ' ').title()[:120]
     text = ' '.join([str(node.get('id') or ''), *node.get('class', [])]).lower()
     for key, name in SECTION_NAMES.items():
         if key in text:
             return name
+    heading=node.find(['h1','h2','h3'])
+    if heading:
+        title=heading.get_text(' ',strip=True)
+        if 3 <= len(title) <= 75: return title
     return 'Hero' if i == 0 else f'Section {i+1}'
 
 
@@ -55,14 +64,20 @@ def extract(source: str):
     soup = sanitize(source)
     body = soup.body
     root = body.find('main') or body
-    nodes = [n for n in root.find_all('section') if not n.find_parent('section')]
+    explicitly_marked = [n for n in root.find_all(attrs={'data-we-section': True}) if n.get('data-we-section')]
+    nodes = explicitly_marked if explicitly_marked else [n for n in root.find_all('section') if not n.find_parent('section')]
     if not nodes:
         nodes = [n for n in root.find_all(recursive=False) if n.name in ('div', 'article', 'header') and (n.get('id') or n.get('class'))]
     if not nodes:
         raise ValueError('No structural sections found. Wrap your design sections in <section> elements.')
     sections, fields = [], []
+    used_sections=set()
+    used_fields=set()
     for i, node in enumerate(nodes[:40]):
-        sec_key = f'section_{i+1}'
+        annotated = str(node.get('data-we-section') or '').strip()
+        sec_key = annotated if re.fullmatch(r'[a-z][a-z0-9_-]{1,70}',annotated) and annotated not in used_sections else f'section_{i+1}'
+        while sec_key in used_sections: sec_key += '_copy'
+        used_sections.add(sec_key)
         node['data-we-section'] = sec_key
         sections.append({'id': sec_key, 'name': label(node, i), 'order': i+1})
         n = 0
@@ -81,10 +96,19 @@ def extract(source: str):
                 attr = 'text'; field_type = 'textarea' if len(value)>110 else 'text'
             else:continue
             n += 1
-            key = f'{sec_key}_field_{n}'
+            annotation=str(tag.get('data-we-field') or '').strip()
+            key=annotation if re.fullmatch(r'[a-z][a-z0-9_-]{1,100}',annotation) and annotation not in used_fields else f'{sec_key}_field_{n}'
+            while key in used_fields:key += '_copy'
+            used_fields.add(key)
             tag['data-we-field'] = key
+            field_label=str(tag.get('data-we-label') or '').strip()
+            if not field_label:
+                prefix=('Image' if field_type=='image' else {'h1':'Main heading','h2':'Heading','h3':'Subheading','h4':'Small heading','p':'Paragraph','a':'Link','button':'Button','li':'List item','span':'Label'}.get(tag.name,'Text'))
+                snippet=(str(tag.get('alt') or 'Image') if field_type=='image' else value)
+                snippet=' '.join(snippet.split())
+                field_label=f'{prefix}: {snippet[:65]}' + ('…' if len(snippet)>65 else '')
             fields.append({'key': key, 'section_id': sec_key,
-                           'label': ('Image' if field_type=='image' else tag.name.upper())+f' {n}',
+                           'label': field_label[:120],
                            'kind': field_type, 'attr': attr, 'default': value,
                            'mode': 'static', 'global_key': None})
     return str(soup), sections, fields
