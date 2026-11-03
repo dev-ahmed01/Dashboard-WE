@@ -1,0 +1,31 @@
+ID,Persona,Scenario,Result,Evidence,Severity
+T01,First-time admin,Valid login,Pass,API test,P3
+T02,First-time admin,Unapproved template blocks page creation,Pass,API test,P3
+T03,Template admin,Upload HTML and default every field static,Pass,API test,P3
+T04,Template admin,Managed Offices V26 structural import,Pass with mapping friction,8 sections 85 fields; source parser,P2
+T05,Template admin,One Person Office V11 structural import,Pass with mapping friction,8 sections 86 fields; source parser,P2
+T06,Template admin,Identify generic fields and unnamed sections,UX concern,Source inspection,P1
+T07,First-time admin,Approve mapped template,Pass,API test,P3
+T08,Content editor,Create page from approved template,Pass,API test,P3
+T09,Content editor,Save allowed field,Pass,API test,P3
+T10,Content editor,Attempt edit static field,Pass (blocked as expected),API test,P3
+T11,Content editor,Preview saved draft,Pass,API test,P3
+T12,Content editor,Preview unsaved edits,UX issue,Source inspection: preview GETs server copy,P1
+T13,Content editor,Navigate away with unsaved edits,UX issue,Source inspection: no dirty-state guard,P1
+T14,Content editor,Attempt unauthorized template upload,Pass API / confusing UI,API 403 and source review,P2
+T15,Content editor,Attempt publish,Pass (403),API test,P3
+T16,Admin publisher,Publish with SEO metadata,Pass local only,API test,P3
+T17,SEO administrator,Change draft noindex on published page,Confirmed defect,Repro xfail WE-QA-01,P1
+T18,SEO administrator,Redirect conflicts with published URL,Confirmed defect,Repro xfail WE-QA-02,P1
+T19,Two admins,Concurrent stale edit,Confirmed defect,Repro xfail WE-QA-03,P1
+T20,Team admin,Rotate password invalidates prior token,Confirmed defect,Repro xfail WE-QA-04,P1
+T21,Media editor,Upload image and retain alt text,Confirmed defect,Repro xfail WE-QA-05,P2
+T22,Team admin,Create second administrator,Pass,API test,P3
+T23,Team admin,Create editor and enforce backend permissions,Pass,API test,P3
+T24,Team admin,Deactivate employee account,Missing feature,API and UI route inspection,P2
+T25,Reviewer,Submit/approve workflow,Missing role,API and UI inspection,P1
+T26,Published editor,Distinguish changed draft from current publication,UX issue,Status and Saved Drafts source inspection,P2
+T27,Site owner,Production WordPress publish,Not integrated,README and publish route,P1
+T28,Production host,Compose Postgres and MinIO deployment,Not tested,Docker unavailable in test environment,P1
+T29,Admin UI,Desktop visual browser end to end,Not tested,Frontend dependency install blocked in test environment,P1
+T30,Admin UI,Mobile responsive and accessibility verification,Not tested,Browser execution unavailable,P2
