@@ -87,14 +87,14 @@ def run():
         assert preview_bounds["y"] >= mapping_bounds["y"] + mapping_bounds["height"] - 2, "Preview must appear below section mapping"
         assert page.locator(".category-mapping-fullwidth").get_by_role("button", name="Locate").count() == 0
         # One section is initially expanded. Remaining rectangular cards stay collapsed.
-        expect(cards.first.get_by_role("button", name="Hide details")).to_be_visible()
+        expect(cards.first.get_by_role("button", name="Show less")).to_be_visible()
         assert cards.first.locator(".map-field").count() > 0
-        expect(cards.nth(1).get_by_role("button", name="View details")).to_be_visible()
+        expect(cards.nth(1).get_by_role("button", name="View more")).to_be_visible()
         expect(cards.nth(1).locator(".map-field")).to_have_count(0)
-        cards.nth(1).get_by_role("button", name="View details").click()
+        cards.nth(1).get_by_role("button", name="View more").click()
         expect(cards.first.locator(".map-field")).to_have_count(0)
         expect(cards.nth(1).locator(".map-field").first).to_be_visible()
-        cards.first.get_by_role("button", name="View details").click()
+        cards.first.get_by_role("button", name="View more").click()
         expect(cards.nth(1).locator(".map-field")).to_have_count(0)
         expect(cards.first.locator(".map-field").first).to_be_visible()
         # Detected names/content are informative text, not editable mapping fields.
