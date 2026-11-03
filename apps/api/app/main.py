@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import PurePath
+from urllib.parse import urlsplit
 from uuid import uuid4
 from xml.sax.saxutils import escape as xml_escape
 import json
@@ -379,7 +380,23 @@ def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:Use
 def compiled(db,p:Page,section_id=None):
     t=p.template_snapshot or {**template_json(get_template(db,p.template_id)),'object_key':get_template(db,p.template_id).object_key}
     source=ObjectStore().get(t['object_key']).decode('utf-8')
-    return render(source,t['fields'],p.values or {},globals_dict(db),section_id)
+    output=render(source,t['fields'],p.values or {},globals_dict(db),section_id)
+    # Media selection in page-variable image fields retains the actual media
+    # record's alternative text. Published HTML stays immutable after snapshot.
+    if '/api/media/' in output:
+        from bs4 import BeautifulSoup
+        soup=BeautifulSoup(output,'html.parser')
+        changed=False
+        for img in soup.find_all('img',src=True):
+            path=urlsplit(img.get('src','')).path
+            m=re.fullmatch(r'/api/media/(\d+)/content',path)
+            if not m:continue
+            media=db.get(Media,int(m.group(1)))
+            if media:
+                img['alt']=media.alt_text
+                changed=True
+        if changed:output=str(soup)
+    return output
 
 
 @app.get('/api/pages/{page_id}/preview',response_class=HTMLResponse)
@@ -457,6 +474,19 @@ def publication_status(page_id:int,db:Session=Depends(get_db),_:User=Depends(cur
     return {'draft':{'slug':p.slug,'seo':p.seo,'edit_version':p.edit_version},
       'published':({'slug':pub.slug,'version':pub.version,'seo':pub.seo_snapshot or {}} if pub else None),
       'has_unpublished_changes':bool(pub and p.edit_version>p.published_edit_version)}
+
+
+@app.get('/api/shared/usage')
+def shared_usage(db:Session=Depends(get_db),_:User=Depends(current_user)):
+    usage={}
+    for p in db.scalars(select(Page).where(Page.archived==False)).all():
+        used={f.get('global_key') for f in (p.template_snapshot or {}).get('fields',[])
+              if f.get('mode')=='global' and f.get('global_key')}
+        for key in used:
+            entry=usage.setdefault(key,{'key':key,'pages':0,'published_pages':0})
+            entry['pages']+=1
+            entry['published_pages']+=int(p.status=='published')
+    return list(usage.values())
 
 
 @app.get('/api/shared')
