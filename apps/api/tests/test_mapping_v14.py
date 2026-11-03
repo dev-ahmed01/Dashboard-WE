@@ -152,3 +152,21 @@ def test_export_with_hero_before_main_is_seven_sections():
     assert len(sections)==7,[s['name'] for s in sections]
     assert sections[0]['name']=='Hero'
     assert any(f['tag']=='h1' and f['section_id']==sections[0]['id'] for f in fields)
+
+
+def test_new_hero_does_not_steal_legacy_section_ids():
+    old=''.join(
+        f'<section data-we-section="section_{i}" id="{name}">'
+        f'<h2 data-we-field="section_{i}_field_1">{name} heading</h2>'
+        f'<p>{name} supporting description</p></section>'
+        for i,name in enumerate(['offices','features','journey','locations','reviews','faq'],1)
+    )
+    html=('<!doctype html><html><body>'
+          '<header class="hero"><h1>Premium Flexible Private Offices</h1><p>Our private offices are ready for you.</p></header>'
+          '<main>'+old+'</main></body></html>')
+    _,sections,fields=extract(html)
+    assert len(sections)==7
+    assert sections[0]['name']=='Hero'
+    assert sections[0]['id'] not in {'section_1','section_2','section_3','section_4','section_5','section_6'}
+    assert [s['id'] for s in sections[1:]] == [f'section_{i}' for i in range(1,7)]
+    assert all(any(f['key']==f'section_{i}_field_1' and f['section_id']==f'section_{i}' for f in fields) for i in range(1,7))
