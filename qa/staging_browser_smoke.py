@@ -79,9 +79,19 @@ def run():
         expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
         expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
         assert px(".category-panel-header h2") == 18, "Upload panels should use 18px section titles"
-        expect(page.locator(".category-sections .category-section")).to_have_count(2)
+        expect(page.locator(".category-expanded-section")).to_have_count(2)
+        assert page.locator(".category-mapping-fullwidth").bounding_box()["width"] > page.locator(".category-page").bounding_box()["width"] * .95
+        mapping_bounds = page.locator(".category-mapping-fullwidth").bounding_box()
+        preview_bounds = page.locator(".category-preview-below").bounding_box()
+        assert preview_bounds["y"] >= mapping_bounds["y"] + mapping_bounds["height"] - 2, "Preview must appear below section mapping"
+        assert page.locator(".category-mapping-fullwidth").get_by_role("button", name="Locate").count() == 0
         expect(page.locator(".map-field").first).to_be_visible()
-        page.locator(".map-field").first.locator("select").select_option("page")
+        whole_section = page.locator(".category-expanded-section").first.get_by_label("Whole section mode", exact=False)
+        whole_section.select_option("page")
+        expect(page.locator(".map-field").first.locator("select[aria-label^='Behavior:']")).to_have_value("page")
+        whole_section.select_option("static")
+        expect(page.locator(".map-field").first.locator("select[aria-label^='Behavior:']")).to_have_value("static")
+        page.locator(".map-field").first.locator("select[aria-label^='Behavior:']").select_option("page")
         page.locator(".approve input[type=checkbox]").check()
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
         page.get_by_role("button", name="Save template configuration").click()

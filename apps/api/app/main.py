@@ -21,7 +21,7 @@ from .db import get_db, SessionLocal
 from .models import User, Template, Page, Publication, SharedContent, Redirect, Media, AuditLog, utcnow
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
-from .template_engine import extract, render, SAFE_URL
+from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, HEADINGS
 from .seo import metadata_html, safe_slug
 
 
@@ -217,6 +217,8 @@ class FieldConfig(BaseModel):
     mode:str=Field(pattern='^(static|page|global)$')
     label:str=Field(min_length=1,max_length=120)
     global_key:str|None=None
+    heading_tag:str|None=None
+    default:str|None=None
 
 
 class TemplateMapping(BaseModel):
@@ -235,9 +237,27 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     for entry in payload.fields:
         f=dict(existing[entry.key]);f['mode']=entry.mode;f['label']=entry.label
         if entry.mode=='global':
-            if not entry.global_key or not re.fullmatch(r'[a-z][a-z0-9_]{1,100}',entry.global_key):fail(422,'Global fields need a valid shared-content key')
+            if not entry.global_key or not re.fullmatch(r'[a-z][a-z0-9_]{1,100}',entry.global_key):
+                fail(422,'Global fields need a valid shared-content key')
             f['global_key']=entry.global_key
-        else:f['global_key']=None
+        else:
+            f['global_key']=None
+        if entry.heading_tag is not None:
+            if f.get('tag') not in HEADINGS or entry.heading_tag not in HEADINGS:
+                fail(422,'Heading level must be H1 through H6 for a detected heading')
+            f['heading_tag']=entry.heading_tag
+        if entry.default is not None:
+            if f.get('kind') not in ('link','icon'):
+                fail(422,'Only link and icon defaults can be changed in template mapping')
+            if len(entry.default)>1000:
+                fail(422,'Default link or icon value is too long')
+            if f.get('kind')=='link' and entry.default and not is_safe_link(entry.default):
+                fail(422,'Unsafe link destination')
+            if f.get('kind')=='icon' and f.get('attr')=='icon_src' and entry.default and not SAFE_URL.match(entry.default):
+                fail(422,'Unsafe icon image URL')
+            if f.get('kind')=='icon' and f.get('attr')=='class' and not SAFE_CLASS.fullmatch(entry.default):
+                fail(422,'Icon class must contain only safe class characters')
+            f['default']=entry.default
         updated.append(f)
     t.fields=updated
     if payload.sections is not None:
@@ -246,6 +266,42 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     t.approved=payload.approved
     t.version+=1
     audit(db,user,'mapping_update',str(t.id),{'approved':t.approved})
+    db.commit()
+    return template_json(t)
+
+
+@app.post('/api/templates/{template_id}/redetect')
+def redetect_template(template_id:int,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Re-extract saved HTML to include previously missed unmarked sections.
+
+    Existing mapped fields retain their settings and new fields stay static.
+    Re-approval is required. Existing page snapshots are not modified.
+    """
+    t=get_template(db,template_id)
+    source=ObjectStore().get(t.object_key).decode('utf-8')
+    fresh_source,sections,fields=extract(source)
+    existing={f['key']:f for f in t.fields}
+    old_sections={sec['id']:sec for sec in t.sections}
+    for field in fields:
+        old=existing.get(field['key'])
+        if old and old.get('kind')==field.get('kind') and old.get('attr')==field.get('attr'):
+            for key in ('label','mode','global_key'):
+                if key in old:field[key]=old[key]
+            if old.get('tag') in HEADINGS and old.get('heading_tag') in HEADINGS:
+                field['heading_tag']=old['heading_tag']
+            if field['kind'] in ('link','icon') and 'default' in old:
+                field['default']=old['default']
+    for sec in sections:
+        if sec['id'] in old_sections:
+            sec['name']=old_sections[sec['id']]['name']
+    previous=len(t.sections)
+    # Write a new immutable object so existing page/template snapshots keep
+    # referencing their original HTML, even when an old template is re-scanned.
+    new_key=f'templates/{uuid4().hex}.html'
+    ObjectStore().put(new_key,fresh_source.encode('utf-8'),'text/html')
+    t.object_key=new_key
+    t.sections=sections;t.fields=fields;t.approved=False;t.version+=1
+    audit(db,user,'template_redetect',str(t.id),{'before':previous,'after':len(sections),'fields':len(fields)})
     db.commit()
     return template_json(t)
 
@@ -357,7 +413,12 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
         newvals=dict(p.values or {})
         for key,value in payload.values.items():
             if not isinstance(value,str) or len(value)>3000:fail(422,'Values must be text under 3000 characters')
-            if allowed[key]['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
+            field=allowed[key]
+            if field['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
+            if field['kind']=='link' and value and not is_safe_link(value):fail(422,'Unsafe link destination')
+            if field['kind']=='icon':
+                if field.get('attr')=='icon_src' and value and not SAFE_URL.match(value):fail(422,'Icon URL is not allowed')
+                if field.get('attr')=='class' and not SAFE_CLASS.fullmatch(value):fail(422,'Icon class is not allowed')
             newvals[key]=value
         changes['values']=newvals
     if payload.seo is not None:
