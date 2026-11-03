@@ -78,7 +78,8 @@ def latest_publication(db,page_id):
 
 
 class Login(BaseModel):
-    email: str
+    identifier: str | None = None
+    email: str | None = None  # Backward-compatible with existing API clients
     password: str
 
 
@@ -89,8 +90,17 @@ def health():
 
 @app.post('/api/auth/login')
 def login(payload:Login,db:Session=Depends(get_db)):
-    u=db.scalar(select(User).where(User.email==payload.email.lower(),User.active==True))
-    if not u or not verify_password(payload.password,u.password_hash): fail(401,'Invalid credentials')
+    identifier=(payload.identifier or payload.email or '').strip().lower()
+    if not identifier: fail(422,'Enter your username or email')
+    settings=get_settings()
+    # Keep all existing accounts email-based. Only the configured administrator
+    # can additionally sign in with an explicit, opt-in username alias.
+    alias=settings.admin_username.strip().lower()
+    using_admin_alias=bool(alias and identifier==alias)
+    email=settings.admin_email.strip().lower() if using_admin_alias else identifier
+    u=db.scalar(select(User).where(User.email==email,User.active==True))
+    if not u or (using_admin_alias and u.role!='admin') or not verify_password(payload.password,u.password_hash):
+        fail(401,'Invalid credentials')
     return {'access_token':issue_token(u),'user':{'email':u.email,'role':u.role}}
 
 
