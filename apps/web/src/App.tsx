@@ -484,7 +484,7 @@ export default function App(){
                     <span className="category-static-track" aria-hidden="true"/>
                   </label>
                   <button type="button" className="category-section-expand" aria-expanded={isOpen} aria-controls={'section-map-'+sec.id} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>
-                    {isOpen?'Hide details':'View details'}<ChevronRight size={16} aria-hidden="true"/>
+                    {isOpen?'Show less':'View more'}<ChevronRight size={16} aria-hidden="true"/>
                   </button>
                 </div>
                 {isOpen&&<div id={'section-map-'+sec.id} className="category-section-card-content">
