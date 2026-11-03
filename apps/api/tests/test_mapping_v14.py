@@ -135,3 +135,20 @@ def test_redetect_saved_six_to_seven_and_configure_controls(client):
     bad_icon=client.put(f'/api/pages/{pid}',headers=a,
         json={'edit_version':current['edit_version'],'values':{icon['key']:'javascript:alert(1)'}})
     assert bad_icon.status_code==422
+
+
+def test_export_with_hero_before_main_is_seven_sections():
+    source = """<!doctype html><html><body>
+      <header class="hero"><h1>Premium Flexible Private Offices</h1><p>Teams thrive here with a private office.</p></header>
+      <main>
+       <section id="office-types"><h2>Office Types</h2><p>Choose your office</p></section>
+       <section id="features"><h2>Benefits</h2><p>More services</p></section>
+       <section id="journey"><h2>Steps</h2><p>How it works</p></section>
+       <section id="locations"><h2>Locations</h2><p>Local options</p></section>
+       <section id="reviews"><h2>Reviews</h2><p>Trusted teams</p></section>
+       <section id="faq"><h2>FAQs</h2><p>Questions and answers</p></section>
+      </main></body></html>"""
+    _,sections,fields=extract(source)
+    assert len(sections)==7,[s['name'] for s in sections]
+    assert sections[0]['name']=='Hero'
+    assert any(f['tag']=='h1' and f['section_id']==sections[0]['id'] for f in fields)
