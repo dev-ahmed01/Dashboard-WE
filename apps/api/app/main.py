@@ -241,6 +241,36 @@ def delete_all_templates(payload:DeleteTemplatesRequest,db:Session=Depends(get_d
     return {'deleted':len(template_ids),'storage_cleanup_failed':failed}
 
 
+@app.delete('/api/templates/{template_id}')
+def delete_one_template(template_id:int,payload:DeleteTemplatesRequest,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Delete one unreferenced template after an exact-name confirmation.
+
+    Never cascade into pages (including archived drafts and published snapshots).
+    """
+    t=get_template(db,template_id)
+    confirmation=f'DELETE {t.name}'
+    if payload.confirmation!=confirmation:
+        fail(422,'Type '+confirmation+' to confirm deletion')
+    used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id==t.id)) or 0
+    if used:
+        fail(409,f'Cannot delete {t.name}: {used} page(s), including archived or published pages, still use this template. No data was deleted.')
+    key=t.object_key
+    name=t.name
+    db.delete(t)
+    audit(db,user,'template_delete',str(template_id),{'name':name})
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        fail(409,'Unable to delete a template while existing pages reference it. No data was deleted.')
+    failed=0
+    try:
+        ObjectStore().delete(key)
+    except Exception:
+        failed=1
+    return {'deleted':1,'template_id':template_id,'storage_cleanup_failed':failed}
+
+
 @app.post('/api/templates/import',status_code=201)
 async def import_template(file:UploadFile=File(...),name:str='',category:str='Solution Category',
    db:Session=Depends(get_db),user:User=Depends(admin)):

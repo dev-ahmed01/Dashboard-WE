@@ -66,3 +66,44 @@ def test_delete_all_refuses_templates_used_by_any_page_including_archived(client
     assert 'archived or published' in deletion.text
     assert len(client.get('/api/templates',headers=auth).json())==1
     assert client.get(f"/api/pages/{draft['id']}",headers=auth).status_code==200
+
+
+def test_delete_one_template_requires_exact_name_and_preserves_other_templates(client):
+    auth=login(client)
+    first=imported(client,auth,name='Managed Offices Layout')
+    second=imported(client,auth,name='One Person Office Layout')
+    all_keys=set(FakeStore.files)
+    assert len(all_keys)==2
+    url=f"/api/templates/{first['id']}"
+    invalid=client.request('DELETE',url,headers=auth,
+                           json={'confirmation':'DELETE Managed Offices'})
+    assert invalid.status_code==422
+    assert len(client.get('/api/templates',headers=auth).json())==2
+    missing=client.request('DELETE',url,json={'confirmation':'DELETE Managed Offices Layout'})
+    assert missing.status_code in (401,403)
+    result=client.request('DELETE',url,headers=auth,
+                          json={'confirmation':'DELETE Managed Offices Layout'})
+    assert result.status_code==200,result.text
+    assert result.json()['deleted']==1
+    remaining=client.get('/api/templates',headers=auth).json()
+    assert [t['id'] for t in remaining]==[second['id']]
+    assert len(FakeStore.files)==1
+    assert set(FakeStore.files).issubset(all_keys)
+    assert client.request('DELETE',url,headers=auth,
+                          json={'confirmation':'DELETE Managed Offices Layout'}).status_code==404
+
+
+def test_delete_one_refuses_template_with_archived_page(client):
+    auth=login(client)
+    first=imported(client,auth,name='Protected Office Template')
+    approved=approve(client,auth,first)
+    linked_page=page(client,auth,approved,name='Office Draft To Keep')
+    archive=client.post(f"/api/pages/{linked_page['id']}/archive",headers=auth)
+    assert archive.status_code==200,archive.text
+    result=client.request('DELETE',f"/api/templates/{first['id']}",headers=auth,
+                          json={'confirmation':'DELETE Protected Office Template'})
+    assert result.status_code==409
+    assert 'page(s)' in result.text
+    assert len(client.get('/api/templates',headers=auth).json())==1
+    assert client.get(f"/api/pages/{linked_page['id']}",headers=auth).status_code==200
+    assert len(FakeStore.files)==1
