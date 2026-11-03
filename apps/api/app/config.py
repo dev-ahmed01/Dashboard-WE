@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     public_site_url: str = "https://workspacebyemlen.co.in"
     admin_email: str = ""
     admin_password: str = ""
+    admin_username: str = ""  # Optional admin login alias, opt-in via local environment
     s3_endpoint_url: str = "http://minio:9000"
     s3_public_url: str = ""
     s3_access_key: str = ""
