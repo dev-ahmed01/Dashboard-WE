@@ -60,6 +60,8 @@ export default function App(){
   const [uploadCategory,setUploadCategory]=useState('Solution Category')
   const [templateFile,setTemplateFile]=useState<File|null>(null)
   const [mappingId,setMappingId]=useState<number|null>(null)
+  const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
+  const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
   const [shared,setShared]=useState<Record<string,string>>({})
   const [sharedUsage,setSharedUsage]=useState<{key:string;pages:number;published_pages:number}[]>([])
@@ -103,6 +105,7 @@ export default function App(){
       .catch(()=>{if(active)setSelectedTemplatePreview('')})
     return()=>{active=false}
   },[selectedTemplate])
+  useEffect(()=>{setOpenMappingSection(null);setSectionModeBackups({})},[mappingId])
   useEffect(()=>{if(!mappingId)return;let active=true;const query=focusField?'?focus_field='+encodeURIComponent(focusField):'';html(`/api/templates/${mappingId}/preview${query}`).then(r=>{if(active)setMapPreview(r)}).catch(e=>{if(active)showError(e)});return()=>{active=false}},[mappingId,focusField])
 
   async function refresh(){
@@ -150,13 +153,28 @@ export default function App(){
       const updated=await api<Template>(`/api/templates/${t.id}/redetect`,{method:'POST'})
       setTemplates(items=>items.map(item=>item.id===t.id?updated:item))
       setUploaded(updated);setMappingId(updated.id);setFocusField('')
+      setOpenMappingSection(null);setSectionModeBackups({})
       notify(`${updated.sections.length} sections and ${updated.fields.length} fields detected. Review the mapping and approve the template.`)
     })
   }
-  function setWholeSectionMode(templateId:number,sectionId:string,mode:'static'|'page'){
-    setTemplates(items=>items.map(t=>t.id===templateId?{...t,fields:t.fields.map(f=>
-      f.section_id===sectionId?{...f,mode,global_key:null}:f
-    )}:t))
+  function toggleSectionStatic(templateId:number,sectionId:string,locked:boolean){
+    const backupKey=templateId+':'+sectionId
+    if(locked){
+      const template=templates.find(t=>t.id===templateId)
+      if(template){
+        const previous=Object.fromEntries(template.fields
+          .filter(f=>f.section_id===sectionId)
+          .map(f=>[f.key,{mode:f.mode,global_key:f.global_key}]))
+        setSectionModeBackups(prev=>({...prev,[backupKey]:previous}))
+      }
+    }
+    const previousModes=sectionModeBackups[backupKey]
+    setTemplates(items=>items.map(t=>t.id!==templateId?t:{
+      ...t,
+      fields:t.fields.map(f=>f.section_id!==sectionId?f:locked
+        ?{...f,mode:'static' as Mode,global_key:null}
+        :{...f,mode:previousModes?.[f.key]?.mode||'page',global_key:previousModes?.[f.key]?.global_key||null})
+    }))
   }
   async function savePage(){if(!editor)return;await action(async()=>{
     const p=editor.page
@@ -449,55 +467,65 @@ export default function App(){
           {mapping?<div className="category-expanded-sections">
             {mapping.sections.map((sec,i)=>{
               const fields=mapping.fields.filter(f=>f.section_id===sec.id)
-              const allStatic=fields.every(f=>f.mode==='static')
-              const allPage=fields.length>0&&fields.every(f=>f.mode==='page')
-              const sectionMode=allStatic?'static':allPage?'page':'mixed'
-              return <section key={sec.id} className="category-expanded-section">
-                <div className="category-expanded-section-head">
+              const isStatic=fields.every(f=>f.mode==='static')
+              const isOpen=(openMappingSection===null?mapping.sections[0]?.id:openMappingSection)===sec.id
+              const variableCount=fields.filter(f=>f.mode==='page').length
+              const sharedCount=fields.filter(f=>f.mode==='global').length
+              return <section key={sec.id} className={'category-section-card '+(isOpen?'is-open':'')+(isStatic?' is-static':'')}>
+                <div className="category-section-card-header">
                   <span className="category-section-number">{String(i+1).padStart(2,'0')}</span>
-                  <label className="category-section-name-label">Section name
-                    <input value={sec.name} onChange={e=>setTemplates(items=>items.map(t=>t.id===mapping.id?{...t,sections:t.sections.map(x=>x.id===sec.id?{...x,name:e.target.value}:x)}:t))}/>
+                  <div className="category-section-summary">
+                    <h3>{sec.name}</h3>
+                    <small>{fields.length} fields <span aria-hidden="true">·</span> {isStatic?'Static, locked':variableCount+' variable'+(sharedCount?' · '+sharedCount+' shared':'')}</small>
+                  </div>
+                  <label className="category-static-toggle">
+                    <span>Static</span>
+                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic} disabled={!fields.length} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
+                    <span className="category-static-track" aria-hidden="true"/>
                   </label>
-                  <span className="category-section-count">{fields.length} fields</span>
-                  <label className="category-whole-mode">Whole section
-                    <select aria-label={'Whole section mode for '+sec.name} value={sectionMode} onChange={e=>setWholeSectionMode(mapping.id,sec.id,e.target.value as 'static'|'page')}>
-                      <option value="static">Static</option>
-                      <option value="page">Variable</option>
-                      {sectionMode==='mixed'&&<option value="mixed" disabled>Mixed</option>}
-                    </select>
-                  </label>
+                  <button type="button" className="category-section-expand" aria-expanded={isOpen} aria-controls={'section-map-'+sec.id} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>
+                    {isOpen?'Hide details':'View details'}<ChevronRight size={16} aria-hidden="true"/>
+                  </button>
                 </div>
-                <div className="category-map-table">
-                  <div className="category-map-table-head"><span>Field name</span><span>Current content / destination</span><span>Heading level</span><span>Behavior</span></div>
-                  {fields.map(f=><div key={f.key} className="category-map-row map-field">
-                    <div className="category-map-cell">
-                      <label>Field name<input aria-label={'Field name: '+f.key} value={f.label} onChange={e=>modifyMapField(mapping.id,f.key,{label:e.target.value})}/></label>
-                      <small className="category-field-type">{f.kind==='link'?'Button / link destination':f.kind==='icon'?'Icon':f.kind==='image'?'Image':f.tag&&/^h[1-6]$/.test(f.tag)?'Heading':f.kind==='textarea'?'Long text':'Text'}</small>
-                    </div>
-                    <div className="category-map-cell">
-                      <label>{f.kind==='link'?'Link URL':f.kind==='icon'?'Icon value':'Detected content'}
-                        {f.kind==='link'||f.kind==='icon'
-                          ?<input aria-label={'Current value: '+f.key} value={f.default} onChange={e=>modifyMapField(mapping.id,f.key,{default:e.target.value})} placeholder={f.kind==='link'?'Enter button link (e.g. /contact/)':f.attr==='icon_src'?'Enter image URL to replace SVG icon':'Icon CSS classes'}/>
-                          :<textarea aria-label={'Current value: '+f.key} rows={2} value={f.default} readOnly title={f.default}/>}
-                      </label>
-                      {f.kind==='icon'&&f.attr==='icon_src'&&<small className="category-field-help">Original inline SVG stays unless a replacement URL is supplied.</small>}
-                    </div>
-                    <div className="category-map-cell category-heading-cell">
-                      {f.tag&&/^h[1-6]$/.test(f.tag)
-                        ?<label>Level<select aria-label={'Heading level: '+f.key} value={f.heading_tag||f.tag} onChange={e=>modifyMapField(mapping.id,f.key,{heading_tag:e.target.value})}>
-                          {['h1','h2','h3','h4','h5','h6'].map(level=><option value={level} key={level}>{level.toUpperCase()}</option>)}
-                        </select></label>
-                        :<span className="category-not-heading">—</span>}
-                    </div>
-                    <div className="category-map-cell">
-                      <label>Behavior<select aria-label={'Behavior: '+f.key} value={f.mode} onChange={e=>modifyMapField(mapping.id,f.key,{mode:e.target.value as Mode})}>
-                        <option value="static">Static</option><option value="page">Variable</option><option value="global">Shared</option>
-                      </select></label>
-                      {f.mode==='global'&&<label className="category-shared-key">Shared key<input value={f.global_key||''} placeholder="e.g. phone_number" onChange={e=>modifyMapField(mapping.id,f.key,{global_key:e.target.value})}/></label>}
-                    </div>
-                  </div>)}
-                  {!fields.length&&<p className="category-no-fields">No editable fields detected in this section.</p>}
-                </div>
+                {isOpen&&<div id={'section-map-'+sec.id} className="category-section-card-content">
+                  <div className="category-map-table">
+                    <div className="category-map-table-head"><span>Detected field</span><span>Current content / link</span><span>Heading level</span><span>Behavior</span></div>
+                    {fields.map(f=><div key={f.key} className="category-map-row map-field">
+                      <div className="category-map-cell category-field-summary">
+                        <strong title={f.label}>{f.label}</strong>
+                        <small className="category-field-type">{f.kind==='link'?'Button / link destination':f.kind==='icon'?'Icon':f.kind==='image'?'Image':f.tag&&/^h[1-6]$/.test(f.tag)?'Heading':f.kind==='textarea'?'Long text':'Text'}</small>
+                      </div>
+                      <div className="category-map-cell">
+                        {(f.kind==='link'||f.kind==='icon')&&!isStatic
+                          ?<label className="category-map-control-label">{f.kind==='link'?'Destination URL':f.attr==='icon_src'?'Replacement icon URL':'Icon classes'}
+                            <input aria-label={'Current value: '+f.key} value={f.default} onChange={e=>modifyMapField(mapping.id,f.key,{default:e.target.value})} placeholder={f.kind==='link'?'e.g. /contact/ or https://...':f.attr==='icon_src'?'Keep empty for original SVG':'e.g. fa fa-check'}/>
+                          </label>
+                          :<div className="category-detected-value" title={f.default}>{f.default||'Not set'}</div>}
+                        {f.kind==='icon'&&f.attr==='icon_src'&&!isStatic&&<small className="category-field-help">Leave empty to keep the original SVG.</small>}
+                      </div>
+                      <div className="category-map-cell category-heading-cell">
+                        {f.tag&&/^h[1-6]$/.test(f.tag)
+                          ?<label className="category-map-control-label">Level
+                            <select aria-label={'Heading level: '+f.key} value={f.heading_tag||f.tag} disabled={isStatic} onChange={e=>modifyMapField(mapping.id,f.key,{heading_tag:e.target.value})}>
+                              {['h1','h2','h3','h4','h5','h6'].map(level=><option value={level} key={level}>{level.toUpperCase()}</option>)}
+                            </select>
+                          </label>
+                          :<span className="category-not-heading">—</span>}
+                      </div>
+                      <div className="category-map-cell">
+                        {isStatic?<span className="category-static-field-badge"><LockKeyhole size={13}/>Static</span>
+                        :<label className="category-map-control-label">Behavior
+                          <select aria-label={'Behavior: '+f.key} value={f.mode} onChange={e=>modifyMapField(mapping.id,f.key,{mode:e.target.value as Mode})}>
+                            <option value="static">Static</option><option value="page">Variable</option><option value="global">Shared</option>
+                          </select>
+                        </label>}
+                        {!isStatic&&f.mode==='global'&&<label className="category-shared-key">Shared key<input value={f.global_key||''} placeholder="e.g. phone_number" onChange={e=>modifyMapField(mapping.id,f.key,{global_key:e.target.value})}/></label>}
+                      </div>
+                    </div>)}
+                    {!fields.length&&<p className="category-no-fields">No detected fields in this section.</p>}
+                  </div>
+                  {isStatic&&<div className="category-locked-note"><LockKeyhole size={14}/> This section is locked. Turn off Static to adjust links, heading levels or field behavior.</div>}
+                </div>}
               </section>
             })}
           </div>:<div className="category-upload-placeholder"><LayoutTemplate size={23}/><p>Upload or select an HTML template to detect all sections and editable fields.</p></div>}
