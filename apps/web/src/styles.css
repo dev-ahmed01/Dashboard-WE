@@ -1093,3 +1093,9 @@
   .seo-toggle-card{padding:13px}
   .template-delete-dialog{padding:22px}
 }
+
+.template-delete-error{
+  border:1px solid #eeb9bc;border-radius:9px;
+  padding:11px 12px;background:#fff3f3;
+  color:#a4242a;font-size:12px;line-height:1.55;
+}
