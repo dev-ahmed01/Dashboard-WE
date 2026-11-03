@@ -131,6 +131,7 @@ export default function App(){
   const [templateDragActive,setTemplateDragActive]=useState(false)
   const [deletingTemplate,setDeletingTemplate]=useState<Template|'all'|null>(null)
   const [deletePhrase,setDeletePhrase]=useState('')
+  const [deleteError,setDeleteError]=useState('')
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
@@ -199,15 +200,16 @@ export default function App(){
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
   function openDeleteDialog(target:Template|'all'){
-    setDeletingTemplate(target);setDeletePhrase('');setError('')
+    setDeletingTemplate(target);setDeletePhrase('');setDeleteError('')
   }
-  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeletePhrase('')}
+  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeletePhrase('');setDeleteError('')}
   async function confirmTemplateDeletion(){
-    if(!deletingTemplate)return
+    if(!deletingTemplate||busy)return
     const target=deletingTemplate
     const phrase=target==='all'?'DELETE ALL TEMPLATES':'DELETE '+target.name
     if(deletePhrase!==phrase)return
-    await action(async()=>{
+    setBusy(true);setDeleteError('');setError('')
+    try{
       const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
       const result=await api<{deleted:number;storage_cleanup_failed:number}>(endpoint,{
         method:'DELETE',body:json({confirmation:deletePhrase})
@@ -218,7 +220,9 @@ export default function App(){
       setDeletingTemplate(null);setDeletePhrase('')
       notify(result.deleted+' template'+(result.deleted===1?'':'s')+' deleted.'+
         (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage object(s) could not be removed.':''))
-    })
+    }catch(e){
+      setDeleteError(e instanceof Error?e.message:String(e))
+    }finally{setBusy(false)}
   }
   async function redetectTemplate(t:Template){
     if(!window.confirm('Re-detect sections from the saved HTML? Unsaved mapping changes will be discarded. Review and approve the detected fields again afterwards.'))return
@@ -705,6 +709,7 @@ export default function App(){
       <label>To confirm, type <strong>{deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name}</strong>
         <input autoFocus type="text" placeholder="Type the confirmation phrase" autoComplete="off" spellCheck={false} value={deletePhrase} onChange={e=>setDeletePhrase(e.target.value)}/>
       </label>
+      {deleteError&&<div className="template-delete-error" role="alert">{deleteError}</div>}
       <div className="button-group"><button type="button" className="outline" onClick={closeDeleteDialog} disabled={busy}>Cancel</button>
         <button type="submit" className="primary template-confirm-delete" disabled={busy||deletePhrase!==(deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name)}><Trash2 size={15}/> {busy?'Deleting…':'Delete permanently'}</button>
       </div>
