@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
@@ -26,7 +26,6 @@ async function html(path:string):Promise<string>{
 }
 const json=(o:unknown)=>JSON.stringify(o)
 const label=(k:string)=>k.replaceAll('_',' ')
-const prettyDate=(s:string)=>new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})
 
 export default function App(){
   const [user,setUser]=useState<{email:string;role:string}|null>(null)

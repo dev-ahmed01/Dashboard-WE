@@ -34,4 +34,4 @@ def metadata_html(html: str, title: str, slug: str, seo: dict, origin: str):
         {'@type':'ListItem','position':2,'name':title,'item':canonical},
     ]}
     script=soup.new_tag('script',type='application/ld+json');script.string=json.dumps(schema).replace('<','\\u003c');soup.head.append(script)
-    return '<!doctype html>\n'+str(soup)
+    return str(soup)

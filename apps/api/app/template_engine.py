@@ -37,10 +37,7 @@ def sanitize(source: str) -> BeautifulSoup:
                     del tag.attrs[key]
         if tag.name == 'a':
             tag['rel'] = 'noopener noreferrer'
-    return soup
-
-
-def label(node, i):
+    if soup.head:\n        charset = soup.new_tag('meta',charset='utf-8'); soup.head.append(charset)\n        viewport = soup.new_tag('meta'); viewport.attrs={'name':'viewport','content':'width=device-width,initial-scale=1'}; soup.head.append(viewport)\n    return soup\n\n\ndef label(node, i):
     text = ' '.join([str(node.get('id') or ''), *node.get('class', [])]).lower()
     for key, name in SECTION_NAMES.items():
         if key in text:
@@ -105,4 +102,4 @@ def render(source: str, fields: list, values: dict, global_values: dict, section
     if section_id:
         for sec in list(soup.find_all(attrs={'data-we-section':True})):
             if sec.get('data-we-section') != section_id: sec.decompose()
-    return '<!doctype html>\n' + str(soup)
+    return str(soup)
