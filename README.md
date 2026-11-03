@@ -1,4 +1,4 @@
-# Workspace by Emlen — Page Manager V10
+# Workspace by Emlen — Page Manager V11
 
 Production-oriented, self-hostable **template CMS + SEO manager**. Frontend and backend are independently maintained; database and media are externalized. This repository contains no client passwords, production customer data or live-site publishing credentials.
 
@@ -27,13 +27,15 @@ Do not publish ports 5432 or 9000 to the internet. Configure off-host backups fo
 1. **Upload Template**: Upload an approved `.html` file. The importer finds actual `<section>` containers. It strips scripts/event handlers from untrusted HTML. All detected text/image fields start **Static**.
 2. **Templates**: Admins label fields *Static*, *Page variable*, or *Shared global*. Global fields point at an approved shared key. Approve the template only after reviewing its mapping.
 3. **Add Page**: Enter the page name → choose approved template → Continue. The app creates a draft.
-4. **Editor**: Only page-variable fields appear. Configure the SEO title, description, Index/Noindex, Follow/Nofollow, canonical override and slug. The full-page preview is sandboxed and noindexed.
+4. **Editor**: Only page-variable fields appear. Configure the SEO title, description, Index/Noindex, Follow/Nofollow, canonical override and slug. Full-page and section preview use the **current unsaved form** without changing the database or live site. A dirty-state badge and navigation warning protect unsaved changes; revision checks return HTTP 409 rather than overwrite another editor's work.
 5. **Publish**: An admin explicitly creates an immutable local publication snapshot. Future draft edits do not change that snapshot. URL changes can produce a 301 redirect.
-6. **SEO**: Published eligible pages appear in `sitemap.xml`. Previews are not indexed. Breadcrumb JSON-LD and canonical/robots tags are generated automatically.
+6. **SEO**: Only the **latest published metadata snapshot** determines entries in `sitemap.xml`, not unpublished draft SEO. Previews are noindexed. Breadcrumb JSON-LD and canonical/robots tags are generated automatically. Conflicting redirect sources are rejected.
+7. **Media Library**: Image upload retains multipart alt text; existing media alt text can be edited without reuploading.
+8. **Archived Drafts**: Admins can archive and restore unpublished drafts. The API prevents archiving published pages since this app does not implement a safe unpublish operation.
 
 ## Team access
 
-The first admin is bootstrapped from environment variables. Administrators can create distinct editor/admin accounts under **Team Access**; editors cannot publish, alter template field permissions, manage redirects or create users. Passwords use Argon2id hashes. Users can rotate passwords through `POST /api/auth/change-password` (a UI flow can be added later). Login requests are rate-limited in the provided Nginx configuration.
+The first admin is bootstrapped from environment variables. Administrators can create distinct editor/admin accounts under **Team Access**; editors cannot publish, alter template field permissions, manage redirects or create users. Passwords use Argon2id hashes. Users can change their passwords in the admin UI; password changes, administrator resets and account deactivation invalidate prior access tokens. Existing Administrator and Editor permissions are unchanged. Login requests are rate-limited in the provided Nginx configuration.
 
 ## What is intentionally not yet connected
 
@@ -72,3 +74,17 @@ compose.yaml            PostgreSQL + MinIO + API + Web
 ```
 
 The client can self-host on a VPS with one Compose stack initially. Scale the API/worker tier and move Postgres/object storage to managed providers if concurrency or durability needs increase. The storage API remains S3-compatible.
+
+## V11 quality fixes (non-role-changing)
+
+- Fixed five confirmed V10 defects: draft SEO leaking into sitemap, redirect shadowing, concurrent edits, token revocation and media alt text.
+- Mapping UI now groups fields by section, supports meaningful editable labels, and displays a selectable field highlight in a sandboxed template preview. HTML authors can add `data-we-section="hero"`, `data-we-name="Hero"`, `data-we-field="hero_heading"`, and `data-we-label="Heading"` for stable section/field names. These are optional; the existing structural parser remains as fallback.
+- Page editor previews unsaved values using `POST /api/pages/{id}/preview` and does not persist those changes. `PUT` requires `edit_version`; outdated requests fail with `409`. Consumers of the API must send the latest edit_version and reload on conflict.
+- Published pages with saved but not republished changes display `Published · Unpublished changes`, and appear in the Saved Drafts view.
+- Team account status and reset-password operations are under **existing admin privileges**, and all users can rotate their own passwords. No Reviewer role, approval handoff, or role hierarchy changes are introduced.
+- Local publish button explicitly says **Publish locally**. WordPress is still not integrated.
+- Alembic migration `0002` supports existing V10 databases and clean installations; **back up the database before upgrading**. For previously published records, sitemap logic reads robots metadata from stored HTML because old rows have no SEO JSON snapshot.
+
+### Verification and remaining limits
+
+Backend automated tests: `cd apps/api && python -m pytest -q`. The suite includes the formerly failing cases and standalone V11 regression scenarios. Frontend CI builds through GitHub Actions (`npm run build`). Real multiuser browser/UAT, PostgreSQL+MinIO deployment, restore drills, and live WordPress integration still require staging verification before production.
