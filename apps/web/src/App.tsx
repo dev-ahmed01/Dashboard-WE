@@ -47,8 +47,11 @@ export default function App(){
   const [oldPassword,setOldPassword]=useState('')
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
-  const [selectedSection,setSelectedSection]=useState('')
-  const [editSEO,setEditSEO]=useState(false)
+  const [collapsedSections,setCollapsedSections]=useState<string[]>([])
+  const [inlinePreview,setInlinePreview]=useState('')
+  const [inlinePreviewError,setInlinePreviewError]=useState('')
+  const [inlinePreviewLoading,setInlinePreviewLoading]=useState(false)
+  const [previewRefresh,setPreviewRefresh]=useState(0)
   const [newName,setNewName]=useState('')
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
   const [uploaded,setUploaded]=useState<Template|null>(null)
@@ -72,8 +75,21 @@ export default function App(){
   const [filter,setFilter]=useState<'All'|'Published'|'Draft'>('All')
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
+  const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
+  useEffect(()=>{
+    if(!editor||!previewPayload){setInlinePreview('');setInlinePreviewError('');setInlinePreviewLoading(false);return}
+    let cancelled=false
+    setInlinePreviewLoading(true)
+    const timer=window.setTimeout(()=>{
+      html(`/api/pages/${editor.page.id}/preview`,JSON.parse(previewPayload))
+        .then(content=>{if(!cancelled){setInlinePreview(content);setInlinePreviewError('')}})
+        .catch(e=>{if(!cancelled)setInlinePreviewError(e instanceof Error?e.message:String(e))})
+        .finally(()=>{if(!cancelled)setInlinePreviewLoading(false)})
+    },450)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
+  },[editor?.page.id,previewPayload,previewRefresh])
   useEffect(()=>{if(!mappingId)return;let active=true;const query=focusField?'?focus_field='+encodeURIComponent(focusField):'';html(`/api/templates/${mappingId}/preview${query}`).then(r=>{if(active)setMapPreview(r)}).catch(e=>{if(active)showError(e)});return()=>{active=false}},[mappingId,focusField])
 
   async function refresh(){
@@ -91,7 +107,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({email:loginEmail,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setSelectedSection(data.template.sections[0]?.id||'');setEditSEO(false)})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([])})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
@@ -114,7 +130,7 @@ export default function App(){
   })}
   async function publishPage(){if(!editor)return;
     const p=editor.page
-    if(!p.seo.seo_title?.trim()||!p.seo.description?.trim()){setEditSEO(true);showError('Before publishing, add a page SEO title and meta description.');return}
+    if(!p.seo.seo_title?.trim()||!p.seo.description?.trim()){document.getElementById('seo-settings')?.scrollIntoView({behavior:'smooth',block:'start'});showError('Before publishing, add a page SEO title and meta description.');return}
     if(!window.confirm('Publish this version to the LOCAL CMS preview only? The WordPress website will NOT be updated.'))return
     await action(async()=>{
       if(dirty){const saved=await api<Page>(`/api/pages/${p.id}`,{method:'PUT',body:json({title:p.title,slug:p.slug,values:p.values,seo:p.seo,edit_version:p.edit_version})});setEditor(prev=>prev?{...prev,page:saved}:prev);setSavedPage(structuredClone(saved))}
@@ -153,10 +169,49 @@ export default function App(){
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
   {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
-  <div className="editor-layout"><div className="section-list"><strong>PAGE SECTIONS</strong><button className={`section-nav ${editSEO?'active':''}`} onClick={()=>setEditSEO(true)}>SEO Settings</button>{editor.template.sections.map((s,i)=><button key={s.id} className={`section-nav ${!editSEO&&selectedSection===s.id?'active':''}`} onClick={()=>{setSelectedSection(s.id);setEditSEO(false)}}><span className="index">{String(i+1).padStart(2,'0')}</span>{s.name}</button>)}</div>
-  <div className="edit-panel">{editSEO?<><div className="panel-heading"><div><div className="small-label">SEARCH APPEARANCE</div><h2>SEO Settings</h2></div></div><div className="form-stack"><div className="preflight"><strong>Publication checklist (local CMS)</strong><span className={editor.page.seo.seo_title?.trim()?'ok':'missing'}>{editor.page.seo.seo_title?.trim()?'✓':'!'} SEO title</span><span className={editor.page.seo.description?.trim()?'ok':'missing'}>{editor.page.seo.description?.trim()?'✓':'!'} Meta description</span><span className="note">Draft changes never affect published pages until you click Publish locally.</span></div>{publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}<label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label>Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label><label>URL slug<input value={editor.page.slug} onChange={e=>changePage({slug:e.target.value})}/></label><div className="two-col"><div className="switch-block"><strong>Search indexing</strong><div className="segment"><button className={!editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:false})}>Index</button><button className={editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:true})}>Noindex</button></div></div><div className="switch-block"><strong>Link following</strong><div className="segment"><button className={!editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:false})}>Follow</button><button className={editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:true})}>Nofollow</button></div></div></div><label>Canonical override (optional)<input value={editor.page.seo.canonical_override||''} onChange={e=>changeSEO({canonical_override:e.target.value})} placeholder="Automatic self-canonical"/></label><div className="search-preview"><span>Search result preview</span><small>workspacebyemlen.co.in › {editor.page.slug}</small><h3>{editor.page.seo.seo_title||editor.page.title}</h3><p>{editor.page.seo.description||'Add a meta description to preview the search snippet.'}</p></div></div></>:<><div className="panel-heading"><div><div className="small-label">SECTION EDITOR</div><h2>{editor.template.sections.find(x=>x.id===selectedSection)?.name}</h2></div><button className="outline compact" onClick={()=>fullPreview(selectedSection)} disabled={busy}>Preview section <ArrowUpRight size={15}/></button></div>
-  {editor.template.fields.filter(f=>f.section_id===selectedSection&&f.mode==='page').length===0?<div className="locked-section"><ShieldCheck size={28}/><h3>This section is reusable and locked.</h3><p>There are no page-variable fields here. An administrator can change the template field mapping in Templates.</p></div>:<div className="form-stack">{editor.template.fields.filter(f=>f.section_id===selectedSection&&f.mode==='page').map(f=><label key={f.key}>{f.label}{f.kind==='textarea'?<textarea rows={4} value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)}/>:<input value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)} type="text"/>}{f.kind==='image'&&<small>Image URL. Upload media in the Media Library to get a reusable URL.</small>}</label>)}</div>}</>}
-  </div></div></>:
+  <div className="editor-layout editor-flow">
+    <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
+      <div className="panel-heading">
+        <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Only fields approved as page-variable can be changed. The original HTML layout stays intact.</p></div>
+        <span className="editor-field-total">{editor.template.fields.filter(f=>f.mode==='page').length} editable fields</span>
+      </div>
+      <div className="editor-section-rows">
+        {editor.template.sections.map((section,i)=>{
+          const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
+          const collapsed=collapsedSections.includes(section.id)
+          return <div className="editor-section-block" key={section.id}>
+            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>setCollapsedSections(prev=>prev.includes(section.id)?prev.filter(id=>id!==section.id):[...prev,section.id])}>
+              <span className="editor-section-no">{String(i+1).padStart(2,'0')}</span>
+              <span className="editor-section-name"><strong>{section.name}</strong><small>{fields.length?`${fields.length} editable field${fields.length===1?'':'s'}`:'Fixed content · reused from template'}</small></span>
+              {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
+              <ChevronRight size={17} className={`section-chevron ${collapsed?'':'expanded'}`}/>
+            </button>
+            {!collapsed&&fields.length>0&&<div className="editor-fields-grid">{fields.map(f=><label key={f.key} className={f.kind==='textarea'||f.kind==='image'?'wide-field':''}>{f.label}{f.kind==='textarea'?<textarea rows={4} value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)}/>:<input value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)} type="text"/>}{f.kind==='image'&&<small>Image URL · Upload the asset in Media Library first.</small>}</label>)}</div>}
+          </div>
+        })}
+      </div>
+    </section>
+
+    <section className="edit-panel editor-seo-panel" id="seo-settings" aria-labelledby="seo-heading">
+      <div className="panel-heading"><div><div className="small-label">02 / SEARCH</div><h2 id="seo-heading">SEO Settings</h2><p>Set the information search engines use for this page.</p></div></div>
+      <div className="form-stack seo-form-stack">
+        <div className="preflight"><strong>Publication checklist (local CMS)</strong><span className={editor.page.seo.seo_title?.trim()?'ok':'missing'}>{editor.page.seo.seo_title?.trim()?'✓':'!'} SEO title</span><span className={editor.page.seo.description?.trim()?'ok':'missing'}>{editor.page.seo.description?.trim()?'✓':'!'} Meta description</span><span className="note">Draft changes never affect published pages until you click Publish locally.</span></div>
+        {publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}
+        <div className="seo-primary-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label>URL slug<input value={editor.page.slug} onChange={e=>changePage({slug:e.target.value})}/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
+        <div className="two-col"><div className="switch-block"><strong>Search indexing</strong><div className="segment"><button className={!editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:false})}>Index</button><button className={editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:true})}>Noindex</button></div></div><div className="switch-block"><strong>Link following</strong><div className="segment"><button className={!editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:false})}>Follow</button><button className={editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:true})}>Nofollow</button></div></div></div>
+        <label>Canonical override (optional)<input value={editor.page.seo.canonical_override||''} onChange={e=>changeSEO({canonical_override:e.target.value})} placeholder="Automatic self-canonical"/></label>
+        <div className="search-preview"><span>Search result preview</span><small>workspacebyemlen.co.in › {editor.page.slug}</small><h3>{editor.page.seo.seo_title||editor.page.title}</h3><p>{editor.page.seo.description||'Add a meta description to preview the search snippet.'}</p></div>
+      </div>
+    </section>
+
+    <section className="edit-panel editor-preview-panel" id="page-preview" aria-labelledby="preview-heading">
+      <div className="panel-heading"><div><div className="small-label">03 / RESULT</div><h2 id="preview-heading">Page Preview</h2><p>See the full page below. Content and SEO edits appear here automatically without saving.</p></div><div className="button-group"><button className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)} disabled={inlinePreviewLoading}>Refresh preview</button><button className="outline compact" onClick={()=>fullPreview()} disabled={busy}>Expand preview <ArrowUpRight size={15}/></button></div></div>
+      <div className="inline-preview-bar"><span aria-live="polite">{inlinePreviewLoading?'Updating preview…':inlinePreviewError?'Preview unavailable':'Preview is up to date'}</span><span>Desktop · Full page · Draft only</span></div>
+      <div className="inline-preview-frame">{inlinePreview&&<iframe title="Inline page preview" sandbox="" srcDoc={inlinePreview}/>}{!inlinePreview&&<div className="inline-preview-empty">{inlinePreviewLoading?'Generating page preview…':inlinePreviewError||'Preparing preview…'}</div>}</div>
+      {inlinePreviewError&&<div className="inline-preview-error" role="alert">{inlinePreviewError} <button className="quiet-action" onClick={()=>setPreviewRefresh(n=>n+1)}>Try again</button></div>}
+      <div className="editor-preview-foot"><span>Preview changes are not published to WordPress.</span><div className="button-group"><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+    </section>
+  </div></>:
   <>
   {nav==='Category'&&<><div className="page-top"><div><div className="small-label">CONTENT MANAGEMENT</div><h1>Category</h1><p>Manage reusable website pages from approved templates.</p></div></div><div className="tabs">{(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>
   {tab==='All Pages'&&<><div className="toolbar"><h2>All Pages <span className="count">{pages.length}</span></h2><div className="filter-row">{(['All','Published','Draft'] as const).map(x=><button className={filter===x?'active':''} onClick={()=>setFilter(x)} key={x}>{x}</button>)}</div></div><div className="list-table"><div className="list-header"><span>No.</span><span>Page name</span><span>Template</span><span>Status</span><span>Action</span></div>{visiblePages.map((p,i)=><div className="list-row" key={p.id}><span className="number">{String(i+1).padStart(2,'0')}</span><strong>{p.title}</strong><span>{templates.find(t=>t.id===p.template_id)?.name||'Template unavailable'}</span><span><span className={`status ${p.status}`}>{p.has_unpublished_changes?'Published · Draft changes':p.status}</span></span><div className="row-actions"><button className="row-action" onClick={()=>openPage(p)}>Edit <ArrowUpRight size={16}/></button>{user.role==='admin'&&!p.published_version&&<button className="quiet-action" onClick={()=>action(async()=>{if(!window.confirm(`Archive ${p.title}? This hides it from the page list.`))return;await api(`/api/pages/${p.id}/archive`,{method:'POST'});await refresh();notify('Page archived')})}>Archive</button>}</div></div>)}{!visiblePages.length&&<div className="empty">No pages found. Create your first page from an uploaded template.</div>}</div></>}

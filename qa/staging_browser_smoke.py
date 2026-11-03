@@ -63,30 +63,38 @@ def run():
         page.locator(".add-page .template-row").first.click()
         page.get_by_role("button", name="Continue to editor").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
+        expect(page.locator("#section-editing")).to_be_visible()
+        expect(page.locator("#seo-settings")).to_be_visible()
+        expect(page.locator("#page-preview")).to_be_visible()
+        positions = [page.locator(f"#{name}").bounding_box() for name in ("section-editing", "seo-settings", "page-preview")]
+        assert all(position is not None for position in positions), "Editor panels must be rendered"
+        assert positions[0]["y"] < positions[1]["y"] < positions[2]["y"], "Expected content, SEO, then preview"
+        assert positions[0]["width"] > page.locator(".content").bounding_box()["width"] * .75, "Editor must fill available width"
         page.screenshot(path=str(OUT/"03_page_editor.png"))
-        page.locator(".form-stack input").first.fill("Unsaved QA Hero")
+        page.locator(".editor-fields-grid input").first.fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
+        expect(page.frame_locator('iframe[title="Inline page preview"]').get_by_text("Unsaved QA Hero")).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
         frame = page.frame_locator('iframe[title="Website preview"]')
         expect(frame.get_by_text("Unsaved QA Hero")).to_be_visible(timeout=12000)
         page.screenshot(path=str(OUT/"04_unsaved_preview.png"))
         page.get_by_role("button", name="Close preview").click()
-        page.get_by_role("button", name="Save draft").click()
+        page.locator(".page-top").get_by_role("button", name="Save draft").click()
         expect(page.get_by_text("Draft changes saved", exact=False)).to_be_visible()
 
         # Publishing with SEO data: draft changes must not leak into already-published sitemap.
-        page.locator(".section-nav").filter(has_text="SEO Settings").click()
+        page.locator("#seo-settings").scroll_into_view_if_needed()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
         page.get_by_role("button", name="Index", exact=True).click()
-        page.get_by_role("button", name="Publish locally").click()
+        page.locator(".page-top").get_by_role("button", name="Publish locally").click()
         expect(page.get_by_text("Published to the local CMS only", exact=False)).to_be_visible(timeout=15000)
         sitemap = httpx.get(API+"/sitemap.xml").text
         assert "qa-bengaluru-office" in sitemap, sitemap[:500]
         page.screenshot(path=str(OUT/"05_published.png"))
         page.get_by_role("button", name="Noindex").click()
-        page.get_by_role("button", name="Save draft").click()
+        page.locator(".page-top").get_by_role("button", name="Save draft").click()
         assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
 
         # Editor: existing role restrictions unchanged (no uploading or publishing).
