@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
-type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null}
+type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
 type Section={id:string;name:string;order:number}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;canonical_override:string;og_title?:string;og_description?:string}
@@ -133,9 +133,31 @@ export default function App(){
     const t=await api<Template>(`/api/templates/import?${params}`,{method:'POST',body:form});setUploaded(t);setMappingId(t.id);await refresh();notify(`${t.sections.length} structural sections detected. Fields are static until you approve their mapping.`)
   })}
   async function saveMapping(t:Template){await action(async()=>{
-    const updated=await api<Template>(`/api/templates/${t.id}/mapping`,{method:'PUT',body:json({fields:t.fields.map(f=>({key:f.key,label:f.label,mode:f.mode,global_key:f.mode==='global'?f.global_key:null})),sections:t.sections,approved:t.approved})})
-    setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u);notify('Template mapping saved. Only page-variable fields will appear in page editing.')
+    const updated=await api<Template>(`/api/templates/${t.id}/mapping`,{method:'PUT',body:json({
+      fields:t.fields.map(f=>({
+        key:f.key,label:f.label,mode:f.mode,global_key:f.mode==='global'?f.global_key:null,
+        ...(f.tag&&/^h[1-6]$/.test(f.tag)?{heading_tag:f.heading_tag||f.tag}:{}),
+        ...(['link','icon'].includes(f.kind)?{default:f.default}:{})
+      })),
+      sections:t.sections,approved:t.approved
+    })})
+    setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u)
+    notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
+  async function redetectTemplate(t:Template){
+    if(!window.confirm('Re-detect sections from the saved HTML? Unsaved mapping changes will be discarded. Review and approve the detected fields again afterwards.'))return
+    await action(async()=>{
+      const updated=await api<Template>(`/api/templates/${t.id}/redetect`,{method:'POST'})
+      setTemplates(items=>items.map(item=>item.id===t.id?updated:item))
+      setUploaded(updated);setMappingId(updated.id);setFocusField('')
+      notify(`${updated.sections.length} sections and ${updated.fields.length} fields detected. Review the mapping and approve the template.`)
+    })
+  }
+  function setWholeSectionMode(templateId:number,sectionId:string,mode:'static'|'page'){
+    setTemplates(items=>items.map(t=>t.id===templateId?{...t,fields:t.fields.map(f=>
+      f.section_id===sectionId?{...f,mode,global_key:null}:f
+    )}:t))
+  }
   async function savePage(){if(!editor)return;await action(async()=>{
     const p=editor.page
     const result=await api<Page>(`/api/pages/${p.id}`,{method:'PUT',body:json({title:p.title,slug:p.slug,values:p.values,seo:p.seo,edit_version:p.edit_version})})
@@ -288,7 +310,12 @@ export default function App(){
               {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
               <ChevronRight size={17} className={`section-chevron ${collapsed?'':'expanded'}`}/>
             </button>
-            {!collapsed&&fields.length>0&&<div className="editor-fields-grid">{fields.map(f=><label key={f.key} className={f.kind==='textarea'||f.kind==='image'?'wide-field':''}>{f.label}{f.kind==='textarea'?<textarea rows={4} value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)}/>:<input value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)} type="text"/>}{f.kind==='image'&&<small>Image URL · Upload the asset in Media Library first.</small>}</label>)}</div>}
+            {!collapsed&&fields.length>0&&<div className="editor-fields-grid">{fields.map(f=><label key={f.key} className={f.kind==='textarea'||f.kind==='image'||f.kind==='link'?'wide-field':''}>
+              {f.label}{f.kind==='textarea'?<textarea rows={4} value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)}/>:<input value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)} type="text" placeholder={f.kind==='link'?'https://, /contact/, #section, mailto: or tel:':f.kind==='icon'?'Icon class or icon image URL':undefined}/>}
+              {f.kind==='image'&&<small>Image URL · Select an uploaded image or use an allowed image URL.</small>}
+              {f.kind==='link'&&<small>Button destination · use https://, /path, #anchor, mailto: or tel:</small>}
+              {f.kind==='icon'&&<small>{f.attr==='icon_src'?'SVG icon replacement · enter an image URL':'Icon class names · e.g. fa fa-check'}</small>}
+            </label>)}</div>}
           </div>
         })}
       </div>
