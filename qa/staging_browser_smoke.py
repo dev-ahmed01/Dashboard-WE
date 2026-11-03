@@ -67,7 +67,7 @@ def run():
         page.locator(".form-stack input").first.fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
         page.get_by_role("button", name="Full-page preview").click()
-        expect(page.get_by_text("Full-page preview", exact=True)).to_be_visible()
+        expect(page.locator(".preview-modal")).to_be_visible()
         frame = page.frame_locator('iframe[title="Website preview"]')
         expect(frame.get_by_text("Unsaved QA Hero")).to_be_visible(timeout=12000)
         page.screenshot(path=str(OUT/"04_unsaved_preview.png"))
