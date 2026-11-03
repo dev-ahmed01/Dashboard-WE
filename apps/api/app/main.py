@@ -3,16 +3,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import PurePath
+from urllib.parse import urlsplit
 from uuid import uuid4
 from xml.sax.saxutils import escape as xml_escape
 import json
 import re
 
-from fastapi import FastAPI, Depends, File, UploadFile, HTTPException, Response, status
+from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, or_
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -51,7 +52,9 @@ def template_json(t: Template):
 
 
 def page_json(p: Page):
-    return {'id':p.id,'template_id':p.template_id,'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat()}
+    return {'id':p.id,'template_id':p.template_id,'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat(),
+            'edit_version':p.edit_version,'archived':p.archived,
+            'has_unpublished_changes':bool(p.published_version and p.edit_version>p.published_edit_version)}
 
 
 def globals_dict(db):
@@ -131,9 +134,42 @@ def change_password(payload:ChangePassword,db:Session=Depends(get_db),user:User=
     from .security import hash_password,verify_password
     if not verify_password(payload.old_password,user.password_hash):fail(403,'Current password is incorrect')
     user.password_hash=hash_password(payload.new_password)
+    user.auth_version += 1  # Invalidates every previously issued bearer token.
     audit(db,user,'password_changed',str(user.id))
     db.commit()
-    return {'ok':True}
+    return {'ok':True,'message':'Password changed. Please sign in again; previous sessions have expired.'}
+
+
+class UserStatusUpdate(BaseModel):
+    active:bool
+
+
+@app.patch('/api/users/{user_id}/status')
+def change_team_status(user_id:int,payload:UserStatusUpdate,db:Session=Depends(get_db),actor:User=Depends(admin)):
+    target=db.get(User,user_id)
+    if not target:fail(404,'User not found')
+    if target.id==actor.id and not payload.active:fail(409,'You cannot deactivate your own account')
+    if target.active!=payload.active:
+        target.active=payload.active;target.auth_version+=1
+    audit(db,actor,'user_status',str(target.id),{'active':target.active})
+    db.commit()
+    return {'id':target.id,'email':target.email,'active':target.active}
+
+
+class AdminResetPassword(BaseModel):
+    new_password:str=Field(min_length=12,max_length=256)
+
+
+@app.post('/api/users/{user_id}/reset-password')
+def admin_reset_password(user_id:int,payload:AdminResetPassword,db:Session=Depends(get_db),actor:User=Depends(admin)):
+    from .security import hash_password
+    target=db.get(User,user_id)
+    if not target:fail(404,'User not found')
+    target.password_hash=hash_password(payload.new_password)
+    target.auth_version+=1
+    audit(db,actor,'user_password_reset',str(user_id))
+    db.commit()
+    return {'ok':True,'message':'Password reset. Existing sessions revoked.'}
 
 
 @app.get('/api/overview')
@@ -205,10 +241,25 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
 
 
 @app.get('/api/templates/{template_id}/preview',response_class=HTMLResponse)
-def template_preview(template_id:int,db:Session=Depends(get_db),_:User=Depends(current_user)):
+def template_preview(template_id:int,focus_field:str|None=None,db:Session=Depends(get_db),_:User=Depends(current_user)):
     t=get_template(db,template_id)
     src=ObjectStore().get(t.object_key).decode('utf-8')
-    return HTMLResponse(render(src,t.fields,{},globals_dict(db)),headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+    output=render(src,t.fields,{},globals_dict(db))
+    if focus_field:
+        if focus_field not in {f['key'] for f in t.fields}:fail(404,'Unknown field')
+        from bs4 import BeautifulSoup
+        soup=BeautifulSoup(output,'html.parser')
+        highlight=soup.find(attrs={'data-we-field':focus_field})
+        if highlight:
+            styles=soup.new_tag('style');styles.string='[data-we-qa-focus]{outline:4px solid #ed2024!important;outline-offset:3px!important;background:rgba(255,185,0,.2)!important;scroll-margin-top:140px!important}'
+            soup.head.append(styles)
+            highlight['data-we-qa-focus']='1'
+            section=next((f['section_id'] for f in t.fields if f['key']==focus_field),None)
+            if section:
+                for other in list(soup.find_all(attrs={'data-we-section': True})):
+                    if other.get('data-we-section')!=section:other.decompose()
+            output=str(soup)
+    return HTMLResponse(output,headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
 
 
 class NewPage(BaseModel):
@@ -222,7 +273,8 @@ def create_page(payload:NewPage,db:Session=Depends(get_db),user:User=Depends(cur
     if not t.approved:fail(409,'Approve the template field mapping before creating pages')
     base=re.sub(r'[^a-z0-9]+','-',payload.name.lower()).strip('-') or 'page'
     slug=base;i=2
-    while db.scalar(select(Page.id).where(Page.slug==slug)):
+    while (db.scalar(select(Page.id).where(Page.slug==slug)) or db.scalar(select(Redirect.id).where(Redirect.from_path==slug))
+           or db.scalar(select(Publication.id).where(Publication.slug==slug))):
         slug=f'{base}-{i}';i+=1
     p=Page(template_id=t.id,title=payload.name.strip(),slug=slug,values={},template_snapshot={**template_json(t),'object_key':t.object_key},
            seo={'seo_title':'','description':'','noindex':True,'nofollow':False,'canonical_override':''},status='draft')
@@ -233,8 +285,9 @@ def create_page(payload:NewPage,db:Session=Depends(get_db),user:User=Depends(cur
 
 
 @app.get('/api/pages')
-def list_pages(status:str|None=None,db:Session=Depends(get_db),_:User=Depends(current_user)):
+def list_pages(status:str|None=None,include_archived:bool=False,db:Session=Depends(get_db),_:User=Depends(current_user)):
     query=select(Page).order_by(Page.updated_at.desc())
+    if not include_archived:query=query.where(Page.archived==False)
     if status in ('draft','published'):query=query.where(Page.status==status)
     return [page_json(p) for p in db.scalars(query).all()]
 
@@ -245,23 +298,49 @@ def read_page(page_id:int,db:Session=Depends(get_db),_:User=Depends(current_user
     return {'page':page_json(p),'template':p.template_snapshot or template_json(get_template(db,p.template_id))}
 
 
+@app.post('/api/pages/{page_id}/archive')
+def archive_page(page_id:int,db:Session=Depends(get_db),user:User=Depends(admin)):
+    p=get_page(db,page_id)
+    if p.published_version:fail(409,'Published pages cannot be archived while live; an explicit unpublish workflow is required')
+    p.archived=True
+    audit(db,user,'page_archive',str(p.id))
+    db.commit()
+    return {'ok':True,'page_id':p.id}
+
+
+@app.post('/api/pages/{page_id}/restore')
+def restore_page(page_id:int,db:Session=Depends(get_db),user:User=Depends(admin)):
+    p=get_page(db,page_id)
+    p.archived=False
+    audit(db,user,'page_restore',str(p.id))
+    db.commit()
+    return {'ok':True,'page_id':p.id}
+
+
 class PageUpdate(BaseModel):
+    edit_version:int = Field(ge=1, description="Current revision returned by the page API, required to prevent lost edits")
     title:str|None=None
     slug:str|None=None
     values:dict|None=None
     seo:dict|None=None
 
 
-@app.put('/api/pages/{page_id}')
-def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:User=Depends(current_user)):
-    p=get_page(db,page_id);t=p.template_snapshot or template_json(get_template(db,p.template_id))
-    if payload.title is not None:p.title=payload.title.strip()[:200] or p.title
+def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
+    """Validate and construct a proposed page without modifying the stored record."""
+    t=p.template_snapshot or template_json(get_template(db,p.template_id))
+    changes={}
+    if payload.title is not None:changes['title']=payload.title.strip()[:200] or p.title
     if payload.slug is not None:
         try:slug=safe_slug(payload.slug)
         except ValueError as exc:fail(422,str(exc))
-        conflict=db.scalar(select(Page.id).where(Page.slug==slug,Page.id!=page_id))
-        if conflict:fail(409,'URL already used by another page')
-        p.slug=slug
+        if db.scalar(select(Page.id).where(Page.slug==slug,Page.id!=p.id)):
+            fail(409,'URL already used by another page')
+        if db.scalar(select(Redirect.id).where(Redirect.from_path==slug)):
+            fail(409,'URL is reserved by an existing redirect')
+        # A previous publication from a different page must also remain reserved.
+        if db.scalar(select(Publication.id).where(Publication.slug==slug,Publication.page_id!=p.id)):
+            fail(409,'URL is already associated with a published page')
+        changes['slug']=slug
     if payload.values is not None:
         allowed={f['key']:f for f in t['fields'] if f['mode']=='page'}
         if not set(payload.values).issubset(allowed):fail(422,'Attempted to change static or shared template fields')
@@ -270,26 +349,54 @@ def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:Use
             if not isinstance(value,str) or len(value)>3000:fail(422,'Values must be text under 3000 characters')
             if allowed[key]['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
             newvals[key]=value
-        p.values=newvals
+        changes['values']=newvals
     if payload.seo is not None:
         allowed={'seo_title','description','noindex','nofollow','canonical_override','og_title','og_description'}
         if not set(payload.seo).issubset(allowed):fail(422,'Unexpected SEO field')
-        updated=dict(p.seo or {})
+        seo=dict(p.seo or {})
         for k,v in payload.seo.items():
             if k in ('noindex','nofollow') and not isinstance(v,bool):fail(422,'Robots settings must be booleans')
             if k not in ('noindex','nofollow') and (not isinstance(v,str) or len(v)>500):fail(422,'SEO text is too long')
-            updated[k]=v
-        p.seo=updated
-    p.updated_at=utcnow()
-    audit(db,user,'page_save',str(p.id))
-    db.commit();db.refresh(p)
-    return page_json(p)
+            seo[k]=v
+        changes['seo']=seo
+    return changes
 
+
+@app.put('/api/pages/{page_id}')
+def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:User=Depends(current_user)):
+    p=get_page(db,page_id)
+    if p.archived:fail(409,'Restore this page before editing it')
+    if p.edit_version!=payload.edit_version:fail(409,'This page changed since you opened it. Reload to see the latest version before saving.')
+    changes=validated_page_changes(p,payload,db)
+    # Atomic compare-and-set: simultaneous writers cannot overwrite stale revisions.
+    result=db.execute(update(Page).where(Page.id==page_id,Page.edit_version==payload.edit_version)
+        .values(**changes,edit_version=Page.edit_version+1,updated_at=utcnow()).execution_options(synchronize_session=False))
+    if result.rowcount!=1:
+        db.rollback();fail(409,'Another editor saved changes. Reload the page and compare before saving.')
+    audit(db,user,'page_save',str(page_id))
+    db.commit();db.expire_all()
+    return page_json(get_page(db,page_id))
 
 def compiled(db,p:Page,section_id=None):
     t=p.template_snapshot or {**template_json(get_template(db,p.template_id)),'object_key':get_template(db,p.template_id).object_key}
     source=ObjectStore().get(t['object_key']).decode('utf-8')
-    return render(source,t['fields'],p.values or {},globals_dict(db),section_id)
+    output=render(source,t['fields'],p.values or {},globals_dict(db),section_id)
+    # Media selection in page-variable image fields retains the actual media
+    # record's alternative text. Published HTML stays immutable after snapshot.
+    if '/api/media/' in output:
+        from bs4 import BeautifulSoup
+        soup=BeautifulSoup(output,'html.parser')
+        changed=False
+        for img in soup.find_all('img',src=True):
+            path=urlsplit(img.get('src','')).path
+            m=re.fullmatch(r'/api/media/(\d+)/content',path)
+            if not m:continue
+            media=db.get(Media,int(m.group(1)))
+            if media:
+                img['alt']=media.alt_text
+                changed=True
+        if changed:output=str(soup)
+    return output
 
 
 @app.get('/api/pages/{page_id}/preview',response_class=HTMLResponse)
@@ -301,10 +408,32 @@ def page_preview(page_id:int,section_id:str|None=None,db:Session=Depends(get_db)
       'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
 
 
+@app.post('/api/pages/{page_id}/preview',response_class=HTMLResponse)
+def preview_unsaved(page_id:int,payload:PageUpdate,section_id:str|None=None,
+                  db:Session=Depends(get_db),_:User=Depends(current_user)):
+    """Preview current editor state without a write or public-indexable response."""
+    p=get_page(db,page_id)
+    if p.edit_version!=payload.edit_version:fail(409,'This page has changed. Reload before previewing your edits.')
+    changes=validated_page_changes(p,payload,db)
+    t=p.template_snapshot or template_json(get_template(db,p.template_id))
+    if section_id and section_id not in {x['id'] for x in t['sections']}:fail(404,'Unknown section')
+    from types import SimpleNamespace
+    draft=SimpleNamespace(template_id=p.template_id,template_snapshot=p.template_snapshot,
+                          values=changes.get('values',p.values or {}))
+    rendered=compiled(db,draft,section_id)
+    if not section_id:
+        try:
+            rendered=metadata_html(rendered,changes.get('title',p.title),changes.get('slug',p.slug),changes.get('seo',p.seo or {}),get_settings().public_site_url)
+        except ValueError as exc:fail(422,str(exc))
+    return HTMLResponse(rendered,headers={'X-Robots-Tag':'noindex, nofollow',
+      'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+
+
 @app.post('/api/pages/{page_id}/publish')
 def publish(page_id:int,db:Session=Depends(get_db),user:User=Depends(admin)):
     p=get_page(db,page_id)
     t=p.template_snapshot or template_json(get_template(db,p.template_id))
+    if p.archived:fail(409,'Restore this page before publishing')
     if not t['approved']:fail(409,'Template mapping is not approved')
     if not p.seo.get('seo_title') or not p.seo.get('description'):fail(422,'SEO title and description are required')
     html=metadata_html(compiled(db,p),p.title,p.slug,p.seo,get_settings().public_site_url)
@@ -314,11 +443,50 @@ def publish(page_id:int,db:Session=Depends(get_db),user:User=Depends(admin)):
         if existing: existing.to_path=p.slug
         else:db.add(Redirect(from_path=old.slug,to_path=p.slug))
     ver=p.published_version+1
-    db.add(Publication(page_id=p.id,version=ver,slug=p.slug,html=html))
-    p.status='published';p.published_version=ver;p.updated_at=utcnow()
+    db.add(Publication(page_id=p.id,version=ver,slug=p.slug,html=html,seo_snapshot=dict(p.seo or {})))
+    p.status='published';p.published_version=ver;p.published_edit_version=p.edit_version;p.updated_at=utcnow()
     audit(db,user,'publish',str(p.id),{'version':ver,'slug':p.slug})
     db.commit()
     return {'version':ver,'url':f'/site/{p.slug}/','message':'Published to local preview server only. Live website unchanged.'}
+
+
+@app.get('/api/seo/status')
+def seo_status(db:Session=Depends(get_db),_:User=Depends(current_user)):
+    published=0;indexable=0
+    for p in db.scalars(select(Page).where(Page.status=='published',Page.archived==False)).all():
+        pub=latest_publication(db,p.id)
+        if not pub:continue
+        published+=1
+        if pub.seo_snapshot is not None:
+            noindex=pub.seo_snapshot.get('noindex',True)
+        else:
+            from bs4 import BeautifulSoup
+            m=BeautifulSoup(pub.html,'html.parser').find('meta',attrs={'name':'robots'})
+            noindex=not m or 'noindex' in (m.get('content') or '').lower()
+        if not noindex:indexable+=1
+    return {'published':published,'indexable':indexable,'noindex':published-indexable}
+
+
+@app.get('/api/pages/{page_id}/publication-status')
+def publication_status(page_id:int,db:Session=Depends(get_db),_:User=Depends(current_user)):
+    p=get_page(db,page_id)
+    pub=latest_publication(db,page_id)
+    return {'draft':{'slug':p.slug,'seo':p.seo,'edit_version':p.edit_version},
+      'published':({'slug':pub.slug,'version':pub.version,'seo':pub.seo_snapshot or {}} if pub else None),
+      'has_unpublished_changes':bool(pub and p.edit_version>p.published_edit_version)}
+
+
+@app.get('/api/shared/usage')
+def shared_usage(db:Session=Depends(get_db),_:User=Depends(current_user)):
+    usage={}
+    for p in db.scalars(select(Page).where(Page.archived==False)).all():
+        used={f.get('global_key') for f in (p.template_snapshot or {}).get('fields',[])
+              if f.get('mode')=='global' and f.get('global_key')}
+        for key in used:
+            entry=usage.setdefault(key,{'key':key,'pages':0,'published_pages':0})
+            entry['pages']+=1
+            entry['published_pages']+=int(p.status=='published')
+    return list(usage.values())
 
 
 @app.get('/api/shared')
@@ -343,7 +511,7 @@ def update_shared(payload:SharedUpdate,db:Session=Depends(get_db),user:User=Depe
 
 
 @app.post('/api/media',status_code=201)
-async def upload_media(file:UploadFile=File(...),alt_text:str='',db:Session=Depends(get_db),user:User=Depends(current_user)):
+async def upload_media(file:UploadFile=File(...),alt_text:str=Form(''),db:Session=Depends(get_db),user:User=Depends(current_user)):
     permitted={'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'}
     if file.content_type not in permitted:fail(415,'Upload a JPG, PNG or WebP image')
     raw=await file.read(get_settings().max_upload_bytes+1)
@@ -360,6 +528,20 @@ async def upload_media(file:UploadFile=File(...),alt_text:str='',db:Session=Depe
 @app.get('/api/media')
 def get_media(db:Session=Depends(get_db),_:User=Depends(current_user)):
     return [{'id':m.id,'filename':m.filename,'alt_text':m.alt_text,'url':f'/api/media/{m.id}/content'} for m in db.scalars(select(Media).order_by(Media.id.desc())).all()]
+
+
+class MediaAltUpdate(BaseModel):
+    alt_text:str=Field(max_length=300)
+
+
+@app.patch('/api/media/{media_id}')
+def update_media_alt(media_id:int,payload:MediaAltUpdate,db:Session=Depends(get_db),user:User=Depends(current_user)):
+    m=db.get(Media,media_id)
+    if not m:fail(404,'Image not found')
+    m.alt_text=payload.alt_text.strip()
+    audit(db,user,'media_alt_update',str(media_id))
+    db.commit()
+    return {'id':m.id,'alt_text':m.alt_text}
 
 
 @app.get('/api/media/{media_id}/content')
@@ -385,6 +567,10 @@ def add_redirect(payload:RedirectInput,db:Session=Depends(get_db),user:User=Depe
     except ValueError as e:fail(422,str(e))
     if a==b:fail(422,'Cannot redirect to same URL')
     if db.scalar(select(Redirect).where(Redirect.from_path==a)):fail(409,'Redirect source already exists')
+    if db.scalar(select(Publication.id).where(Publication.slug==a)):
+        fail(409,'A published URL cannot be used as a redirect source')
+    if db.scalar(select(Page.id).where(Page.slug==a)):
+        fail(409,'An existing page URL cannot be used as a redirect source')
     graph={r.from_path:r.to_path for r in db.scalars(select(Redirect))}
     cur=b
     for _ in range(100):
@@ -415,9 +601,16 @@ def published_site(slug:str,db:Session=Depends(get_db)):
 def sitemap(db:Session=Depends(get_db)):
     origin=get_settings().public_site_url.rstrip('/')
     urls=[]
-    for p in db.scalars(select(Page).where(Page.status=='published')).all():
-        if p.seo.get('noindex',True):continue
+    for p in db.scalars(select(Page).where(Page.status=='published',Page.archived==False)).all():
         pub=latest_publication(db,p.id)
+        if not pub:continue
+        if pub.seo_snapshot is not None:
+            if pub.seo_snapshot.get('noindex',True):continue
+        else:
+            # Backwards compatibility for publications made before SEO snapshots existed.
+            from bs4 import BeautifulSoup
+            meta=BeautifulSoup(pub.html,'html.parser').find('meta',attrs={'name':'robots'})
+            if not meta or 'noindex' in (meta.get('content') or '').lower():continue
         if pub:
             urls.append(f'<url><loc>{xml_escape(origin+"/"+pub.slug+"/")}</loc><lastmod>{pub.published_at.date()}</lastmod></url>')
     return Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join(urls)+'</urlset>',media_type='application/xml')

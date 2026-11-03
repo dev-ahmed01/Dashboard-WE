@@ -15,6 +15,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(512))
     role: Mapped[str] = mapped_column(String(20), default='editor')
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class Template(Base):
@@ -50,6 +51,9 @@ class Page(Base):
     published_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    edit_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    published_edit_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Publication(Base):
@@ -59,6 +63,7 @@ class Publication(Base):
     version: Mapped[int] = mapped_column(Integer)
     slug: Mapped[str] = mapped_column(String(255), index=True)
     html: Mapped[str] = mapped_column(Text)
+    seo_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     __table_args__ = (UniqueConstraint('page_id', 'version'),)
 

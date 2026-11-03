@@ -13,6 +13,11 @@ from app.db import Base, engine
 from app import main
 
 
+def put_page(c,page_id,headers,body):
+    rev=c.get(f'/api/pages/{page_id}',headers=headers).json()['page']['edit_version']
+    return c.put(f'/api/pages/{page_id}',json={**body,'edit_version':rev},headers=headers)
+
+
 class FakeStore:
     files={}
     def __init__(self):pass
@@ -50,9 +55,9 @@ def test_template_mapping_page_edit_and_published_snapshot(monkeypatch):
         p=made.json()
         locked=next(f for f in t['fields'] if f['default']=='Fixed office headline')
         editable=next(f for f in t['fields'] if f['default']=='Changing subcopy')
-        bad=client.put(f"/api/pages/{p['id']}",json={'values':{locked['key']:'HACK'}},headers=H)
+        bad=put_page(client,p['id'],H,{'values':{locked['key']:'HACK'}})
         assert bad.status_code==422
-        saved=client.put(f"/api/pages/{p['id']}",json={'values':{editable['key']:'Custom office copy'},'seo':{'seo_title':'One Person Office | Emlen','description':'Tailored one-person private offices in Bengaluru.','noindex':False,'nofollow':True}},headers=H)
+        saved=put_page(client,p['id'],H,{'values':{editable['key']:'Custom office copy'},'seo':{'seo_title':'One Person Office | Emlen','description':'Tailored one-person private offices in Bengaluru.','noindex':False,'nofollow':True}})
         assert saved.status_code==200,saved.text
         preview=client.get(f"/api/pages/{p['id']}/preview",headers=H)
         assert 'Custom office copy' in preview.text
@@ -68,16 +73,16 @@ def test_template_mapping_page_edit_and_published_snapshot(monkeypatch):
         assert 'BreadcrumbList' in current.text
         assert 'one-person-office/' in client.get('/sitemap.xml').text
         # Later draft changes and global changes do not mutate the published snapshot.
-        assert client.put(f"/api/pages/{p['id']}",json={'values':{editable['key']:'Second draft text'}},headers=H).status_code==200
+        assert put_page(client,p['id'],H,{'values':{editable['key']:'Second draft text'}}).status_code==200
         assert client.put('/api/shared',json={'items':{'company_benefit':'New global copy'}},headers=H).status_code==200
         assert 'Second draft text' not in client.get('/site/one-person-office/').text
         assert 'New global copy' not in client.get('/site/one-person-office/').text
         # The page remains tied to the mapping version at the time of creation.
         fields_locked=[dict(f,mode='static',global_key=None) for f in fields]
         assert client.put(f"/api/templates/{t['id']}/mapping",json={'fields':fields_locked,'approved':True},headers=H).status_code==200
-        assert client.put(f"/api/pages/{p['id']}",json={'values':{editable['key']:'Still allowed by snapshot'}},headers=H).status_code==200
+        assert put_page(client,p['id'],H,{'values':{editable['key']:'Still allowed by snapshot'}}).status_code==200
         # Unpublished slug is not allowed to serve the old published content.
-        assert client.put(f"/api/pages/{p['id']}",json={'slug':'renamed-office'},headers=H).status_code==200
+        assert put_page(client,p['id'],H,{'slug':'renamed-office'}).status_code==200
         assert client.get('/site/renamed-office/').status_code==404
         assert client.get('/site/one-person-office/').status_code==200
         assert client.post(f"/api/pages/{p['id']}/publish",headers=H).status_code==200
