@@ -42,7 +42,13 @@ def run():
         page.screenshot(path=str(OUT/"01_admin_dashboard.png"))
 
         # First-time administrator: upload a real HTML fragment and map one variable field.
-        page.locator(".tabs").get_by_role("button", name="Upload Template").click()
+        assert page.locator(".navigation .nav-item").count() == 1, "Category must be the only sidebar module"
+        assert page.get_by_text("CONTENT MANAGEMENT").count() == 0
+        tabs = page.locator(".category-tabs").get_by_role("tab")
+        assert tabs.count() == 3
+        widths = [tabs.nth(i).bounding_box()["width"] for i in range(3)]
+        assert max(widths) - min(widths) < 3, f"Unequal category tabs: {widths}"
+        page.locator(".tabs").get_by_role("tab", name="Upload Template").click()
         html = """<!doctype html><html><head><style>body{font-family:Arial}
         .hero{padding:40px;background:#fff}</style></head><body><main>
         <section class="hero" data-we-section="hero" data-we-name="Hero">
@@ -57,8 +63,9 @@ def run():
         page.get_by_placeholder("e.g. Managed Office Category").fill("Staging Template")
         page.get_by_role("button", name="Detect and map sections").click()
         expect(page.get_by_text("2 structural sections detected", exact=False)).to_be_visible(timeout=15000)
-        page.get_by_role("button", name="Configure editability").click()
-        expect(page.get_by_role("heading", name="Templates", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
+        expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
+        expect(page.locator(".category-sections .category-section")).to_have_count(2)
         expect(page.locator(".map-field").first).to_be_visible()
         page.locator(".map-field").first.locator("select").select_option("page")
         page.locator(".approve input[type=checkbox]").check()
@@ -67,11 +74,11 @@ def run():
         expect(page.get_by_text("Template mapping saved", exact=False)).to_be_visible()
 
         # Page creation: name -> approved template -> editor.
-        page.locator(".navigation").get_by_role("button", name="Category").click()
-        page.locator(".tabs").get_by_role("button", name="Add Page").click()
-        page.get_by_placeholder("e.g. One Person Office").fill("QA Bengaluru Office")
-        page.locator(".add-page .template-row").first.click()
-        page.get_by_role("button", name="Continue to editor").click()
+        page.locator(".tabs").get_by_role("tab", name="Add Page").click()
+        page.locator("#category-template-select").select_option(index=1)
+        expect(page.locator('iframe[title="Selected template preview"]')).to_be_visible()
+        page.get_by_placeholder("Enter page name").fill("QA Bengaluru Office")
+        page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
         expect(page.locator("#section-editing")).to_be_visible()
         expect(page.locator("#seo-settings")).to_be_visible()
@@ -117,9 +124,10 @@ def run():
         page.get_by_placeholder("Your password").fill("Smoke-Editor-Password-2026")
         page.get_by_role("button", name="Sign in").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible(timeout=15000)
-        assert page.locator(".tabs").get_by_role("button",name="Upload Template").count()==0
+        assert page.locator(".tabs").get_by_role("tab",name="Upload Template").count()==0
         assert page.locator(".navigation").get_by_role("button",name="Templates").count()==0
-        page.locator(".list-row").first.get_by_role("button",name="Edit").click()
+        page.locator(".category-table-row").first.locator(".category-actions summary").click()
+        page.locator(".category-table-row").first.get_by_role("button",name="Edit page").click()
         expect(page.locator(".editor-layout")).to_be_visible()
         assert page.get_by_role("button",name="Publish locally").count()==0
         page.screenshot(path=str(OUT/"06_editor_permissions.png"))
