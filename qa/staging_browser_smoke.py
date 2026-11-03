@@ -25,7 +25,7 @@ def run():
         page.on("dialog", lambda dialog: dialog.accept())
         page.goto(ROOT, wait_until="domcontentloaded")
         expect(page.get_by_role("heading", name="Welcome back.")).to_be_visible()
-        page.get_by_placeholder("admin@workspacebyemlen.co.in").fill(os.environ["ADMIN_EMAIL"])
+        page.get_by_placeholder("Enter username or email").fill(os.environ["ADMIN_EMAIL"])
         page.get_by_placeholder("Your password").fill(os.environ["ADMIN_PASSWORD"])
         page.get_by_role("button", name="Sign in").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible(timeout=15000)
@@ -103,7 +103,7 @@ def run():
         token = t.json()["access_token"]
         api_json("POST","/api/users",token,json={"email":"smoke-editor@example.test","password":"Smoke-Editor-Password-2026","role":"editor"})
         page.get_by_role("button", name="Sign out").click()
-        page.get_by_placeholder("admin@workspacebyemlen.co.in").fill("smoke-editor@example.test")
+        page.get_by_placeholder("Enter username or email").fill("smoke-editor@example.test")
         page.get_by_placeholder("Your password").fill("Smoke-Editor-Password-2026")
         page.get_by_role("button", name="Sign in").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible(timeout=15000)
