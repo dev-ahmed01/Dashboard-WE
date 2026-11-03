@@ -281,6 +281,18 @@ export default function App(){
   const changePage=(patch:Partial<Page>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,...patch}}:cur)
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
+  function editorFieldControl(field:Field,position:number){
+    const title=friendlyEditorLabel(field,position)
+    const value=editor?.page.values[field.key]??field.default
+    return <label key={field.key} className={'editor-human-field '+(field.kind==='textarea'||field.kind==='image'||field.kind==='link'?'wide-field':'')}>
+      <span className="editor-human-field-name">{title}</span>
+      {field.kind==='textarea'
+        ?<textarea aria-label={title} rows={3} value={value} onChange={e=>changeField(field.key,e.target.value)}/>
+        :<input aria-label={title} value={value} onChange={e=>changeField(field.key,e.target.value)} type="text"
+          placeholder={field.kind==='link'?'e.g. /contact/ or #enquiry':field.kind==='icon'?'Optional icon image URL':undefined}/>}
+      {editorHelp(field)&&<small className="editor-human-help">{editorHelp(field)}</small>}
+    </label>
+  }
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
   const categoryPages=visiblePages.filter(p=>{
@@ -393,6 +405,7 @@ export default function App(){
       <div className="editor-section-rows">
         {editor.template.sections.map((section,i)=>{
           const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
+          const groups=editorGroups(fields)
           const collapsed=collapsedSections.includes(section.id)
           return <div className="editor-section-block" key={section.id}>
             <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>setCollapsedSections(prev=>prev.includes(section.id)?prev.filter(id=>id!==section.id):[...prev,section.id])}>
@@ -401,12 +414,23 @@ export default function App(){
               {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
               <ChevronRight size={17} className={`section-chevron ${collapsed?'':'expanded'}`}/>
             </button>
-            {!collapsed&&fields.length>0&&<div className="editor-fields-grid">{fields.map(f=><label key={f.key} className={f.kind==='textarea'||f.kind==='image'||f.kind==='link'?'wide-field':''}>
-              {f.label}{f.kind==='textarea'?<textarea rows={4} value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)}/>:<input value={editor.page.values[f.key]??f.default} onChange={e=>changeField(f.key,e.target.value)} type="text" placeholder={f.kind==='link'?'https://, /contact/, #section, mailto: or tel:':f.kind==='icon'?'Icon class or icon image URL':undefined}/>}
-              {f.kind==='image'&&<small>Image URL · Select an uploaded image or use an allowed image URL.</small>}
-              {f.kind==='link'&&<small>Button destination · use https://, /path, #anchor, mailto: or tel:</small>}
-              {f.kind==='icon'&&<small>{f.attr==='icon_src'?'SVG icon replacement · enter an image URL':'Icon class names · e.g. fa fa-check'}</small>}
-            </label>)}</div>}
+            {!collapsed&&fields.length>0&&<div className="editor-friendly-groups">
+              {groups.content.length>0&&<details className="editor-field-group" open>
+                <summary><span><strong>Headings & text</strong><small>Page headlines, descriptions and bullet points</small></span><span className="editor-group-count">{groups.content.length}</span><ChevronRight size={16}/></summary>
+                <div className="editor-fields-grid">{groups.content.map((f,i)=>editorFieldControl(f,i+1))}</div>
+              </details>}
+              {groups.actions.length>0&&<details className="editor-field-group editor-actions-group">
+                <summary><span><strong>Buttons & links</strong><small>Change button wording and where each button takes visitors</small></span><span className="editor-group-count">{groups.actions.length}</span><ChevronRight size={16}/></summary>
+                <div className="editor-action-collection">{groups.actions.map((item,i)=><div className="editor-action-card" key={item.id}>
+                  <div className="editor-action-card-head"><span className="editor-action-no">{String(i+1).padStart(2,'0')}</span><div><strong>{item.name}</strong><small>Button {i+1} · Edit text or destination below</small></div></div>
+                  <div className="editor-fields-grid">{item.fields.map((field,j)=>editorFieldControl(field,j+1))}</div>
+                </div>)}</div>
+              </details>}
+              {groups.media.length>0&&<details className="editor-field-group editor-media-group">
+                <summary><span><strong>Images & icons</strong><small>Replace visuals only when you need a different image or icon</small></span><span className="editor-group-count">{groups.media.length}</span><ChevronRight size={16}/></summary>
+                <div className="editor-fields-grid">{groups.media.map((f,i)=>editorFieldControl(f,i+1))}</div>
+              </details>}
+            </div>}
           </div>
         })}
       </div>
@@ -415,10 +439,19 @@ export default function App(){
     <section className="edit-panel editor-seo-panel" id="seo-settings" aria-labelledby="seo-heading">
       <div className="panel-heading"><div><div className="small-label">02 / SEARCH</div><h2 id="seo-heading">SEO Settings</h2><p>Set the information search engines use for this page.</p></div></div>
       <div className="form-stack seo-form-stack">
-        <div className="preflight"><strong>Publication checklist (local CMS)</strong><span className={editor.page.seo.seo_title?.trim()?'ok':'missing'}>{editor.page.seo.seo_title?.trim()?'✓':'!'} SEO title</span><span className={editor.page.seo.description?.trim()?'ok':'missing'}>{editor.page.seo.description?.trim()?'✓':'!'} Meta description</span><span className="note">Draft changes never affect published pages until you click Publish locally.</span></div>
+
         {publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}
         <div className="seo-primary-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label>URL slug<input value={editor.page.slug} onChange={e=>changePage({slug:e.target.value})}/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
-        <div className="two-col"><div className="switch-block"><strong>Search indexing</strong><div className="segment"><button className={!editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:false})}>Index</button><button className={editor.page.seo.noindex?'selected':''} onClick={()=>changeSEO({noindex:true})}>Noindex</button></div></div><div className="switch-block"><strong>Link following</strong><div className="segment"><button className={!editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:false})}>Follow</button><button className={editor.page.seo.nofollow?'selected':''} onClick={()=>changeSEO({nofollow:true})}>Nofollow</button></div></div></div>
+        <div className="two-col seo-switches">
+          <label className="seo-toggle-card">
+            <span className="seo-toggle-copy"><strong>Allow indexing</strong><small>{editor.page.seo.noindex?'Off · Ask search engines not to show this page in results.':'On · Allow search engines to include this page in results.'}</small></span>
+            <span className="seo-toggle-control"><input role="switch" aria-label="Allow indexing" type="checkbox" checked={!editor.page.seo.noindex} onChange={e=>changeSEO({noindex:!e.target.checked})}/><span className="seo-toggle-track" aria-hidden="true"/></span>
+          </label>
+          <label className="seo-toggle-card">
+            <span className="seo-toggle-copy"><strong>Follow links</strong><small>{editor.page.seo.nofollow?'Off · Ask search engines not to follow links on this page.':'On · Allow search engines to follow links on this page.'}</small></span>
+            <span className="seo-toggle-control"><input role="switch" aria-label="Follow links" type="checkbox" checked={!editor.page.seo.nofollow} onChange={e=>changeSEO({nofollow:!e.target.checked})}/><span className="seo-toggle-track" aria-hidden="true"/></span>
+          </label>
+        </div>
         <label>Canonical override (optional)<input value={editor.page.seo.canonical_override||''} onChange={e=>changeSEO({canonical_override:e.target.value})} placeholder="Automatic self-canonical"/></label>
         <div className="search-preview"><span>Search result preview</span><small>workspacebyemlen.co.in › {editor.page.slug}</small><h3>{editor.page.seo.seo_title||editor.page.title}</h3><p>{editor.page.seo.description||'Add a meta description to preview the search snippet.'}</p></div>
       </div>
