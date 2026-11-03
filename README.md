@@ -30,7 +30,7 @@ Do not publish ports 5432 or 9000 to the internet. Configure off-host backups fo
 4. **Editor**: Only page-variable fields appear. Configure the SEO title, description, Index/Noindex, Follow/Nofollow, canonical override and slug. Full-page and section preview use the **current unsaved form** without changing the database or live site. A dirty-state badge and navigation warning protect unsaved changes; revision checks return HTTP 409 rather than overwrite another editor's work.
 5. **Publish**: An admin explicitly creates an immutable local publication snapshot. Future draft edits do not change that snapshot. URL changes can produce a 301 redirect.
 6. **SEO**: Only the **latest published metadata snapshot** determines entries in `sitemap.xml`, not unpublished draft SEO. Previews are noindexed. Breadcrumb JSON-LD and canonical/robots tags are generated automatically. Conflicting redirect sources are rejected.
-7. **Media Library**: Image upload retains multipart alt text; existing media alt text can be edited without reuploading.
+7. **Media Library**: Image upload retains multipart alt text; existing media alt text can be edited without reuploading. Images selected from the Media Library carry their stored alt text into draft previews and new publication snapshots.
 8. **Archived Drafts**: Admins can archive and restore unpublished drafts. The API prevents archiving published pages since this app does not implement a safe unpublish operation.
 
 ## Team access
