@@ -315,11 +315,145 @@ export default function App(){
     </section>
   </div></>:
   <>
-  {nav==='Category'&&<><div className="page-top"><div><div className="small-label">CONTENT MANAGEMENT</div><h1>Category</h1><p>Manage reusable website pages from approved templates.</p></div></div><div className="tabs">{(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>
-  {tab==='All Pages'&&<><div className="toolbar"><h2>All Pages <span className="count">{pages.length}</span></h2><div className="filter-row">{(['All','Published','Draft'] as const).map(x=><button className={filter===x?'active':''} onClick={()=>setFilter(x)} key={x}>{x}</button>)}</div></div><div className="list-table"><div className="list-header"><span>No.</span><span>Page name</span><span>Template</span><span>Status</span><span>Action</span></div>{visiblePages.map((p,i)=><div className="list-row" key={p.id}><span className="number">{String(i+1).padStart(2,'0')}</span><strong>{p.title}</strong><span>{templates.find(t=>t.id===p.template_id)?.name||'Template unavailable'}</span><span><span className={`status ${p.status}`}>{p.has_unpublished_changes?'Published · Draft changes':p.status}</span></span><div className="row-actions"><button className="row-action" onClick={()=>openPage(p)}>Edit <ArrowUpRight size={16}/></button>{user.role==='admin'&&!p.published_version&&<button className="quiet-action" onClick={()=>action(async()=>{if(!window.confirm(`Archive ${p.title}? This hides it from the page list.`))return;await api(`/api/pages/${p.id}/archive`,{method:'POST'});await refresh();notify('Page archived')})}>Archive</button>}</div></div>)}{!visiblePages.length&&<div className="empty">No pages found. Create your first page from an uploaded template.</div>}</div></>}
-  {tab==='Add Page'&&<div className="add-page"><h2>Add Page</h2><p>Enter the page name, then select an approved template.</p><label className="add-name">Page name<input placeholder="e.g. One Person Office" value={newName} onChange={e=>setNewName(e.target.value)}/></label><h3>Choose template</h3><div className="template-rows">{templates.filter(t=>t.approved).map((t,i)=><button key={t.id} className={`template-row ${selectedTemplate===t.id?'selected':''}`} onClick={()=>setSelectedTemplate(t.id)}><span className="index">{String(i+1).padStart(2,'0')}</span><strong>{t.name}</strong><small>{t.category}</small><span className="select-circle">{selectedTemplate===t.id&&<Check size={14}/>}</span></button>)}{templates.filter(t=>t.approved).length===0&&<div className="empty">No approved templates available. Upload a template, configure its fields and approve it first.</div>}</div><button className="primary continue" onClick={createPage} disabled={busy||!selectedTemplate||!newName.trim()}>Continue to editor <ArrowUpRight size={17}/></button></div>}
-  {tab==='Upload Template'&&user.role==='admin'&&<div className="upload-screen"><h2>Upload Template</h2><p>Upload an approved HTML design. Sections are detected by structure, not headings.</p><div className="upload-box"><UploadCloud size={34}/><strong>Choose your HTML template</strong><span>Only .html files · Maximum 8 MB</span><label className="file-button">Choose HTML file<input type="file" accept=".html,text/html" onChange={e=>setTemplateFile(e.target.files?.[0]||null)}/></label><small>{templateFile?.name||'No file selected'}</small></div><div className="upload-fields"><label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label><label>Category<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value)}>{['Solution Category','Sub-solution','Country','City','Property'].map(x=><option key={x}>{x}</option>)}</select></label></div><button className="primary centered" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>{uploaded&&<div className="upload-result"><h3>{uploaded.name}</h3><p>{uploaded.sections.length} sections · {uploaded.fields.length} detected fields. Everything is static until configured.</p><button className="outline" onClick={()=>{setNav('Templates');setFocusField('');setMappingId(uploaded.id)}}>Configure editability <ArrowUpRight size={16}/></button></div>}</div>}
-  </>}
+  {nav==='Category'&&<div className="category-page">
+    <div className="category-heading">
+      <h1>Category</h1>
+      <p>Manage reusable website pages from approved templates.</p>
+    </div>
+    <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label="Category views">
+      {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
+        <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
+      )}
+    </div>
+
+    {tab==='All Pages'&&<div className="category-all-pages" role="tabpanel">
+      <div className="category-toolbar">
+        <div className="category-search"><Search size={19}/><input value={pageSearch} onChange={e=>setPageSearch(e.target.value)} placeholder="Search pages..." aria-label="Search pages"/></div>
+        <div className="category-filters" role="group" aria-label="Page status filter">
+          {(['All','Published','Draft'] as const).map(name=>
+            <button type="button" key={name} className={filter===name?'active':''} aria-pressed={filter===name} onClick={()=>{setFilter(name);setSelectedPageIds([])}}>
+              {name} <span>{name==='All'?pages.length:name==='Published'?pages.filter(p=>p.status==='published').length:pages.filter(p=>p.status==='draft'||p.has_unpublished_changes).length}</span>
+            </button>
+          )}
+        </div>
+      </div>
+      {selectedPageIds.length>0&&<div className="category-selection-bar">
+        <strong>{selectedPageIds.length} selected</strong>
+        <button type="button" onClick={()=>setSelectedPageIds([])}>Clear selection</button>
+        {user.role==='admin'&&<button type="button" disabled={busy||selectedHasPublished} title={selectedHasPublished?'Published pages cannot be archived':''} onClick={archiveSelectedDrafts}>Archive selected drafts</button>}
+      </div>}
+      <div className="category-pages-table">
+        <div className="category-table-head">
+          <input type="checkbox" aria-label="Select all visible pages" checked={allVisibleSelected} onChange={e=>{
+            const ids=categoryPages.map(p=>p.id)
+            setSelectedPageIds(selected=>e.target.checked?[...new Set([...selected,...ids])]:selected.filter(id=>!ids.includes(id)))
+          }} disabled={!categoryPages.length}/>
+          <span>Page Name</span><span>Template</span><span>Status</span><span>Updated</span><span className="category-action-title">Action</span>
+        </div>
+        {categoryPages.map(p=><div className="category-table-row" key={p.id}>
+          <input type="checkbox" aria-label={'Select '+p.title} checked={selectedPageIds.includes(p.id)} onChange={e=>setSelectedPageIds(ids=>e.target.checked?[...ids,p.id]:ids.filter(id=>id!==p.id))}/>
+          <div className="category-page-name"><strong>{p.title}</strong><span>{'/'+p.slug+'/'}</span></div>
+          <div className="category-template-name">{templates.find(t=>t.id===p.template_id)?.name||'Unavailable template'}</div>
+          <div><span className={'category-status '+(p.status==='published'?'category-published':'category-draft')}>{p.status==='published'?'Published':'Draft'}</span>{p.has_unpublished_changes&&<small className="category-draft-indicator">Unpublished changes</small>}</div>
+          <time dateTime={p.updated_at}>{new Date(p.updated_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</time>
+          <details className="category-actions"><summary aria-label={'Actions for '+p.title}><MoreHorizontal size={20}/></summary><div className="category-action-menu">
+            <button type="button" onClick={()=>openPage(p)}>Edit page</button>
+            {user.role==='admin'&&!p.published_version&&<button type="button" onClick={()=>archiveDraft(p)}>Archive draft</button>}
+          </div></details>
+        </div>)}
+        {!categoryPages.length&&<div className="category-empty">
+          <strong>{pageSearch||filter!=='All'?'No matching pages':'No pages yet'}</strong>
+          {pageSearch||filter!=='All'
+            ?<button type="button" className="outline" onClick={()=>{setPageSearch('');setFilter('All')}}>Clear filters</button>
+            :<button type="button" className="primary" onClick={()=>setTab(user.role==='admin'?'Upload Template':'Add Page')}>{user.role==='admin'?'Upload a template':'Add a page'} <ArrowUpRight size={16}/></button>}
+        </div>}
+      </div>
+    </div>}
+
+    {tab==='Add Page'&&<div className="category-create-screen" role="tabpanel">
+      <div className="category-form-card">
+        <div className="category-form-row">
+          <label htmlFor="category-template-select">Choose template</label>
+          <select id="category-template-select" value={selectedTemplate??''} onChange={e=>setSelectedTemplate(e.target.value?Number(e.target.value):null)}>
+            <option value="">Select approved template</option>
+            {approvedTemplates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div className="category-form-row">
+          <label htmlFor="category-new-page-name">Page name</label>
+          <input id="category-new-page-name" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Enter page name" maxLength={200}/>
+        </div>
+        <div className="category-form-actions">
+          <button type="button" className="outline" onClick={()=>{setNewName('');setSelectedTemplate(null);setTab('All Pages')}}>Cancel</button>
+          <button type="button" className="primary" onClick={createPage} disabled={busy||!selectedTemplate||!newName.trim()}>Add Page <ArrowUpRight size={17}/></button>
+        </div>
+      </div>
+      <div className="category-template-summary">
+        {selectedApprovedTemplate?<>
+          <div className="category-template-thumb"><iframe title="Selected template preview" sandbox="" srcDoc={selectedTemplatePreview}/></div>
+          <div className="category-template-summary-text"><h2>{selectedApprovedTemplate.name}</h2><p>{selectedApprovedTemplate.category} · {selectedApprovedTemplate.sections.length} sections</p><span className="category-status category-approved">Approved template</span></div>
+        </>:<div className="category-no-template">
+          <LayoutTemplate size={27}/><h2>No template selected</h2>
+          <p>{approvedTemplates.length?'Choose a template above to preview it.':'There are no approved templates yet.'}</p>
+          {user.role==='admin'&&!approvedTemplates.length&&<button className="outline" type="button" onClick={()=>setTab('Upload Template')}>Upload template <ArrowUpRight size={16}/></button>}
+        </div>}
+      </div>
+    </div>}
+
+    {tab==='Upload Template'&&user.role==='admin'&&<div className="category-upload-screen" role="tabpanel">
+      <div className={'category-upload-dropzone '+(templateDragActive?'drag-active':'')} onDragOver={e=>{e.preventDefault();setTemplateDragActive(true)}} onDragLeave={e=>{e.preventDefault();setTemplateDragActive(false)}} onDrop={e=>{e.preventDefault();setTemplateDragActive(false);chooseTemplateFile(e.dataTransfer.files?.[0]||null)}}>
+        <UploadCloud size={29}/>
+        <strong>{templateFile?templateFile.name:'Upload an HTML template'}</strong>
+        <span>Drag and drop an HTML file here, or</span>
+        <label className="category-upload-browse">Browse files<input type="file" accept=".html,text/html" onChange={e=>chooseTemplateFile(e.target.files?.[0]||null)}/></label>
+        <small>HTML (.html) · Maximum 8 MB</small>
+      </div>
+      <div className="category-upload-fields">
+        <label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label>
+        <label>Category<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value)}>{['Solution Category','Sub-solution','Country','City','Property'].map(x=><option key={x}>{x}</option>)}</select></label>
+        <button type="button" className="primary" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>
+      </div>
+      <div className="category-mapping-layout mapping-area">
+        <section className="category-mapping-card">
+          <div className="category-panel-header"><h2>Section Mapping</h2><span>{mapping?mapping.sections.length+' detected sections':'No sections detected'}</span></div>
+          {mapping?<div className="category-sections">
+            {mapping.sections.map(sec=><details key={sec.id} className="category-section" open={sec.order===1}>
+              <summary><span className="category-section-number">{String(sec.order).padStart(2,'0')}</span><span className="category-section-title"><strong>{sec.name}</strong><small>{mapping.fields.filter(f=>f.section_id===sec.id).length} fields</small></span><span className="category-detected">Detected</span><ChevronRight size={17}/></summary>
+              <div className="category-section-fields">
+                <label>Section name<input value={sec.name} onChange={e=>setTemplates(items=>items.map(t=>t.id===mapping.id?{...t,sections:t.sections.map(x=>x.id===sec.id?{...x,name:e.target.value}:x)}:t))}/></label>
+                {mapping.fields.filter(f=>f.section_id===sec.id).map(f=><div key={f.key} className="category-map-field map-field">
+                  <div className="category-field-heading"><strong>{f.label}</strong><button type="button" className="quiet-action" onClick={()=>{setMappingId(mapping.id);setFocusField(f.key)}}><Eye size={14}/> Locate</button></div>
+                  <label>Field name<input value={f.label} onChange={e=>modifyMapField(mapping.id,f.key,{label:e.target.value})}/></label>
+                  <label>Field behavior<select value={f.mode} onChange={e=>modifyMapField(mapping.id,f.key,{mode:e.target.value as Mode})}><option value="static">Static</option><option value="page">Page variable</option><option value="global">Shared global</option></select></label>
+                  {f.mode==='global'&&<label>Shared key<input value={f.global_key||''} placeholder="e.g. business_phone" onChange={e=>modifyMapField(mapping.id,f.key,{global_key:e.target.value})}/></label>}
+                </div>)}
+              </div>
+            </details>)}
+          </div>:<div className="category-upload-placeholder"><LayoutTemplate size={23}/><p>Upload an HTML template to detect its sections.</p></div>}
+        </section>
+        <section className="category-mapping-card category-preview-card">
+          <div className="category-panel-header"><h2>Visual Preview</h2>{mapping&&<button className="quiet-action" type="button" onClick={()=>setFocusField('')}>Full page</button>}</div>
+          {mapping?<div className="category-browser-frame"><div className="category-browser-bar"><span/><span/><span/><div>{mapping.name}</div></div><iframe title="Mapped template preview" sandbox="" srcDoc={mapPreview}/></div>
+          :<div className="category-upload-placeholder category-preview-placeholder"><Eye size={25}/><p>The uploaded design will appear here.</p></div>}
+        </section>
+      </div>
+      {mapping&&<div className="category-map-actions">
+        <label className="approve"><input type="checkbox" checked={mapping.approved} onChange={e=>setTemplates(items=>items.map(t=>t.id===mapping.id?{...t,approved:e.target.checked}:t))}/> Approve template</label>
+        <button className="primary" type="button" disabled={busy} onClick={()=>saveMapping(mapping)}>Save template configuration <ArrowUpRight size={17}/></button>
+      </div>}
+      <div className="category-uploaded-list">
+        <h2>Uploaded Templates <span>({templates.length})</span></h2>
+        <div className="category-uploaded-table">
+          {templates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
+            <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
+            <span className={'category-status '+(t.approved?'category-approved':'category-draft')}>{t.approved?'Approved':'Needs mapping'}</span>
+            <button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button>
+          </div>)}
+          {!templates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
+        </div>
+      </div>
+    </div>}
+  </div>}
 
   {nav==='Templates'&&<><div className="page-top"><div><div className="small-label">TEMPLATE LIBRARY</div><h1>Templates</h1><p>Choose which fields stay static, become shared, or vary by page.</p></div></div><div className="template-rows">{templates.map((t,i)=><button key={t.id} className={`template-row ${mapping?.id===t.id?'selected':''}`} onClick={()=>{setFocusField('');setMappingId(t.id)}}><span className="index">{String(i+1).padStart(2,'0')}</span><strong>{t.name}</strong><small>{t.category}</small><span className={`status ${t.approved?'published':'draft'}`}>{t.approved?'Approved':'Needs mapping'}</span><ArrowUpRight size={18}/></button>)}{!templates.length&&<div className="empty">No templates yet. Upload your first approved HTML design.</div>}</div>{mapping&&<div className="mapping-area">
     <div className="panel-heading"><div><div className="small-label">TEMPLATE CONFIGURATION</div><h2>{mapping.name}</h2><p>Fields are locked by default. Approve only the fields that should change between pages.</p></div><label className="approve"><input type="checkbox" checked={mapping.approved} onChange={e=>setTemplates(ts=>ts.map(t=>t.id===mapping.id?{...t,approved:e.target.checked}:t))}/> Approve template</label></div>
