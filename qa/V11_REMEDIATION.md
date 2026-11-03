@@ -20,9 +20,10 @@ Baseline: `main` V10, reviewed in `qa/ADMIN_UAT_REPORT.md`. Scope: implement def
 - Upload and template configuration hidden from Editor accounts; backend permissions remain unchanged.
 - Saved-but-unpublished changes are flagged on published pages and appear in Saved Drafts.
 - Self-service password change, admin account enable/disable/reset; unchanged role model (admin/editor).
-- Shared content clearly warns about immutable publication snapshots.
+- Shared content shows affected draft/published page counts and warns that published snapshots require republishing.
 - Archive/restore limited to draft pages; published archive explicitly rejected.
-- Local-only publish labeling and SEO preflight requirements.
+- Local-only publish labeling, SEO preflight, and a read-only currently published SEO comparison in the editor.
+- Media Library alt text appears in preview and new publication HTML for registered media URLs.
 
 ## Outside scope, unchanged
 
