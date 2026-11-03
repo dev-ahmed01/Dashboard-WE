@@ -79,19 +79,44 @@ def run():
         expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
         expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
         assert px(".category-panel-header h2") == 18, "Upload panels should use 18px section titles"
-        expect(page.locator(".category-expanded-section")).to_have_count(2)
+        cards = page.locator(".category-section-card")
+        expect(cards).to_have_count(2)
         assert page.locator(".category-mapping-fullwidth").bounding_box()["width"] > page.locator(".category-page").bounding_box()["width"] * .95
         mapping_bounds = page.locator(".category-mapping-fullwidth").bounding_box()
         preview_bounds = page.locator(".category-preview-below").bounding_box()
         assert preview_bounds["y"] >= mapping_bounds["y"] + mapping_bounds["height"] - 2, "Preview must appear below section mapping"
         assert page.locator(".category-mapping-fullwidth").get_by_role("button", name="Locate").count() == 0
-        expect(page.locator(".map-field").first).to_be_visible()
-        whole_section = page.locator(".category-expanded-section").first.get_by_label("Whole section mode", exact=False)
-        whole_section.select_option("page")
-        expect(page.locator(".map-field").first.locator("select[aria-label^='Behavior:']")).to_have_value("page")
-        whole_section.select_option("static")
-        expect(page.locator(".map-field").first.locator("select[aria-label^='Behavior:']")).to_have_value("static")
-        page.locator(".map-field").first.locator("select[aria-label^='Behavior:']").select_option("page")
+        # One section is initially expanded. Remaining rectangular cards stay collapsed.
+        expect(cards.first.get_by_role("button", name="Hide details")).to_be_visible()
+        assert cards.first.locator(".map-field").count() > 0
+        expect(cards.nth(1).get_by_role("button", name="View details")).to_be_visible()
+        expect(cards.nth(1).locator(".map-field")).to_have_count(0)
+        cards.nth(1).get_by_role("button", name="View details").click()
+        expect(cards.first.locator(".map-field")).to_have_count(0)
+        expect(cards.nth(1).locator(".map-field").first).to_be_visible()
+        cards.first.get_by_role("button", name="View details").click()
+        expect(cards.nth(1).locator(".map-field")).to_have_count(0)
+        expect(cards.first.locator(".map-field").first).to_be_visible()
+        # Detected names/content are informative text, not editable mapping fields.
+        expect(cards.first.locator("input[aria-label^='Field name:']")).to_have_count(0)
+        expect(cards.first.locator(".category-field-summary strong").first).to_be_visible()
+        lock_switch = cards.first.get_by_role("switch", name="Keep Hero static")
+        expect(lock_switch).to_be_checked()
+        expect(cards.first.locator("select[aria-label^='Behavior:']")).to_have_count(0)
+        heading_level = cards.first.locator("select[aria-label^='Heading level:']").first
+        expect(heading_level).to_be_disabled()
+        # Unlock, set one field, lock all controls, then restore previous choices.
+        lock_switch.uncheck()
+        mode = cards.first.locator("select[aria-label^='Behavior:']").first
+        expect(mode).to_have_value("page")
+        expect(heading_level).to_be_enabled()
+        mode.select_option("static")
+        lock_switch.check()
+        expect(cards.first.locator("select[aria-label^='Behavior:']")).to_have_count(0)
+        expect(heading_level).to_be_disabled()
+        lock_switch.uncheck()
+        expect(mode).to_have_value("static")
+        mode.select_option("page")
         page.locator(".approve input[type=checkbox]").check()
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
         page.get_by_role("button", name="Save template configuration").click()
