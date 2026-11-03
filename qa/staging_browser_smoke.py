@@ -39,6 +39,17 @@ def run():
         identifier.fill(os.environ["ADMIN_EMAIL"])
         page.get_by_role("button", name="Sign in").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible(timeout=15000)
+        # Typography hierarchy is deliberately restrained on desktop.
+        def px(selector, property_name="fontSize"):
+            return page.locator(selector).first.evaluate(
+                "(el, key) => parseFloat(getComputedStyle(el)[key])", property_name
+            )
+        assert px(".category-heading h1") == 32, "Page title should be 32px"
+        assert px(".category-heading p") == 13, "Description should be 13px"
+        assert px(".category-tabs button") == 14, "Tab labels should be 14px"
+        assert px(".category-sidebar .nav-item") == 13, "Sidebar label should be 13px"
+        assert px(".category-table-head") == 11, "Table header should be 11px"
+        assert px(".category-shell .topbar", "height") == 68, "Top bar should be 68px"
         page.screenshot(path=str(OUT/"01_admin_dashboard.png"))
 
         # First-time administrator: upload a real HTML fragment and map one variable field.
@@ -49,6 +60,8 @@ def run():
         widths = [tabs.nth(i).bounding_box()["width"] for i in range(3)]
         assert max(widths) - min(widths) < 3, f"Unequal category tabs: {widths}"
         page.locator(".tabs").get_by_role("tab", name="Upload Template").click()
+        assert px(".category-upload-dropzone", "minHeight") == 139, "Upload panel should be compact"
+        page.screenshot(path=str(OUT/"02_upload_screen.png"))
         html = """<!doctype html><html><head><style>body{font-family:Arial}
         .hero{padding:40px;background:#fff}</style></head><body><main>
         <section class="hero" data-we-section="hero" data-we-name="Hero">
@@ -65,6 +78,7 @@ def run():
         expect(page.get_by_text("2 structural sections detected", exact=False)).to_be_visible(timeout=15000)
         expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
         expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
+        assert px(".category-panel-header h2") == 18, "Upload panels should use 18px section titles"
         expect(page.locator(".category-sections .category-section")).to_have_count(2)
         expect(page.locator(".map-field").first).to_be_visible()
         page.locator(".map-field").first.locator("select").select_option("page")
@@ -77,6 +91,9 @@ def run():
         page.locator(".tabs").get_by_role("tab", name="Add Page").click()
         page.locator("#category-template-select").select_option(index=1)
         expect(page.locator('iframe[title="Selected template preview"]')).to_be_visible()
+        assert px(".category-form-row>label") == 14, "Form labels should be 14px"
+        assert px(".category-form-row input", "height") == 44, "Form inputs should be 44px high"
+        page.screenshot(path=str(OUT/"02_add_page.png"))
         page.get_by_placeholder("Enter page name").fill("QA Bengaluru Office")
         page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
