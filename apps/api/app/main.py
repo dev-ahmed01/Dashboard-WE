@@ -295,7 +295,11 @@ def redetect_template(template_id:int,db:Session=Depends(get_db),user:User=Depen
         if sec['id'] in old_sections:
             sec['name']=old_sections[sec['id']]['name']
     previous=len(t.sections)
-    ObjectStore().put(t.object_key,fresh_source.encode('utf-8'),'text/html')
+    # Write a new immutable object so existing page/template snapshots keep
+    # referencing their original HTML, even when an old template is re-scanned.
+    new_key=f'templates/{uuid4().hex}.html'
+    ObjectStore().put(new_key,fresh_source.encode('utf-8'),'text/html')
+    t.object_key=new_key
     t.sections=sections;t.fields=fields;t.approved=False;t.version+=1
     audit(db,user,'template_redetect',str(t.id),{'before':previous,'after':len(sections),'fields':len(fields)})
     db.commit()
