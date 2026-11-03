@@ -32,7 +32,7 @@ def issue_token(user: User):
     if not settings.jwt_secret or len(settings.jwt_secret) < 32:
         raise RuntimeError('JWT_SECRET must contain at least 32 characters')
     expires = datetime.now(timezone.utc) + timedelta(hours=8)
-    return jwt.encode({'sub': str(user.id), 'role': user.role, 'exp': expires}, settings.jwt_secret, algorithm='HS256')
+    return jwt.encode({'sub': str(user.id), 'role': user.role, 'av': user.auth_version, 'exp': expires}, settings.jwt_secret, algorithm='HS256')
 
 
 def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)):
@@ -41,7 +41,7 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
     try:
         data = jwt.decode(credentials.credentials, get_settings().jwt_secret, algorithms=['HS256'])
         user = db.get(User, int(data['sub']))
-        if not user or not user.active:
+        if not user or not user.active or data.get('av') != user.auth_version:
             raise ValueError('User not active')
         return user
     except Exception:
