@@ -226,13 +226,18 @@ def delete_all_templates(payload:DeleteTemplatesRequest,db:Session=Depends(get_d
         db.rollback()
         fail(409,'Unable to delete templates while they are referenced. No templates were deleted.')
     failed=0
-    store=ObjectStore()
-    for key in set(keys):
-        try:
-            store.delete(key)
-        except Exception:
-            # Database rows were already deleted. Report incomplete object cleanup.
-            failed+=1
+    unique_keys=set(keys)
+    try:
+        store=ObjectStore()
+    except Exception:
+        failed=len(unique_keys)
+    else:
+        for key in unique_keys:
+            try:
+                store.delete(key)
+            except Exception:
+                # Database rows were already deleted. Report incomplete object cleanup.
+                failed+=1
     return {'deleted':len(template_ids),'storage_cleanup_failed':failed}
 
 
