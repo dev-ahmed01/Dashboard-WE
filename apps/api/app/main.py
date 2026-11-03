@@ -195,6 +195,47 @@ def templates(db:Session=Depends(get_db),_:User=Depends(current_user)):
     return [template_json(t) for t in db.scalars(select(Template).order_by(Template.id.desc())).all()]
 
 
+class DeleteTemplatesRequest(BaseModel):
+    confirmation: str
+
+
+@app.delete('/api/templates')
+def delete_all_templates(payload:DeleteTemplatesRequest,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Remove the entire test template library, but never strand existing pages.
+
+    A template referenced by any draft, published, or archived page blocks the
+    entire operation. Storage is cleaned after a successful DB transaction.
+    """
+    if payload.confirmation != 'DELETE ALL TEMPLATES':
+        fail(422,'Type DELETE ALL TEMPLATES to confirm deletion')
+    templates_to_delete=db.scalars(select(Template).order_by(Template.id)).all()
+    if not templates_to_delete:
+        return {'deleted':0,'storage_cleanup_failed':0}
+    template_ids=[t.id for t in templates_to_delete]
+    used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id.in_(template_ids))) or 0
+    if used:
+        fail(409,f'Cannot delete templates: {used} existing page(s), including archived or published pages, still reference them. No templates were deleted.')
+    keys=[t.object_key for t in templates_to_delete]
+    for t in templates_to_delete:
+        db.delete(t)
+    audit(db,user,'templates_delete_all','templates',{'count':len(template_ids),'ids':template_ids})
+    # Database constraints also prevent races with concurrent page creation.
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        fail(409,'Unable to delete templates while they are referenced. No templates were deleted.')
+    failed=0
+    store=ObjectStore()
+    for key in set(keys):
+        try:
+            store.delete(key)
+        except Exception:
+            # Database rows were already deleted. Report incomplete object cleanup.
+            failed+=1
+    return {'deleted':len(template_ids),'storage_cleanup_failed':failed}
+
+
 @app.post('/api/templates/import',status_code=201)
 async def import_template(file:UploadFile=File(...),name:str='',category:str='Solution Category',
    db:Session=Depends(get_db),user:User=Depends(admin)):
