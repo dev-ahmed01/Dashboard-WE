@@ -37,7 +37,13 @@ def sanitize(source: str) -> BeautifulSoup:
                     del tag.attrs[key]
         if tag.name == 'a':
             tag['rel'] = 'noopener noreferrer'
-    if soup.head:\n        charset = soup.new_tag('meta',charset='utf-8'); soup.head.append(charset)\n        viewport = soup.new_tag('meta'); viewport.attrs={'name':'viewport','content':'width=device-width,initial-scale=1'}; soup.head.append(viewport)\n    return soup\n\n\ndef label(node, i):
+    if soup.head:
+        charset = soup.new_tag('meta',charset='utf-8'); soup.head.append(charset)
+        viewport = soup.new_tag('meta'); viewport.attrs={'name':'viewport','content':'width=device-width,initial-scale=1'}; soup.head.append(viewport)
+    return soup
+
+
+def label(node, i):
     text = ' '.join([str(node.get('id') or ''), *node.get('class', [])]).lower()
     for key, name in SECTION_NAMES.items():
         if key in text:
