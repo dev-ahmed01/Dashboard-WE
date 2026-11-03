@@ -873,3 +873,24 @@
   .category-section-card .category-map-cell label.category-map-control-label{font-size:11px}
   .category-locked-note{align-items:flex-start;padding:11px 13px;line-height:1.5}
 }
+
+/* Template library reset: subdued destructive action, separate from approval. */
+.category-uploaded-heading{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:14px;margin-bottom:12px;
+}
+.category-uploaded-heading h2{margin-bottom:0}
+.category-uploaded-heading .category-delete-templates{
+  min-height:35px;padding:8px 12px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  font-size:11px;font-weight:700;
+  color:#c6282f;border:1px solid #f1ced0;border-radius:9px;
+  background:#fff;
+}
+.category-uploaded-heading .category-delete-templates:hover:not(:disabled){
+  color:#fff;background:#d82429;border-color:#d82429;
+}
+.category-uploaded-heading .category-delete-templates:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:590px){
+  .category-uploaded-heading{align-items:flex-start;flex-direction:column}
+}

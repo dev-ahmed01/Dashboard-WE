@@ -133,6 +133,11 @@ def run():
         page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
         expect(page.locator("#section-editing")).to_be_visible()
+        # The unmodified Benefits section was saved as Static, so Add Page
+        # must not expose any editable content controls for it.
+        static_block=page.locator(".editor-section-block").nth(1)
+        expect(static_block.get_by_text("Fixed content · reused from template")).to_be_visible()
+        expect(static_block.locator(".editor-fields-grid")).to_have_count(0)
         expect(page.locator("#seo-settings")).to_be_visible()
         expect(page.locator("#page-preview")).to_be_visible()
         positions = [page.locator(f"#{name}").bounding_box() for name in ("section-editing", "seo-settings", "page-preview")]

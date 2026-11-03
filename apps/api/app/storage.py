@@ -24,3 +24,6 @@ class ObjectStore:
 
     def get(self, key: str) -> bytes:
         return self.client.get_object(Bucket=self.bucket, Key=key)['Body'].read()
+
+    def delete(self, key: str):
+        self.client.delete_object(Bucket=self.bucket, Key=key)

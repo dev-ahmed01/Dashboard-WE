@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
@@ -147,6 +147,26 @@ export default function App(){
     setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u)
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
+  async function deleteAllTemplates(){
+    if(!templates.length)return
+    const confirmation=window.prompt(
+      'Delete all '+templates.length+' uploaded templates from this CMS? This cannot be undone. Existing pages will be protected.\n\nType DELETE ALL TEMPLATES to confirm:'
+    )
+    if(confirmation===null)return
+    if(confirmation!=='DELETE ALL TEMPLATES'){
+      showError('Deletion cancelled. The confirmation phrase must match exactly.');return
+    }
+    await action(async()=>{
+      const result=await api<{deleted:number;storage_cleanup_failed:number}>('/api/templates',{
+        method:'DELETE',body:json({confirmation})
+      })
+      setMappingId(null);setUploaded(null);setSelectedTemplate(null)
+      setOpenMappingSection(null);setSectionModeBackups({})
+      await refresh()
+      notify(result.deleted+' templates deleted.'+
+        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage objects could not be removed.':''))
+    })
+  }
   async function redetectTemplate(t:Template){
     if(!window.confirm('Re-detect sections from the saved HTML? Unsaved mapping changes will be discarded. Review and approve the detected fields again afterwards.'))return
     await action(async()=>{
@@ -541,7 +561,10 @@ export default function App(){
         <button className="primary" type="button" disabled={busy} onClick={()=>saveMapping(mapping)}>Save template configuration <ArrowUpRight size={17}/></button>
       </div>}
       <div className="category-uploaded-list">
-        <h2>Uploaded Templates <span>({templates.length})</span></h2>
+        <div className="category-uploaded-heading">
+          <h2>Uploaded Templates <span>({templates.length})</span></h2>
+          {templates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={deleteAllTemplates}><Trash2 size={15}/> Delete all templates</button>}
+        </div>
         <div className="category-uploaded-table">
           {templates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
             <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
