@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, FilePenLine, Globe2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, Settings2, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null}
@@ -31,6 +31,7 @@ export default function App(){
   const [user,setUser]=useState<{email:string;role:string}|null>(null)
   const [loginIdentifier,setLoginIdentifier]=useState('')
   const [loginPassword,setLoginPassword]=useState('')
+  const [showLoginPassword,setShowLoginPassword]=useState(false)
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [message,setMessage]=useState('')
@@ -158,7 +159,64 @@ export default function App(){
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
 
-  if(!user)return <div className="login-bg"><div className="login-card"><div className="logo dark"><span className="logo-dot"/>workspace<span className="by-emlen">BY EMLEN</span></div><div className="login-icon"><LockKeyhole size={28}/></div><h1>Welcome back.</h1><p>Sign in to manage pages, templates and SEO.</p><form onSubmit={e=>{e.preventDefault();login()}}><label>Username or email</label><input type="text" placeholder="Enter username or email" autoComplete="username" value={loginIdentifier} onChange={e=>setLoginIdentifier(e.target.value)} required/><label>Password</label><input type="password" placeholder="Your password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required/><button className="primary fill" disabled={busy}>Sign in <ArrowUpRight size={18}/></button></form>{error&&<div className="alert error">{error}</div>}<small>Secure sign-in · Access configured during deployment</small></div></div>
+  if (!user) return (
+    <div className="login-bg">
+      <div className="login-card">
+        <div className="login-brand">
+          <div className="logo dark"><span className="logo-dot"/>workspace<span className="by-emlen">BY EMLEN</span></div>
+        </div>
+
+        <div className="login-intro">
+          <div className="login-icon" aria-hidden="true"><LockKeyhole size={24}/></div>
+          <h1>Welcome back.</h1>
+          <p>Sign in to manage your website pages, templates and SEO.</p>
+        </div>
+
+        <form className="login-form" onSubmit={e=>{e.preventDefault();login()}}>
+          <div className="login-field">
+            <label htmlFor="login-identifier">Username or email</label>
+            <input
+              id="login-identifier"
+              type="text"
+              name="username"
+              placeholder="Enter username or email"
+              autoComplete="username"
+              value={loginIdentifier}
+              onChange={e=>setLoginIdentifier(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="login-field">
+            <label htmlFor="login-password">Password</label>
+            <div className="login-password-wrap">
+              <input
+                id="login-password"
+                type={showLoginPassword?'text':'password'}
+                name="password"
+                placeholder="Your password"
+                autoComplete="current-password"
+                value={loginPassword}
+                onChange={e=>setLoginPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="login-password-toggle"
+                aria-label={showLoginPassword?'Hide password':'Show password'}
+                aria-pressed={showLoginPassword}
+                onClick={()=>setShowLoginPassword(value=>!value)}
+              >{showLoginPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button>
+            </div>
+          </div>
+          <button className="primary fill login-submit" type="submit" disabled={busy}>
+            {busy?'Signing in…':'Sign in'}{!busy&&<ArrowUpRight size={18}/>}
+          </button>
+        </form>
+        {error&&<div className="alert error login-error" role="alert">{error}</div>}
+      </div>
+    </div>
+  )
 
   return <div className="shell"><aside className="sidebar"><div className="brand"><span className="brand-mark"/> <div><strong>workspace</strong><small>BY EMLEN</small></div></div><div className="side-label">WORKSPACE</div><div className="navigation">
     {([['Category',LayoutTemplate],['Templates',FileCode2],['Saved Drafts',FilePenLine],['Published',Globe2],['Archived',FilePenLine],['Shared Content',Copy],['SEO',Search],['Team Access',ShieldCheck],['Media Library',Settings2]] as const)
