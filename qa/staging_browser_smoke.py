@@ -79,6 +79,7 @@ def run():
         page.locator(".section-nav").filter(has_text="SEO Settings").click()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
+        page.get_by_role("button", name="Index", exact=True).click()
         page.get_by_role("button", name="Publish locally").click()
         expect(page.get_by_text("Published to the local CMS only", exact=False)).to_be_visible(timeout=15000)
         sitemap = httpx.get(API+"/sitemap.xml").text
