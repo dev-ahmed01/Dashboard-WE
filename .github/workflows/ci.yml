@@ -28,3 +28,13 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         run: npm run build
+      - name: Smoke test production nginx container and SPA fallback
+        run: |
+          docker build -t workspace-emlen-web-smoke -f apps/web/Dockerfile .
+          docker run -d --name workspace-emlen-web-smoke --add-host api:127.0.0.1 -p 127.0.0.1:18080:80 workspace-emlen-web-smoke
+          docker exec workspace-emlen-web-smoke nginx -t
+          curl --fail --silent --show-error --retry 12 --retry-connrefused --retry-delay 2 http://127.0.0.1:18080/ | grep -F '<div id="root"></div>'
+          curl --fail --silent --show-error http://127.0.0.1:18080/any/client/route | grep -F '<div id="root"></div>'
+      - name: Print nginx diagnostics on failure
+        if: failure()
+        run: docker logs workspace-emlen-web-smoke || true
