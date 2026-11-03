@@ -76,7 +76,7 @@ def run():
         expect(page.get_by_text("Draft changes saved", exact=False)).to_be_visible()
 
         # Publishing with SEO data: draft changes must not leak into already-published sitemap.
-        page.locator(".section-nav").get_by_role("button", name="SEO Settings").click()
+        page.locator(".section-nav").filter(has_text="SEO Settings").click()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
         page.get_by_role("button", name="Publish locally").click()
