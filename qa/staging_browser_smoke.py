@@ -63,8 +63,11 @@ def run():
         page.locator(".add-page .template-row").first.click()
         page.get_by_role("button", name="Continue to editor").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
+        expect(page.locator("#section-editing")).to_be_visible()
+        expect(page.locator("#seo-settings")).to_be_visible()
+        expect(page.locator("#page-preview")).to_be_visible()
         page.screenshot(path=str(OUT/"03_page_editor.png"))
-        page.locator(".form-stack input").first.fill("Unsaved QA Hero")
+        page.locator(".editor-fields-grid input").first.fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
@@ -76,7 +79,7 @@ def run():
         expect(page.get_by_text("Draft changes saved", exact=False)).to_be_visible()
 
         # Publishing with SEO data: draft changes must not leak into already-published sitemap.
-        page.locator(".section-nav").filter(has_text="SEO Settings").click()
+        page.locator("#seo-settings").scroll_into_view_if_needed()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
         page.get_by_role("button", name="Index", exact=True).click()
