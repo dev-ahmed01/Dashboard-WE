@@ -1,0 +1,92 @@
+name: Staging integration smoke
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: workspace
+          POSTGRES_USER: workspace
+          POSTGRES_PASSWORD: smoke_db_pass_2026
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workspace -d workspace"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      APP_ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://workspace:smoke_db_pass_2026@127.0.0.1:5432/workspace
+      JWT_SECRET: 9c3246a60ecb475aac234a130a3181e53a3bf664d32a4101a87b49ff038c9baa
+      ADMIN_EMAIL: smoke-admin@example.test
+      ADMIN_PASSWORD: Smoke-Admin-Password-2026
+      PUBLIC_SITE_URL: https://example.test
+      CORS_ORIGIN: http://127.0.0.1:5173
+      S3_ENDPOINT_URL: http://127.0.0.1:9000
+      S3_ACCESS_KEY: smoke_user
+      S3_SECRET_KEY: Smoke-Object-Storage-2026
+      S3_BUCKET: workspace-staging-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start disposable MinIO object storage
+        run: |
+          docker run -d --name we-smoke-minio -p 127.0.0.1:9000:9000 \
+            -e MINIO_ROOT_USER="$S3_ACCESS_KEY" -e MINIO_ROOT_PASSWORD="$S3_SECRET_KEY" \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:9000/minio/health/ready > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs we-smoke-minio
+          exit 1
+      - name: Install API dependencies and migrate actual PostgreSQL
+        working-directory: apps/api
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install playwright==1.55.0
+          alembic upgrade head
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/we-smoke-api.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/we-smoke-api.log
+          exit 1
+      - name: Start React frontend and install Chromium
+        working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          python -m playwright install --with-deps chromium
+          npm run dev -- --host 127.0.0.1 --port 5173 > /tmp/we-smoke-web.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173 > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/we-smoke-web.log
+          exit 1
+      - name: Admin and editor real-browser workflow
+        run: python qa/staging_browser_smoke.py
+      - name: Capture diagnostics on failure
+        if: failure()
+        run: |
+          cat /tmp/we-smoke-api.log 2>/dev/null || true
+          cat /tmp/we-smoke-web.log 2>/dev/null || true
+          docker logs we-smoke-minio 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v11-staging-browser-screenshots
+          path: qa/artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
