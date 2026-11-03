@@ -66,9 +66,14 @@ def run():
         expect(page.locator("#section-editing")).to_be_visible()
         expect(page.locator("#seo-settings")).to_be_visible()
         expect(page.locator("#page-preview")).to_be_visible()
+        positions = [page.locator(f"#{name}").bounding_box() for name in ("section-editing", "seo-settings", "page-preview")]
+        assert all(position is not None for position in positions), "Editor panels must be rendered"
+        assert positions[0]["y"] < positions[1]["y"] < positions[2]["y"], "Expected content, SEO, then preview"
+        assert positions[0]["width"] > page.locator(".content").bounding_box()["width"] * .75, "Editor must fill available width"
         page.screenshot(path=str(OUT/"03_page_editor.png"))
         page.locator(".editor-fields-grid input").first.fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
+        expect(page.frame_locator('iframe[title="Inline page preview"]').get_by_text("Unsaved QA Hero")).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
         frame = page.frame_locator('iframe[title="Website preview"]')
