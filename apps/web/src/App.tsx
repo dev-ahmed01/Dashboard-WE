@@ -27,6 +27,55 @@ async function html(path:string,payload?:unknown):Promise<string>{
 const json=(o:unknown)=>JSON.stringify(o)
 const label=(k:string)=>k.replaceAll('_',' ')
 
+type EditorAction={id:string;name:string;fields:Field[]}
+type EditorGroups={content:Field[];actions:EditorAction[];media:Field[]}
+
+/** Keep a CTA's text and destination next to each other, based on the
+ * importer's stable extraction order (text immediately precedes its link).
+ * This works on saved V14+ templates without changing database records. */
+function editorGroups(fields:Field[]):EditorGroups{
+  const used=new Set<string>()
+  const actions:EditorAction[]=[]
+  const cta=(f:Field)=>f.kind==='link'||((f.tag==='a'||f.tag==='button')&&f.attr==='text')
+  fields.forEach((f,i)=>{
+    if(!cta(f)||used.has(f.key))return
+    const pair:Field[]=[f];used.add(f.key)
+    const prev=fields[i-1],next=fields[i+1]
+    if(f.kind==='link'&&prev&&!used.has(prev.key)&&prev.attr==='text'&&cta(prev)){
+      pair.unshift(prev);used.add(prev.key)
+    }else if(f.attr==='text'&&next&&!used.has(next.key)&&next.kind==='link'){
+      pair.push(next);used.add(next.key)
+    }
+    const textField=pair.find(x=>x.attr==='text')
+    const raw=(textField?.default||f.label.replace(/^(?:Link destination|Button link|Button text|Link text):\s*/i,'')).replace(/\s+/g,' ').trim()
+    const name=raw.length>55?raw.slice(0,55).trim()+'…':raw||'Untitled button'
+    actions.push({id:pair[0].key,name,fields:pair})
+  })
+  return {
+    content:fields.filter(f=>!used.has(f.key)&&f.kind!=='image'&&f.kind!=='icon'),
+    actions,
+    media:fields.filter(f=>!used.has(f.key)&&(f.kind==='image'||f.kind==='icon'))
+  }
+}
+function friendlyEditorLabel(field:Field,position:number):string{
+  if(field.kind==='link')return 'Where this button goes'
+  if(field.kind==='icon')return field.attr==='icon_src'?'Replacement icon image URL':'Icon style'
+  if(field.kind==='image')return 'Image URL'
+  if(field.attr==='text'&&(field.tag==='a'||field.tag==='button'))return 'Button text'
+  if(field.tag==='h1')return 'Main headline (H1)'
+  if(field.tag&&/^h[2-6]$/.test(field.tag))return 'Heading ('+field.tag.toUpperCase()+')'
+  if(field.tag==='p')return 'Paragraph '+position
+  if(field.tag==='li')return 'Bullet point '+position
+  if(field.tag==='label')return 'Form label '+position
+  return field.kind==='textarea'?'Long description '+position:'Text '+position
+}
+function editorHelp(field:Field):string{
+  if(field.kind==='link')return 'Use #enquiry for a section, /contact/ for a page, or a full https:// address.'
+  if(field.kind==='icon')return field.attr==='icon_src'?'Leave blank to keep the existing icon. To replace it, paste an image URL.':'Enter icon CSS class names only.'
+  if(field.kind==='image')return 'Paste the URL of an uploaded or approved image.'
+  return field.default?'Currently: '+(field.default.length>105?field.default.slice(0,105).trim()+'…':field.default):''
+}
+
 export default function App(){
   const [user,setUser]=useState<{email:string;role:string}|null>(null)
   const [loginIdentifier,setLoginIdentifier]=useState('')
@@ -80,6 +129,8 @@ export default function App(){
   const [selectedPageIds,setSelectedPageIds]=useState<number[]>([])
   const [selectedTemplatePreview,setSelectedTemplatePreview]=useState('')
   const [templateDragActive,setTemplateDragActive]=useState(false)
+  const [deletingTemplate,setDeletingTemplate]=useState<Template|'all'|null>(null)
+  const [deletePhrase,setDeletePhrase]=useState('')
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
@@ -147,24 +198,26 @@ export default function App(){
     setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u)
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
-  async function deleteAllTemplates(){
-    if(!templates.length)return
-    const confirmation=window.prompt(
-      'Delete all '+templates.length+' uploaded templates from this CMS? This cannot be undone. Existing pages will be protected.\n\nType DELETE ALL TEMPLATES to confirm:'
-    )
-    if(confirmation===null)return
-    if(confirmation!=='DELETE ALL TEMPLATES'){
-      showError('Deletion cancelled. The confirmation phrase must match exactly.');return
-    }
+  function openDeleteDialog(target:Template|'all'){
+    setDeletingTemplate(target);setDeletePhrase('');setError('')
+  }
+  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeletePhrase('')}
+  async function confirmTemplateDeletion(){
+    if(!deletingTemplate)return
+    const target=deletingTemplate
+    const phrase=target==='all'?'DELETE ALL TEMPLATES':'DELETE '+target.name
+    if(deletePhrase!==phrase)return
     await action(async()=>{
-      const result=await api<{deleted:number;storage_cleanup_failed:number}>('/api/templates',{
-        method:'DELETE',body:json({confirmation})
+      const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
+      const result=await api<{deleted:number;storage_cleanup_failed:number}>(endpoint,{
+        method:'DELETE',body:json({confirmation:deletePhrase})
       })
-      setMappingId(null);setUploaded(null);setSelectedTemplate(null)
-      setOpenMappingSection(null);setSectionModeBackups({})
+      if(target==='all'||mappingId===target.id){setMappingId(null);setUploaded(null);setOpenMappingSection(null);setSectionModeBackups({})}
+      if(target==='all'||selectedTemplate===target.id)setSelectedTemplate(null)
       await refresh()
-      notify(result.deleted+' templates deleted.'+
-        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage objects could not be removed.':''))
+      setDeletingTemplate(null);setDeletePhrase('')
+      notify(result.deleted+' template'+(result.deleted===1?'':'s')+' deleted.'+
+        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage object(s) could not be removed.':''))
     })
   }
   async function redetectTemplate(t:Template){
@@ -563,13 +616,13 @@ export default function App(){
       <div className="category-uploaded-list">
         <div className="category-uploaded-heading">
           <h2>Uploaded Templates <span>({templates.length})</span></h2>
-          {templates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={deleteAllTemplates}><Trash2 size={15}/> Delete all templates</button>}
+          {templates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
         </div>
         <div className="category-uploaded-table">
           {templates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
             <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
             <span className={'category-status '+(t.approved?'category-approved':'category-draft')}>{t.approved?'Approved':'Needs mapping'}</span>
-            <button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button>
+            <div className="category-template-row-actions"><button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button><button type="button" className="category-template-delete-one" onClick={()=>openDeleteDialog(t)} disabled={busy} aria-label={'Delete template '+t.name} title={'Delete '+t.name}><Trash2 size={15}/> Delete</button></div>
           </div>)}
           {!templates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
         </div>
@@ -610,6 +663,20 @@ export default function App(){
   {nav==='Media Library'&&<><div className="page-top"><div><div className="small-label">IMAGE STORAGE</div><h1>Media Library</h1><p>Images are stored outside the application container with their alternative text.</p></div></div><form className="media-upload" onSubmit={e=>{e.preventDefault();const form=new FormData(e.currentTarget);action(async()=>{await api('/api/media',{method:'POST',body:form});setMedia(await api('/api/media'));notify('Image uploaded')})}}><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required/><input type="text" name="alt_text" placeholder="Alt text: what does this image convey?"/><button className="primary" disabled={busy}>Upload image</button></form><div className="media-grid">{media.map(m=><div className="media-card" key={m.id}><img src={m.url} alt={m.alt_text||''}/><strong>{m.filename}</strong><small>{m.alt_text||'Decorative / no alt text set'}</small><button className="quiet-action" onClick={()=>action(async()=>{const value=window.prompt('Edit image alt text (leave blank for decorative images)',m.alt_text);if(value===null)return;await api(`/api/media/${m.id}`,{method:'PATCH',body:json({alt_text:value})});setMedia(await api('/api/media'));notify('Alt text updated')})}>Edit alt text</button><button className="outline compact" onClick={()=>{navigator.clipboard.writeText(location.origin+m.url);notify('Image URL copied')}}>Copy URL <Copy size={14}/></button></div>)}</div></>}
   </>}
   </div></main>
+  {deletingTemplate!==null&&<div className="dialog-backdrop template-delete-backdrop">
+    <form className="dialog-card template-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="template-delete-title" onSubmit={e=>{e.preventDefault();confirmTemplateDeletion()}}>
+      <div className="template-delete-icon"><Trash2 size={23}/></div>
+      <h2 id="template-delete-title">{deletingTemplate==='all'?'Delete all templates?':'Delete this template?'}</h2>
+      <p>{deletingTemplate==='all'?'This permanently deletes the uploaded template library.':'This permanently deletes "'+deletingTemplate.name+'".'}</p>
+      <p className="template-delete-warning">Templates already used by any page—including archived or published pages—are protected. If a page depends on a selected template, the deletion is blocked and nothing is removed.</p>
+      <label>To confirm, type <strong>{deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name}</strong>
+        <input autoFocus type="text" placeholder="Type the confirmation phrase" autoComplete="off" spellCheck={false} value={deletePhrase} onChange={e=>setDeletePhrase(e.target.value)}/>
+      </label>
+      <div className="button-group"><button type="button" className="outline" onClick={closeDeleteDialog} disabled={busy}>Cancel</button>
+        <button type="submit" className="primary template-confirm-delete" disabled={busy||deletePhrase!==(deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name)}><Trash2 size={15}/> {busy?'Deleting…':'Delete permanently'}</button>
+      </div>
+    </form>
+  </div>}
   {showPassword&&<div className="dialog-backdrop"><form className="dialog-card" onSubmit={e=>{e.preventDefault();rotatePassword()}}><h2>Change your password</h2><p>All existing sessions will be signed out after the change.</p><label>Current password<input type="password" value={oldPassword} required onChange={e=>setOldPassword(e.target.value)}/></label><label>New password (minimum 12 characters)<input type="password" value={newPassword} minLength={12} required onChange={e=>setNewPassword(e.target.value)}/></label><div className="button-group"><button type="button" className="outline" onClick={()=>setShowPassword(false)}>Cancel</button><button className="primary" disabled={busy}>Change password</button></div></form></div>}
   {preview!==null&&<div className="preview-modal"><div className="preview-head"><div><strong>Full-page preview</strong><span>Sandboxed · Draft · Not indexed</span></div><button onClick={()=>setPreview(null)} aria-label="Close preview"><X size={23}/></button></div><iframe title="Website preview" sandbox="" srcDoc={preview}/></div>}
   </div>
