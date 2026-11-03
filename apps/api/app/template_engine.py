@@ -147,8 +147,26 @@ def get_sections(root):
 
 def extract(source: str):
     soup = sanitize(source)
-    root = soup.body.find('main') or soup.body
+    main = soup.body.find('main')
+    root = main or soup.body
     nodes = get_sections(root)
+    if main:
+        # Some exported designs put their visual hero <header> before <main>;
+        # legacy extraction looked inside main only and silently omitted it.
+        before_main = []
+        for node in soup.body.find_all(['header', 'section', 'div']):
+            if node is main:
+                continue
+            if node is main or main in node.parents or node.find('main'):
+                continue
+            if node.find_parent(['nav', 'footer']) or not node.find('h1'):
+                continue
+            if node.find('h1').get_text(' ', strip=True) and len(node.get_text(' ', strip=True)) >= 25:
+                before_main.append(node)
+        if before_main:
+            # Choose the first meaningful outer container, not a nested hero card.
+            hero = next((n for n in before_main if n.name in ('header', 'section')), before_main[0])
+            nodes = [hero] + nodes
     if not nodes:
         raise ValueError('No structural sections found. Wrap your design sections in <section> elements.')
     sections, fields = [], []
