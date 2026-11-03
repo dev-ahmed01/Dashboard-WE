@@ -66,7 +66,8 @@ def run():
         .hero{padding:40px;background:#fff}</style></head><body><main>
         <section class="hero" data-we-section="hero" data-we-name="Hero">
         <h1 data-we-field="hero_heading" data-we-label="Main headline">Original office headline</h1>
-        <p>Locked original supporting content</p></section>
+        <p>Locked original supporting content</p>
+         <a href="#enquiry">Request a callback</a></section>
         <section data-we-section="benefits" data-we-name="Benefits">
         <h2>Flexible benefits</h2><p>Static benefit description</p></section>
         </main></body></html>"""
@@ -117,10 +118,29 @@ def run():
         lock_switch.uncheck()
         expect(mode).to_have_value("static")
         mode.select_option("page")
+        # Save the button's text and URL as editable fields, so they can be
+        # shown together under one named button group in the page editor.
+        ctas=cards.first.locator(".map-field").filter(has_text="Request a callback")
+        assert ctas.count()==2, "Expected separate extracted button text and link"
+        for i in range(ctas.count()):
+            ctas.nth(i).locator("select[aria-label^='Behavior:']").select_option("page")
         page.locator(".approve input[type=checkbox]").check()
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
         page.get_by_role("button", name="Save template configuration").click()
         expect(page.get_by_text("Template mapping saved", exact=False)).to_be_visible()
+        # Destructive actions require an actual dialog and an exact typed phrase.
+        page.get_by_role("button", name="Delete template Staging Template").click()
+        delete_dialog=page.get_by_role("dialog", name="Delete this template?")
+        expect(delete_dialog).to_be_visible()
+        delete_button=delete_dialog.get_by_role("button", name="Delete permanently")
+        expect(delete_button).to_be_disabled()
+        delete_dialog.get_by_placeholder("Type the confirmation phrase").fill("DELETE wrong template")
+        expect(delete_button).to_be_disabled()
+        delete_dialog.get_by_placeholder("Type the confirmation phrase").fill("DELETE Staging Template")
+        expect(delete_button).to_be_enabled()
+        delete_dialog.get_by_role("button", name="Cancel").click()
+        expect(delete_dialog).to_have_count(0)
+        expect(page.locator(".category-uploaded-row")).to_have_count(1)
 
         # Page creation: name -> approved template -> editor.
         page.locator(".tabs").get_by_role("tab", name="Add Page").click()
@@ -139,6 +159,13 @@ def run():
         expect(static_block.get_by_text("Fixed content · reused from template")).to_be_visible()
         expect(static_block.locator(".editor-fields-grid")).to_have_count(0)
         expect(page.locator("#seo-settings")).to_be_visible()
+        expect(page.locator(".editor-field-group").first.get_by_text("Headings & text")).to_be_visible()
+        expect(page.locator(".editor-actions-group summary")).to_be_visible()
+        page.locator(".editor-actions-group summary").click()
+        expect(page.locator(".editor-action-card")).to_have_count(1)
+        expect(page.locator(".editor-action-card-head strong")).to_have_text("Request a callback")
+        expect(page.locator(".editor-action-card input")).to_have_count(2)
+        expect(page.locator("#seo-settings").get_by_text("Publication checklist (local CMS)")).to_have_count(0)
         expect(page.locator("#page-preview")).to_be_visible()
         positions = [page.locator(f"#{name}").bounding_box() for name in ("section-editing", "seo-settings", "page-preview")]
         assert all(position is not None for position in positions), "Editor panels must be rendered"
@@ -161,13 +188,17 @@ def run():
         page.locator("#seo-settings").scroll_into_view_if_needed()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
-        page.get_by_role("button", name="Index", exact=True).click()
+        page.get_by_role("switch", name="Allow indexing").check()
+        expect(page.get_by_role("switch", name="Allow indexing")).to_be_checked()
+        page.get_by_role("switch", name="Follow links").uncheck()
+        expect(page.get_by_role("switch", name="Follow links")).not_to_be_checked()
+        page.get_by_role("switch", name="Follow links").check()
         page.locator(".page-top").get_by_role("button", name="Publish locally").click()
         expect(page.get_by_text("Published to the local CMS only", exact=False)).to_be_visible(timeout=15000)
         sitemap = httpx.get(API+"/sitemap.xml").text
         assert "qa-bengaluru-office" in sitemap, sitemap[:500]
         page.screenshot(path=str(OUT/"05_published.png"))
-        page.get_by_role("button", name="Noindex").click()
+        page.get_by_role("switch", name="Allow indexing").uncheck()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()
         assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
 
