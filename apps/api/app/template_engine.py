@@ -154,14 +154,15 @@ def extract(source: str):
         # Some exported designs put their visual hero <header> before <main>;
         # legacy extraction looked inside main only and silently omitted it.
         before_main = []
-        for node in soup.body.find_all(['header', 'section', 'div']):
+        for node in soup.body.descendants:
             if node is main:
+                break
+            if not isinstance(node, Tag) or node.name not in ('header', 'section', 'div'):
                 continue
-            if node is main or main in node.parents or node.find('main'):
+            if node.find('main') or node.find_parent(['nav', 'footer']):
                 continue
-            if node.find_parent(['nav', 'footer']) or not node.find('h1'):
-                continue
-            if node.find('h1').get_text(' ', strip=True) and len(node.get_text(' ', strip=True)) >= 25:
+            heading = node.find('h1')
+            if heading and heading.get_text(' ', strip=True) and len(node.get_text(' ', strip=True)) >= 25:
                 before_main.append(node)
         if before_main:
             # Choose the first meaningful outer container, not a nested hero card.
