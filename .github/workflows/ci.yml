@@ -1,0 +1,30 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, 'feature/**']
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install Python dependencies
+        working-directory: apps/api
+        run: pip install -r requirements.txt
+      - name: Run Python tests
+        working-directory: apps/api
+        run: python -m pytest -q
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm install --no-audit
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm run build
