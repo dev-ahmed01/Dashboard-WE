@@ -33,6 +33,7 @@ class FakeStore:
     def ensure_bucket(self): pass
     def put(self,key,data,content_type): self.files[key]=data
     def get(self,key): return self.files[key]
+    def delete(self,key): self.files.pop(key,None)
 
 @pytest.fixture
 def client(monkeypatch):
