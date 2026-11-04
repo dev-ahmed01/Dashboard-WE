@@ -197,6 +197,13 @@ def run():
         cta_icon.get_by_label("Choose icon",exact=False).select_option("icon:arrow-up-right")
         expect(side_frame.locator('a[href="'+recording+'"] svg path')).to_have_count(2,timeout=15000)
         expect(page.locator(".editor-block-cta").first.get_by_label("Button destination")).to_have_value(recording)
+        # Verify a real click in the preview opens the exact destination through
+        # a parent-controlled link tester without navigating away from the CMS.
+        page.evaluate("window.__testOpened=[];window.open=(url)=>{window.__testOpened.push(url);return null;}")
+        side_frame.locator('a[href="'+recording+'"]').click()
+        assert page.evaluate("window.__testOpened") == [recording]
+        expect(page.locator(".editor-side-preview-feedback")).to_contain_text("separate tab")
+        expect(side_frame.locator('a[href="'+recording+'"]')).to_have_count(1)
         # A newly added card is saved as a repeater and updates the live preview.
         highlights.get_by_role("button", name="Add another card").click()
         new_card=highlights.locator(".editor-repeat-item.added").first
