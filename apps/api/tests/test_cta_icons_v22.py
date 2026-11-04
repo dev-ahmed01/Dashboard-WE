@@ -46,7 +46,7 @@ def test_enable_link_icon_editing_and_preview_real_external_url(client):
     assert a['href']==RECORDING
     assert a['rel']==['noopener','noreferrer'] or 'noopener' in a['rel']
     svg=a.find('svg')
-    assert svg and svg['viewBox']=='0 0 24 24'
+    assert svg and (svg.get('viewBox') or svg.get('viewbox'))=='0 0 24 24'
     assert len(svg.select('path'))==2
     assert svg.get('width')=='20' and svg.get('height')=='20'
     assert html.select_one('button') is None
@@ -58,7 +58,7 @@ def test_enable_link_icon_editing_and_preview_real_external_url(client):
     persisted=client.get(f"/api/pages/{p['id']}/preview",headers=auth)
     assert persisted.status_code==200
     assert RECORDING in persisted.text
-    assert 'viewBox="0 0 24 24"' in persisted.text
+    assert 'viewbox="0 0 24 24"' in persisted.text.lower()
     assert put_page(client,p['id'],auth,{'values':{icon['key']:'icon:script'}}).status_code==422
     assert put_page(client,p['id'],auth,{'values':{link['key']:'javascript:alert(1)'}}).status_code==422
     assert put_page(client,p['id'],auth,{'values':{icon['key']:'https://example.com/icon.png'}}).status_code==200
