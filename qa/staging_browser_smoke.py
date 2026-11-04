@@ -275,7 +275,7 @@ def run():
         # V23: Canva-style tools work on the SAME draft and render live.
         page.get_by_role("button", name="Add text", exact=True).click()
         expect(frame.locator('[data-we-design-element]')).to_have_count(1,timeout=15000)
-        inspector.get_by_label("Overlay text").fill("Flexible office CTA statement")
+        inspector.get_by_label("Overlay text", exact=True).fill("Flexible office CTA statement")
         expect(frame.get_by_text("Flexible office CTA statement")).to_be_visible(timeout=15000)
         inspector.get_by_label("Overlay Horizontal position").fill("85")
         expect(frame.locator('[data-we-design-element]')).to_have_attribute(
