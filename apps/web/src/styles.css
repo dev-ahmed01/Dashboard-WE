@@ -1799,3 +1799,18 @@
   .visual-head-actions button{padding:5px}
   .visual-head-actions .designer-zoom-switch{display:none}
 }
+
+.designer-existing-layers{border-top:1px solid #ede6e1;padding-top:9px}
+.designer-existing-layers>summary{
+  cursor:pointer;padding:5px 0;color:#63564e;
+  font:700 11px/1.5 Poppins,sans-serif;
+}
+.designer-existing-layer-list{display:grid;gap:6px;margin-top:8px;max-height:280px;overflow:auto}
+.designer-existing-layer-list button{
+  display:flex;align-items:center;text-align:left;gap:7px;
+  border:1px solid #e9e1db;background:#fff;border-radius:8px;
+  padding:8px;min-height:33px;
+  font:600 10px Poppins,sans-serif;color:#504640;
+}
+.designer-existing-layer-list button.layer-selected{border-color:#ed2024;background:#fff2f2;color:#ce1820}
+.designer-existing-layer-list button span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
