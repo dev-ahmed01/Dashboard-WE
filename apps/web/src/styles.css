@@ -1468,3 +1468,101 @@
 }
 .editor-repeat-variant>span{font-size:11px;font-weight:700}
 .editor-repeat-variant small{font-size:10px;color:#85766a;font-weight:400;line-height:1.5}
+
+/* V21: full-page visual design editor — no changes to public site styling. */
+.visual-head-actions{display:flex;align-items:center;gap:9px}
+.visual-head-actions button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid #e6dfd9;background:#fff;
+  color:#2c2622;border-radius:9px;min-height:35px;padding:8px 12px;
+  font-size:12px;font-weight:700;
+}
+.visual-head-actions button.visual-mode-on{
+  background:#fff0f0;border-color:#ed2024;color:#e41e24;
+}
+.visual-head-actions button.visual-save{
+  background:#ed2024;border-color:#ed2024;color:#fff;
+}
+.visual-head-actions button:disabled{opacity:.5;cursor:not-allowed}
+.visual-main{display:flex;min-height:0;flex:1;overflow:hidden}
+.visual-main>iframe{flex:1;min-width:0;width:100%;height:100%;border:0;background:#fff}
+.visual-inspector{
+  box-sizing:border-box;flex:none;width:315px;max-width:35%;
+  background:#fefdfc;border-left:1px solid #e8e2dd;
+  padding:18px;display:flex;flex-direction:column;gap:13px;
+  overflow-y:auto;overscroll-behavior:contain;
+}
+.visual-inspector h2{
+  margin:0;font:750 19px/1.2 'Bricolage Grotesque',sans-serif;color:#211d1b;
+}
+.visual-inspector>p{
+  margin:0;font-size:11px;line-height:1.65;color:#817873;
+}
+.visual-inspector-group{
+  display:grid;gap:12px;
+  padding:13px;border:1px solid #ece6e1;background:#fff;
+  border-radius:12px;
+}
+.visual-inspector-group h3{
+  font-size:13px;color:#27211e;font-weight:750;margin:0;
+  line-height:1.35;overflow-wrap:anywhere;
+}
+.visual-inspector-group label{
+  display:grid;gap:7px;
+  font-size:11px;font-weight:700;color:#544942;min-width:0;
+}
+.visual-inspector-group select,.visual-inspector-group input:not([type='range']):not([type='checkbox']),
+.visual-inspector-group textarea{
+  box-sizing:border-box;width:100%;min-width:0;
+  background:#fff;border:1px solid #e7dfda;
+  border-radius:9px;padding:10px 11px;
+  font-size:12px;line-height:1.55;font-weight:450;color:#26211e;
+}
+.visual-inspector-group select{height:40px}
+.visual-inspector-group textarea{min-height:85px;resize:vertical}
+.visual-inspector-group input[type='range']{accent-color:#ed2024;width:100%}
+.visual-inspector-group .visual-lock-row{
+  display:flex;align-items:center;gap:7px;font-size:11px;
+  color:#594d46;cursor:pointer;
+}
+.visual-lock-row input{accent-color:#ed2024}
+.visual-inspector-group button.visual-add{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  border:1px dashed #e6b44c;color:#72500b;background:#fff8e5;
+  border-radius:9px;padding:10px;font-size:12px;font-weight:750;
+}
+.visual-inspector-group button.visual-add:disabled{opacity:.5}
+.visual-variant-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.visual-variant-buttons>span{grid-column:1/-1;font-size:11px;color:#66584e;font-weight:700}
+.visual-variant-buttons button{
+  border:1px solid #e7ded8;background:#faf8f5;
+  border-radius:8px;padding:8px 3px;font-size:10px;font-weight:750;color:#5f554f;
+}
+.visual-variant-buttons button[aria-pressed='true']{
+  background:#ed2024;border-color:#ed2024;color:#fff;
+}
+.visual-inspector-empty{
+  padding:22px 14px;border:1px dashed #e6dbd4;
+  background:#fff;border-radius:11px;
+  text-align:center;color:#857a73;
+  font-size:12px;line-height:1.55;
+}
+.visual-inspector-note{font-size:10px;color:#94877e;line-height:1.6}
+.editor-current-image{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid #e9e2dd;border-radius:9px;background:#faf9f7;
+  padding:6px;max-width:100%;
+}
+.editor-current-image img{height:60px;width:90px;object-fit:cover;border-radius:6px}
+.editor-current-image small{font-size:10px;color:#81766f}
+.editor-ordered-field .editor-ordered-help svg{display:inline;vertical-align:middle}
+@media(max-width:1000px){
+  .visual-inspector{width:290px;max-width:45%}
+}
+@media(max-width:720px){
+  .visual-main{flex-direction:column}
+  .visual-main>iframe{height:60%;flex:1}
+  .visual-inspector{width:100%;max-width:none;min-height:170px;max-height:40%;border-left:0;border-top:1px solid #e8e2dd;padding:12px}
+  .visual-head-actions button{font-size:11px;padding:7px;min-height:32px}
+  .preview-head{padding:10px}
+}
