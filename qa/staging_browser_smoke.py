@@ -168,39 +168,46 @@ def run():
         expect(page.locator("#seo-settings")).to_be_visible()
         expect(page.get_by_label("URL slug")).to_have_count(0)
         expect(page.locator("#page-preview")).to_have_count(0)
-        expect(page.locator(".editor-ordered-block").first).to_be_visible()
-        assert page.locator(".editor-ordered-block").count() >= 4
-        expect(page.locator(".editor-block-card")).to_have_count(2)
-        expect(page.locator(".editor-block-card").first.get_by_text("Offices in prime locations")).to_be_visible()
-        expect(page.locator(".editor-block-card").nth(1).get_by_text("Multiple pricing plans")).to_be_visible()
+        # Native repeaters use the real HTML cards and reproduce their layout.
+        highlights=page.locator(".editor-repeat-group").first
+        expect(highlights).to_be_visible()
+        expect(highlights.locator(".editor-repeat-item")).to_have_count(2)
+        expect(highlights.get_by_role("button", name="Add another card")).to_be_visible()
         expect(page.locator(".editor-block-cta")).to_have_count(2)
         expect(page.locator(".editor-block-cta").first.locator("strong")).to_have_text("Request a callback")
         expect(page.locator(".editor-block-cta").nth(1).locator("strong")).to_have_text("Call now")
         expect(page.locator(".editor-block-cta").nth(1).locator(".editor-fixed-destination code")).to_have_text("tel:+919814953954")
         expect(page.locator(".editor-block-cta input[aria-label='Button destination']")).to_have_value("#enquiry")
-        assert page.locator(".editor-block-card").first.bounding_box()["y"] < page.locator(".editor-block-cta").first.bounding_box()["y"], "Cards must follow source HTML order"
-        # All three SVGs are contextual; none is an anonymous input by default.
-        expect(page.locator(".editor-context-icon")).to_have_count(3)
-        expect(page.locator(".editor-context-icon input:visible")).to_have_count(0)
-        page.locator(".editor-block-card").first.locator(".editor-context-icon summary").click()
-        expect(page.locator(".editor-block-card").first.locator(".editor-context-icon input")).to_be_visible()
-        page.locator(".editor-block-card").first.locator(".editor-context-icon summary").click()
-        expect(page.locator(".editor-context-icon input:visible")).to_have_count(0)
+        # A newly added card is saved as a repeater and updates the live preview.
+        highlights.get_by_role("button", name="Add another card").click()
+        new_card=highlights.locator(".editor-repeat-item.added").first
+        new_card.locator("summary").click()
+        new_card.get_by_label("Card heading").fill("New flexible office benefit")
+        expect(new_card.get_by_label("Card heading")).to_have_value("New flexible office benefit")
+        expect(highlights.locator(".editor-repeat-item")).to_have_count(3)
+        side_frame=page.frame_locator('iframe[title="Selected section preview"]')
+        expect(side_frame.get_by_text("New flexible office benefit")).to_be_visible(timeout=15000)
         expect(page.locator(".editor-side-preview")).to_be_visible()
         side_bounds=page.locator(".editor-side-preview").bounding_box()
         fields_bounds=page.locator(".editor-section-rows").bounding_box()
-        assert side_bounds["x"]>=fields_bounds["x"]+fields_bounds["width"]-2, "Side preview must appear to the right"
-        side_frame=page.frame_locator('iframe[title="Selected section preview"]')
-        expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
-        # Side preview follows the selected editable section.
+        assert side_bounds["x"]>=fields_bounds["x"]+fields_bounds["width"]-2
+        # Opening another section should bring its heading into view.
         page.locator(".editor-section-toggle").nth(1).click()
         expect(side_frame.get_by_text("Flexible benefits")).to_be_visible(timeout=15000)
+        page.wait_for_timeout(850)
+        benefits_pos=page.locator(".editor-section-block").nth(1).bounding_box()
+        assert 0 <= benefits_pos["y"] < 180, "Opening a section should scroll it into view"
         page.locator(".editor-section-toggle").first.click()
-        expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
-        page.screenshot(path=str(OUT/"03_page_editor.png"))
+        expect(side_frame.get_by_text("New flexible office benefit")).to_be_visible(timeout=15000)
         page.get_by_label("Main headline").fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
         expect(side_frame.get_by_text("Unsaved QA Hero")).to_be_visible(timeout=15000)
+        # Arrow icon is preserved even after the CTA text is rewritten.
+        page.locator(".editor-block-cta").first.get_by_label("Button text").fill("Schedule a callback")
+        expect(side_frame.get_by_text("Schedule a callback")).to_be_visible(timeout=15000)
+        arrow=side_frame.locator("a.btn .pill-arr")
+        expect(arrow).to_have_text("↗")
+        page.screenshot(path=str(OUT/"03_page_editor_repeaters.png"))
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
         frame = page.frame_locator('iframe[title="Website preview"]')
