@@ -1205,3 +1205,138 @@
   .editor-side-preview-window{height:370px}
   .editor-side-preview{padding:11px}
 }
+
+/* V19: page-order content controls, contextual CTAs, no anonymous SVG fields. */
+.editor-page-ordered-list{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  background:#fbfaf9;
+}
+.editor-ordered-block{
+  border:1px solid #e9e3df;
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 2px 10px rgba(25,17,13,.018);
+}
+.editor-block-card{border-color:#efdcd2}
+.editor-block-cta{border-color:#eed5d5}
+.editor-ordered-block-header{
+  display:flex;align-items:center;gap:11px;
+  padding:13px 14px;
+  background:#f9f8f7;
+  border-bottom:1px solid #ebe6e3;
+}
+.editor-block-card .editor-ordered-block-header{background:#fffaf6}
+.editor-block-cta .editor-ordered-block-header{background:#fff8f8}
+.editor-ordered-block-header>div{
+  display:flex;min-width:0;
+  flex-direction:column;gap:3px;
+}
+.editor-ordered-block-header small{
+  color:#8f8179;font-size:10px;font-weight:700;
+}
+.editor-ordered-block-header strong{
+  color:#282320;font-size:13px;
+  line-height:1.42;font-weight:750;
+  overflow-wrap:anywhere;
+}
+.editor-ordered-step{
+  display:grid;place-items:center;
+  flex:none;
+  width:31px;height:31px;
+  background:#f4efec;color:#7b6159;
+  border-radius:9px;
+  font-size:11px;font-weight:800;
+}
+.editor-block-cta .editor-ordered-step{color:#ed2024;background:#ffecec}
+.editor-block-card .editor-ordered-step{color:#956705;background:#fff0b9}
+.editor-ordered-block-fields{
+  padding:15px;
+  display:grid;
+  gap:15px;
+  grid-template-columns:minmax(0,1fr);
+}
+.editor-ordered-field{display:grid;gap:7px;min-width:0}
+.editor-ordered-label{
+  color:#332e29;font-size:12px;font-weight:700;
+  line-height:1.5;overflow-wrap:anywhere;
+}
+.editor-ordered-field input,
+.editor-ordered-field textarea{
+  box-sizing:border-box;
+  width:100%;min-width:0;
+  border:1px solid #e3deda;
+  background:#fff;color:#27221e;
+  border-radius:10px;
+  padding:11px 13px;
+  min-height:44px;
+  line-height:1.5;
+  font-size:12px;font-weight:500;
+  box-shadow:none;
+}
+.editor-ordered-field textarea{
+  resize:vertical;min-height:85px;
+  white-space:pre-wrap;
+}
+.editor-ordered-field input:focus,
+.editor-ordered-field textarea:focus{
+  outline:3px solid #ffb90033;outline-offset:0;
+  border-color:#ed2024;
+}
+.editor-ordered-help{
+  display:block;color:#8c807a;
+  font-size:10px;line-height:1.55;
+  overflow-wrap:anywhere;
+}
+.editor-destination-field{
+  padding-top:11px;
+  border-top:1px solid #f1ece9;
+}
+.editor-block-cta .editor-destination-field input{
+  border-color:#f0d7d8;background:#fffafa;
+}
+.editor-context-icon{
+  border-top:1px solid #eee9e5;
+  background:#fdfcfa;
+}
+.editor-context-icon>summary{
+  display:flex;align-items:center;gap:8px;
+  padding:11px 14px;
+  font-size:11px;font-weight:700;color:#75665d;
+  cursor:pointer;list-style:none;
+}
+.editor-context-icon>summary::-webkit-details-marker{display:none}
+.editor-context-icon>summary svg{margin-left:auto;transition:transform .18s}
+.editor-context-icon[open]>summary svg{transform:rotate(90deg)}
+.editor-context-icon>p{
+  padding:0 14px;
+  font-size:10px;
+  line-height:1.5;color:#867b72;
+}
+.editor-context-icon .editor-ordered-block-fields{padding:12px 14px 15px}
+.editor-no-variable{
+  display:grid;justify-items:start;gap:8px;
+  padding:24px;color:#82756e;
+  font-size:12px;line-height:1.5;
+  border:1px dashed #e5dbd5;
+  border-radius:12px;background:#fff;
+}
+.editor-no-variable strong{font-size:14px;color:#39302c}
+.editor-no-variable p{margin:0}
+.editor-side-preview-actions{display:flex;align-items:center;gap:7px}
+.editor-side-preview-actions button{font-size:10px;min-height:31px;padding:6px 9px}
+.seo-simple-fields{display:grid;grid-template-columns:minmax(0,1fr)}
+.seo-simple-fields label{grid-column:1/-1}
+.seo-simple-fields input{width:100%}
+@media(max-width:1260px){
+  .editor-ordered-block-fields{padding:13px}
+  .editor-side-preview-actions{gap:5px}
+}
+@media(max-width:760px){
+  .editor-page-ordered-list{padding:9px;gap:10px}
+  .editor-ordered-block-fields{padding:12px}
+  .editor-ordered-block-header{padding:11px}
+}
