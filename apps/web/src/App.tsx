@@ -1068,6 +1068,169 @@ export default function App(){
       </details>}
     </div>
   }
+  function canvasStyleControls(category:'items'|'fields',id:string){
+    const options=category==='items'?visualDesign.items?.[id]||{}:visualDesign.fields?.[id]||{}
+    const patch=(next:DesignStyle)=>designPatch(category,id,next)
+    const numberInput=(title:string,key:keyof DesignStyle,min:number,max:number,fallback:number,unit='px')=>
+      <label key={key} className="designer-number-field">{title}
+        <div className="designer-unit-input">
+          <input type="number" aria-label={title} min={min} max={max} value={Number(options[key]??fallback)}
+            onChange={e=>patch({[key]:Math.max(min,Math.min(max,Math.round(Number(e.target.value)||0)))})}/>
+          <span>{unit}</span>
+        </div>
+      </label>
+    return <div className="designer-property-stack">
+      <div className="designer-property-section">
+        <h3><Move size={15}/> Position & size</h3>
+        <div className="designer-property-grid">
+          {numberInput('Move horizontally','x',-600,600,0)}
+          {numberInput('Move vertically','y',-600,600,0)}
+          {numberInput('Width','widthPx',30,1800,category==='items'?300:300)}
+          {numberInput('Height','heightPx',20,1000,category==='items'?300:80)}
+          {numberInput('Rotate','rotate',-180,180,0,'°')}
+          {numberInput('Corner radius','radius',0,120,0)}
+        </div>
+      </div>
+      <div className="designer-property-section">
+        <h3><Type size={15}/> Appearance</h3>
+        <div className="designer-property-grid">
+          <label>Text color<input aria-label="Text color" type="color" value={options.color||'#161616'} onChange={e=>patch({color:e.target.value})}/></label>
+          <label>Fill color<input aria-label="Fill color" type="color" value={options.background||'#FFFFFF'} onChange={e=>patch({background:e.target.value})}/></label>
+        </div>
+        <label>Typeface
+          <select aria-label="Typeface" value={options.fontFamily||'Poppins'} onChange={e=>patch({fontFamily:e.target.value})}>
+            {['Poppins','Bricolage Grotesque','Arial','Georgia','Verdana'].map(f=><option key={f}>{f}</option>)}
+          </select>
+        </label>
+        <label>Text alignment
+          <select aria-label="Text alignment" value={options.textAlign||'left'} onChange={e=>patch({textAlign:e.target.value})}>
+            {['left','center','right','justify'].map(a=><option key={a} value={a}>{a[0].toUpperCase()+a.slice(1)}</option>)}
+          </select>
+        </label>
+        <div className="designer-property-grid">
+          {numberInput('Font weight','fontWeight',400,800,600,'')}
+          {numberInput('Letter spacing','letterSpacing',-5,20,0)}
+          {numberInput('Line height','lineHeight',80,250,130,'%')}
+          {numberInput('Padding','padding',0,80,0)}
+        </div>
+        <label>Opacity: {options.opacity??100}%
+          <input type="range" aria-label="Element opacity" min="0" max="100" value={options.opacity??100}
+            onChange={e=>patch({opacity:Number(e.target.value)})}/>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Layers size={15}/> Layer & visibility</h3>
+        <div className="designer-property-grid">
+          {numberInput('Layer order','zIndex',0,50,0,'')}
+          {category==='items'&&numberInput('Card order','order',0,80,0,'')}
+        </div>
+        <label className="visual-lock-row"><input type="checkbox" checked={!!options.locked}
+          aria-label="Lock selected element" onChange={e=>patch({locked:e.target.checked})}/>
+          <LockKeyhole size={14}/> Lock element</label>
+        <label className="visual-lock-row"><input type="checkbox" checked={!!options.hidden}
+          aria-label="Hide selected element" onChange={e=>patch({hidden:e.target.checked})}/>
+          <EyeOff size={14}/> Hide from page</label>
+        <button type="button" className="designer-neutral-action" onClick={()=>designRemove(category,id)}>
+          <RotateCw size={15}/> Reset styling
+        </button>
+      </div>
+    </div>
+  }
+  function canvasOverlayControls(el:CanvasElement){
+    const set=(p:Partial<CanvasElement>)=>overlayPatch(el.id,p)
+    const num=(title:string,key:'x'|'y'|'width'|'height'|'rotate'|'radius'|'fontSize'|'opacity'|'zIndex',
+      min:number,max:number,unit='px')=>
+      <label className="designer-number-field">{title}
+        <div className="designer-unit-input"><input type="number" aria-label={'Overlay '+title}
+          min={min} max={max} value={el[key]}
+          onChange={e=>set({[key]:Math.max(min,Math.min(max,Math.round(Number(e.target.value)||0)))})}/>
+          <span>{unit}</span></div>
+      </label>
+    return <div className="designer-property-stack">
+      <div className="designer-property-section">
+        <h3>{el.type==='text'?'Text':el.type==='image'?'Image':el.type==='button'?'Button':'Shape'} properties</h3>
+        {(el.type==='text'||el.type==='button')&&<label>Text
+          <textarea aria-label="Overlay text" value={el.text||''} rows={3}
+            disabled={!!el.locked} maxLength={1000} onChange={e=>set({text:e.target.value})}/>
+        </label>}
+        {(el.type==='image'||el.type==='button')&&<label>{el.type==='image'?'Image URL':'Button link'}
+          <input aria-label={el.type==='image'?'Overlay image URL':'Overlay button URL'}
+            disabled={!!el.locked} value={el.url||''} onChange={e=>set({url:e.target.value})}/>
+        </label>}
+        {el.type==='image'&&<label>Upload a photo
+          <input aria-label="Upload overlay image" type="file" accept="image/png,image/jpeg,image/webp"
+            disabled={!!el.locked} onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>set({url}))}/>
+        </label>}
+        <label>Move to section
+          <select aria-label="Overlay section" disabled={!!el.locked} value={el.sectionId}
+            onChange={e=>set({sectionId:e.target.value})}>
+            {editor?.template.sections.map(sec=><option key={sec.id} value={sec.id}>{sec.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Move size={15}/> Position & dimensions</h3>
+        <div className="designer-property-grid">
+          {num('Horizontal position','x',0,2400)}
+          {num('Vertical position','y',0,12000)}
+          {num('Width','width',30,1800)}
+          {num('Height','height',20,1000)}
+          {num('Rotation','rotate',-180,180,'°')}
+          {num('Corners','radius',0,120)}
+        </div>
+        <small>Drag on the page to move; use the red corner handle to resize. Arrow keys move precisely, Shift + arrows move 10px.</small>
+      </div>
+      <div className="designer-property-section">
+        <h3><Type size={15}/> Style</h3>
+        <div className="designer-property-grid">
+          <label>Text color<input type="color" aria-label="Overlay text color" value={el.color}
+            disabled={!!el.locked} onChange={e=>set({color:e.target.value})}/></label>
+          <label>Fill color<input type="color" aria-label="Overlay fill color" value={el.background}
+            disabled={!!el.locked} onChange={e=>set({background:e.target.value})}/></label>
+          {num('Text size','fontSize',8,120)}
+          {num('Opacity','opacity',0,100,'%')}
+        </div>
+        <label>Typeface
+          <select aria-label="Overlay font" value={el.fontFamily} disabled={!!el.locked}
+            onChange={e=>set({fontFamily:e.target.value})}>
+            {['Poppins','Bricolage Grotesque','Arial','Georgia','Verdana'].map(name=><option key={name}>{name}</option>)}
+          </select>
+        </label>
+        <label>Weight
+          <select aria-label="Overlay font weight" value={el.fontWeight} disabled={!!el.locked}
+            onChange={e=>set({fontWeight:Number(e.target.value)})}>
+            {[400,500,600,700,800].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>Alignment
+          <select aria-label="Overlay text alignment" value={el.textAlign} disabled={!!el.locked}
+            onChange={e=>set({textAlign:e.target.value})}>
+            {['left','center','right','justify'].map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Layers size={15}/> Layer actions</h3>
+        <div className="designer-property-grid">
+          <button type="button" className="designer-neutral-action" disabled={!!el.locked||el.zIndex>=50}
+            onClick={()=>set({zIndex:Math.min(50,el.zIndex+1)})}><ArrowUp size={14}/> Forward</button>
+          <button type="button" className="designer-neutral-action" disabled={!!el.locked||el.zIndex<=0}
+            onClick={()=>set({zIndex:Math.max(0,el.zIndex-1)})}><ArrowDown size={14}/> Backward</button>
+        </div>
+        <label className="visual-lock-row"><input type="checkbox" aria-label="Lock overlay" checked={!!el.locked}
+          onChange={e=>set({locked:e.target.checked})}/><LockKeyhole size={14}/> Lock element</label>
+        <label className="visual-lock-row"><input type="checkbox" aria-label="Hide overlay" checked={!!el.hidden}
+          onChange={e=>set({hidden:e.target.checked})}/><EyeOff size={14}/> Hide element</label>
+        <div className="designer-property-grid">
+          <button type="button" className="designer-neutral-action" onClick={overlayDuplicate}
+            disabled={(visualDesign.elements||[]).length>=50}><Copy size={15}/> Duplicate</button>
+          <button type="button" className="designer-neutral-action danger" disabled={!!el.locked}
+            onClick={overlayRemove}><Trash2 size={15}/> Delete</button>
+        </div>
+      </div>
+    </div>
+  }
+
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
   const categoryPages=visiblePages.filter(p=>{
