@@ -38,7 +38,7 @@ def test_canva_page_elements_render_and_survive_save(client):
       'elements':[
         overlay(section_id=first_sec,text='Custom <img src=x onerror=alert(1)>'),
         overlay(id='ov_button_added',type='button',section_id=first_sec),
-        overlay(id='ov_shape_added',type='shape',section_id=first_sec,text='',rotate:-20),
+        overlay(id='ov_shape_added',type='shape',section_id=first_sec,text='',rotate=-20),
         overlay(id='ov_image_added',type='image',section_id=first_sec),
       ]
     }
