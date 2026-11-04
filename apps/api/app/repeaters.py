@@ -207,3 +207,93 @@ def apply_extras(soup, fields: list[dict], values: dict, change_field):
                     if tag.get(marker):
                         tag[marker]=group['id']+'_added_'+str(index)+'_'+tag[marker]
             wrapper.append(clone)
+
+
+DESIGN_KEY='__design__'
+
+
+def read_design(values):
+    try:
+        item=json.loads(values.get(DESIGN_KEY,'{}'))
+        return item if isinstance(item,dict) else {}
+    except (ValueError,TypeError):
+        return {}
+
+
+def apply_design(soup,fields,values):
+    """Apply a narrow, sanitized layout schema without inserting user CSS."""
+    design=read_design(values)
+    if not design:return
+    from bs4 import BeautifulSoup
+    groups=design.get('groups') or {}
+    items=design.get('items') or {}
+    field_styles=design.get('fields') or {}
+    stylesheet=[]
+    for group_id,settings in groups.items():
+        if not isinstance(settings,dict):continue
+        wrapper=soup.find(attrs={'data-we-repeat-group':group_id})
+        if not wrapper:continue
+        cols=settings.get('columns')
+        gap=settings.get('gap')
+        if isinstance(cols,int) and 1<=cols<=6 and wrapper.name in ('div','ul','ol'):
+            selector=f'[data-we-repeat-group="{group_id}"]'
+            stylesheet.append(f'{selector}{{display:grid!important;grid-template-columns:repeat({cols},minmax(0,1fr))!important;}}')
+            stylesheet.append(f'@media(max-width:900px){{{selector}{{grid-template-columns:repeat({min(cols,2)},minmax(0,1fr))!important;}}}}')
+            stylesheet.append(f'@media(max-width:580px){{{selector}{{grid-template-columns:1fr!important;}}}}')
+        if isinstance(gap,int) and 0<=gap<=48:
+            wrapper['style']=(wrapper.get('style','')+f';gap:{gap}px!important;')
+    for item_id,options in items.items():
+        if not isinstance(options,dict):continue
+        node=soup.find(attrs={'data-we-repeat-item':item_id})
+        if not node:continue
+        span=options.get('span')
+        height=options.get('height')
+        styles=[]
+        if isinstance(span,int) and 1<=span<=4:
+            styles.append(f'grid-column:span {span}!important')
+            stylesheet.append(f'@media(max-width:900px){{[data-we-repeat-item="{item_id}"]{{grid-column:auto!important;}}}}')
+        if isinstance(height,int) and 150<=height<=600:
+            styles.append(f'height:{height}px!important')
+        if styles:node['style']=(node.get('style','')+';'+';'.join(styles)+';')
+    for key,options in field_styles.items():
+        if not isinstance(options,dict):continue
+        node=soup.find(attrs={'data-we-field':key})
+        if not node:continue
+        size=options.get('fontPx')
+        if isinstance(size,int) and 10<=size<=100:
+            node['style']=(node.get('style','')+f';font-size:{size}px!important;')
+    if stylesheet:
+        style=soup.new_tag('style')
+        style['id']='we-editor-safe-layout'
+        style.string='\n'.join(stylesheet)
+        (soup.head or soup.body).append(style)
+
+
+def validate_design(raw,sections,fields):
+    if not isinstance(raw,str) or len(raw)>16000:
+        raise ValueError('Layout settings must be under 16 KB')
+    try: data=json.loads(raw)
+    except (TypeError,ValueError):
+        raise ValueError('Invalid visual layout settings')
+    if not isinstance(data,dict) or set(data)-{'groups','items','fields'}:
+        raise ValueError('Unexpected visual layout controls')
+    groups={g['id']:g for s in sections for g in s.get('repeaters',[])}
+    permitted_fields={f['key'] for f in fields if f.get('mode')=='page'}
+    item_ids={item['id'] for group in groups.values() for item in group['items']}
+    item_ids.update(f"{gid}_added_{i}" for gid in groups for i in range(1,MAX_ADDITIONS+1))
+    for category,allowed in (('groups',set(groups)),('items',item_ids),('fields',permitted_fields)):
+        entries=data.get(category,{})
+        if not isinstance(entries,dict) or len(entries)>240 or set(entries)-allowed:
+            raise ValueError('Visual layout references a locked or unknown element')
+        for opts in entries.values():
+            if not isinstance(opts,dict):raise ValueError('Invalid visual layout options')
+            allowed_opts=({'columns':(1,6),'gap':(0,48)} if category=='groups'
+                          else {'span':(1,4),'height':(150,600),'locked':None} if category=='items'
+                          else {'fontPx':(10,100),'locked':None})
+            if set(opts)-set(allowed_opts):raise ValueError('Invalid visual style option')
+            for key,value in opts.items():
+                limits=allowed_opts[key]
+                if limits is None:
+                    if not isinstance(value,bool):raise ValueError('Lock state must be true or false')
+                elif type(value) is not int or not limits[0]<=value<=limits[1]:
+                    raise ValueError('Visual size is outside the allowed range')
