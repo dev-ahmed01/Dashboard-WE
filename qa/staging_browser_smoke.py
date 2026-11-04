@@ -295,7 +295,8 @@ def run():
         expect(frame.locator('[data-we-design-element]')).to_have_count(1,timeout=15000)
         page.get_by_role("button", name="Add shape").click()
         expect(frame.locator('[data-we-design-element]')).to_have_count(2,timeout=15000)
-        page.get_by_role("button", name="Show layers").click()
+        if page.get_by_role("button", name="Show layers").get_attribute("aria-pressed")=="false":
+            page.get_by_role("button", name="Show layers").click()
         expect(inspector.locator(".designer-layers")).to_be_visible()
         page.get_by_role("button", name="Toggle alignment grid").click()
         page.get_by_label("Preview device").select_option("mobile")
