@@ -1056,7 +1056,7 @@ export default function App(){
       </div>
     </div>
     <div className="visual-main">
-      <iframe ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
+      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
         srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
