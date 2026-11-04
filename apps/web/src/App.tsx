@@ -35,6 +35,25 @@ type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields
 const isCtaText=(f:Field)=>f.attr==='text'&&(f.tag==='a'||f.tag==='button')
 const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replace(/\s+/g,' ').trim().length>n?'…':'')
 
+const SIMPLE_ICONS=[
+  {value:'icon:arrow-up-right',label:'Arrow up-right ↗'},
+  {value:'icon:arrow-right',label:'Arrow right →'},
+  {value:'icon:phone',label:'Phone'},
+  {value:'icon:map-pin',label:'Location pin'},
+  {value:'icon:check',label:'Check mark'},
+  {value:'icon:calendar',label:'Calendar'},
+  {value:'icon:chevron-right',label:'Chevron'},
+  {value:'icon:layers',label:'Layers'},
+]
+function isTestableHref(url:string){
+  const trimmed=url.trim()
+  return /^(https?:\/\/[^ \r\n\t]+|mailto:[^ \r\n\t]+|tel:[+0-9() -]+)$/i.test(trimmed)
+}
+function isSafePreviewHref(url:string){
+  return isTestableHref(url)||url.startsWith('#')||(url.startsWith('/')&&!url.startsWith('//'))
+}
+
+
 /** Order the editor as the real HTML is ordered: headline, calls-to-action,
  * then repeated highlight cards, descriptions and images. Static content is
  * used only to identify a block. It never produces an editable input. */
@@ -187,7 +206,9 @@ export default function App(){
     return()=>window.cancelAnimationFrame(frame)
   },[activeEditorSection])
 
-  const [focusedPreviewField,setFocusedPreviewField]=useState('')
+  const [customIconPickers,setCustomIconPickers]=useState<string[]>([])
+  const [linkFeedback,setLinkFeedback]=useState('')
+    const [focusedPreviewField,setFocusedPreviewField]=useState('')
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
   const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
   const [sectionPreviewError,setSectionPreviewError]=useState('')
@@ -438,7 +459,64 @@ export default function App(){
       return {...current,page:{...current.page,values:vals}}
     })
   }
+  function attachPreviewLinks(frame:HTMLIFrameElement){
+    // Source HTML is sandboxed without scripting. Listen from the parent so
+    // links open safely in another tab instead of replacing the preview.
+    const doc=frame.contentDocument
+    if(!doc)return
+    doc.addEventListener('click',event=>{
+      if(canvasMode)return // visual editor uses click-to-select instead
+      const node=event.target as Element
+      const link=node.closest?.('a[href]')
+      if(!link)return
+      const href=(link.getAttribute('href')||'').trim()
+      if(href.startsWith('#')){
+        event.preventDefault()
+        const id=href.slice(1)
+        const target=id?doc.getElementById(id):null
+        if(target){target.scrollIntoView({behavior:'smooth',block:'start'});setLinkFeedback('Jumped to '+href)}
+        else setLinkFeedback('This button links to '+href+'. Use the full-page preview to locate that section.')
+        return
+      }
+      event.preventDefault()
+      if(!isSafePreviewHref(href)){setLinkFeedback('This destination is not a permitted link.');return}
+      if(isTestableHref(href)){
+        // Call directly from the user click, preserving the browser gesture.
+        window.open(href,'_blank','noopener,noreferrer')
+        setLinkFeedback('Opened '+href+' in a separate tab. The CMS preview stays here.')
+      }else{
+        window.open(href,'_blank','noopener,noreferrer')
+        setLinkFeedback('Opened the local route in a separate tab.')
+      }
+    },true)
+  }
+  function iconChoiceControl(pickerId:string,value:string,onValue:(v:string)=>void){
+    const custom=customIconPickers.includes(pickerId)||/^https?:\/\//i.test(value)
+    const selected=custom?'custom':value.startsWith('icon:')?value:'original'
+    return <div className="editor-simple-icon-choice">
+      <label>Choose icon
+        <select aria-label={'Choose icon '+pickerId} value={selected} onChange={event=>{
+          const v=event.target.value
+          if(v==='custom'){setCustomIconPickers(prev=>prev.includes(pickerId)?prev:[...prev,pickerId]);return}
+          setCustomIconPickers(prev=>prev.filter(id=>id!==pickerId))
+          onValue(v==='original'?'':v)
+        }}>
+          <option value="original">Keep original icon</option>
+          {SIMPLE_ICONS.map(icon=><option key={icon.value} value={icon.value}>{icon.label}</option>)}
+          <option value="custom">Use my own icon image URL</option>
+        </select>
+      </label>
+      {custom&&<label>Icon image address
+        <input type="url" aria-label={'Icon image URL '+pickerId} placeholder="https://example.com/icon.png"
+          value={/^https?:\/\//i.test(value)?value:''}
+          onChange={event=>onValue(event.target.value)}/>
+        <small>Use a direct PNG, JPG or WebP image URL—not a webpage or video link.</small>
+      </label>}
+      <small className="editor-ordered-help">Your original arrow or symbol stays in place until you choose a replacement.</small>
+    </div>
+  }
   function canvasLoaded(frame:HTMLIFrameElement){
+    attachPreviewLinks(frame)
     if(!canvasMode)return
     const doc=frame.contentDocument
     if(!doc)return
@@ -552,7 +630,7 @@ export default function App(){
               {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
             </select>
           </label>}
-          <span className="editor-repeat-count">{original+additions.length}</span>
+
         </div>
       </div>
       <div className="editor-repeat-items">
@@ -768,11 +846,12 @@ export default function App(){
         <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
         <div className="editor-side-preview-window">
           {activeSectionId&&sectionPreviewHtml
-            ?<iframe title="Selected section preview" sandbox="" srcDoc={sectionPreviewHtml}/>
+            ?<iframe title="Selected section preview" sandbox="allow-same-origin" srcDoc={sectionPreviewHtml} onLoad={e=>attachPreviewLinks(e.currentTarget)}/>
             :<div className="editor-side-preview-empty">{sectionPreviewLoading?'Loading section…':activeSectionId?'Preparing section…':'Choose a section on the left.'}</div>}
           {sectionPreviewLoading&&sectionPreviewHtml&&<span className="editor-preview-refreshing">Updating…</span>}
         </div>
         {sectionPreviewError&&<p className="editor-side-preview-error" role="alert">{sectionPreviewError}</p>}
+        {!!linkFeedback&&<small className="editor-side-preview-feedback" role="status">{linkFeedback}</small>}
         <small className="editor-side-preview-foot">Preview only · Not published</small>
       </aside>
       </div>
@@ -1045,6 +1124,7 @@ export default function App(){
   </div>}
   {showPassword&&<div className="dialog-backdrop"><form className="dialog-card" onSubmit={e=>{e.preventDefault();rotatePassword()}}><h2>Change your password</h2><p>All existing sessions will be signed out after the change.</p><label>Current password<input type="password" value={oldPassword} required onChange={e=>setOldPassword(e.target.value)}/></label><label>New password (minimum 12 characters)<input type="password" value={newPassword} minLength={12} required onChange={e=>setNewPassword(e.target.value)}/></label><div className="button-group"><button type="button" className="outline" onClick={()=>setShowPassword(false)}>Cancel</button><button className="primary" disabled={busy}>Change password</button></div></form></div>}
   {preview!==null&&<div className={'preview-modal '+(canvasMode?'canvas-active':'')}>
+    {!!linkFeedback&&<div className="preview-link-feedback" role="status">{linkFeedback}<button type="button" aria-label="Dismiss link message" onClick={()=>setLinkFeedback('')}><X size={14}/></button></div>}
     <div className="preview-head">
       <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
       <div className="visual-head-actions">
@@ -1056,7 +1136,7 @@ export default function App(){
       </div>
     </div>
     <div className="visual-main">
-      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
+      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox="allow-same-origin"
         srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
