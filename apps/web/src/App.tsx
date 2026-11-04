@@ -491,6 +491,20 @@ export default function App(){
       }
     },true)
   }
+  async function uploadPicture(file:File|null,onReady:(url:string)=>void){
+    if(!file)return
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      showError('Choose a JPG, PNG or WebP image.');return
+    }
+    await action(async()=>{
+      const data=new FormData()
+      data.append('file',file)
+      data.append('alt_text',file.name.replace(/\.[^.]+$/,'').replace(/[-_]+/g,' '))
+      const result=await api<{id:number;url:string}>('/api/media',{method:'POST',body:data})
+      onReady(result.url)
+      notify('Image uploaded. The preview now uses your image. Save draft to keep it.')
+    })
+  }
   function iconChoiceControl(pickerId:string,value:string,onValue:(v:string)=>void){
     const custom=customIconPickers.includes(pickerId)||/^https?:\/\//i.test(value)
     const selected=custom?'custom':value.startsWith('icon:')?value:'original'
@@ -512,7 +526,11 @@ export default function App(){
           value={/^https?:\/\//i.test(value)?value:''}
           onChange={event=>onValue(event.target.value)}/>
         <small>Use a direct PNG, JPG or WebP image URL—not a webpage or video link.</small>
-      </label>}
+      </label>
+      <label>Or upload an icon from your computer
+        <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={'Upload icon '+pickerId}
+          onChange={e=>uploadPicture(e.target.files?.[0]||null,onValue)}/>
+      </label>
       <small className="editor-ordered-help">Your original arrow or symbol stays in place until you choose a replacement.</small>
     </div>
   }
@@ -587,6 +605,12 @@ export default function App(){
           :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
             onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
             placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':undefined}/>}
+      {field.kind==='image'&&<div className="editor-easy-image-upload">
+        <label>Or upload a replacement photo (JPG, PNG or WebP)
+          <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={'Upload photo for '+title}
+            onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>changeField(field.key,url))}/>
+        </label>
+      </div>}
       {field.kind==='link'&&<div className="editor-link-check">
         {isTestableHref(value)?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>:
          value.startsWith('#')?<small>Goes to the {value} section on this page. Click the button in the full-page preview to check it.</small>:
@@ -698,6 +722,11 @@ export default function App(){
                     (field.kind==='textarea'||value.length>110)
                       ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
                       :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
+                  {field.kind==='image'&&<div className="editor-easy-image-upload"><label>Or upload a photo
+                    <input type="file" accept="image/png,image/jpeg,image/webp"
+                      aria-label={'Upload image for '+suffix+' '+(index+1)}
+                      onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>updateRepeatEntry(group,index,field.key,url))}/>
+                  </label></div>}
                   {field.kind==='link'&&<div className="editor-link-check">{isTestableHref(value)
                     ?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
                     :<small>Use a URL, #anchor, tel: or mailto: destination.</small>}</div>}
@@ -1245,6 +1274,14 @@ export default function App(){
                     else if(!e.target.value)unsetField(selectedCanvasField.key)
                     else changeField(selectedCanvasField.key,e.target.value)
                   }}/>
+                  <div className="editor-easy-image-upload"><label>Or upload a replacement photo
+                    <input type="file" accept="image/png,image/jpeg,image/webp"
+                      aria-label="Upload selected image"
+                      onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>{
+                        if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,url)
+                        else changeField(selectedCanvasField.key,url)
+                      })}/>
+                  </label></div>
                 :selectedCanvasField.kind==='icon'&&selectedCanvasField.attr==='icon_src'
                 ?iconChoiceControl('visual-'+selectedCanvasField.key,
                   extraIndex>=0&&selectedCanvasGroup
