@@ -1649,19 +1649,79 @@ export default function App(){
     <div className="preview-head">
       <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
       <div className="visual-head-actions">
+        {canvasMode&&<>
+          <button type="button" title="Undo (Ctrl + Z)" aria-label="Undo design change" disabled={canvasUndoRef.current.length===0}
+            onClick={undoCanvas}><Undo2 size={17}/><span className="designer-desktop-label">Undo</span></button>
+          <button type="button" title="Redo (Ctrl + Y)" aria-label="Redo design change" disabled={canvasRedoRef.current.length===0}
+            onClick={redoCanvas}><Redo2 size={17}/><span className="designer-desktop-label">Redo</span></button>
+          <button type="button" aria-pressed={canvasGrid} aria-label="Toggle alignment grid" title="Alignment grid"
+            onClick={()=>{setCanvasGrid(v=>!v);setPreviewRefresh(n=>n+1)}}><Grid3X3 size={16}/></button>
+          <select aria-label="Preview device" className="designer-device-switch" value={canvasDevice} onChange={e=>setCanvasDevice(e.target.value as typeof canvasDevice)}>
+            <option value="desktop">Desktop</option><option value="tablet">Tablet</option><option value="mobile">Mobile</option>
+          </select>
+          <select aria-label="Canvas zoom" className="designer-zoom-switch" value={canvasZoom} onChange={e=>setCanvasZoom(Number(e.target.value))}>
+            {[50,75,90,100,125,150].map(v=><option key={v} value={v}>{v}%</option>)}
+          </select>
+        </>}
         <button type="button" className={canvasMode?'visual-mode-on':'visual-mode-off'} onClick={()=>{
           setCanvasMode(mode=>!mode);setCanvasSelection(null);setCanvasGroupId('');previewScrollRef.current=0
-        }}><Eye size={16}/>{canvasMode?'Exit visual editing':'Edit design'}</button>
+        }}><Eye size={16}/>{canvasMode?'Exit editor':'Edit design'}</button>
         {canvasMode&&<button type="button" className="visual-save" disabled={!dirty||busy} onClick={savePage}><Save size={15}/> Save draft</button>}
         <button type="button" onClick={()=>{setPreview(null);setCanvasMode(false);setCanvasSelection(null)}} aria-label="Close preview"><X size={23}/></button>
       </div>
     </div>
-    <div className="visual-main">
+    <div className={'visual-main '+(canvasMode?'designer-workspace':'')}>
+      {canvasMode&&<nav className="designer-toolrail" aria-label="Add elements">
+        <button type="button" title="Select and drag elements" aria-label="Select tool" className="tool-active"
+          onClick={()=>setCanvasSelection(null)}><MousePointer2 size={19}/><span>Select</span></button>
+        <button type="button" title="Add text" aria-label="Add text" onClick={()=>overlayAdd('text')}>
+          <Type size={20}/><span>Text</span></button>
+        <button type="button" title="Add image" aria-label="Add image" onClick={()=>overlayAdd('image')}>
+          <Image size={19}/><span>Image</span></button>
+        <button type="button" title="Add rectangle or shape" aria-label="Add shape" onClick={()=>overlayAdd('shape')}>
+          <Square size={19}/><span>Shape</span></button>
+        <button type="button" title="Add button or link" aria-label="Add button" onClick={()=>overlayAdd('button')}>
+          <Link2 size={19}/><span>Button</span></button>
+        <button type="button" title="Show layers" aria-label="Show layers" aria-pressed={canvasLayersOpen}
+          onClick={()=>setCanvasLayersOpen(v=>!v)}><Layers size={19}/><span>Layers</span></button>
+      </nav>}
       <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox="allow-same-origin"
+        style={canvasMode?{width:canvasDevice==='desktop'?'100%':canvasDevice==='tablet'?'768px':'390px',maxWidth:'100%',zoom:canvasZoom/100,
+          flex:canvasDevice==='desktop'?'1 1 auto':'none'}:undefined}
         srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
-        <p>Click a heading, picture, button or card in the page to select it. Edit the draft without changing the template.</p>
+        <p>Click any editable element. Drag to move, drag the red corner to resize, or use the controls below. Changes stay in your draft.</p>
+        <div className="designer-info-bar">
+          <span>Editor ready</span><small>Ctrl+Z undo · Ctrl+D duplicate · Delete remove</small>
+        </div>
+        <div className="visual-inspector-group">
+          <h3>Page settings</h3>
+          <label>Page background
+            <input aria-label="Page background color" type="color"
+              value={visualDesign.page?.background||'#FFFFFF'}
+              onChange={e=>commitDesign({...visualDesign,page:{...visualDesign.page,background:e.target.value}},'page-background')}/>
+          </label>
+          <small>Brand presets</small>
+          <div className="designer-swatches">
+            {['#ED2024','#161616','#FFB900','#FFFFFF','#FFF4F2'].map(color=>
+              <button key={color} type="button" title={'Set page background '+color} aria-label={'Choose '+color+' background'}
+                style={{background:color}} onClick={()=>commitDesign({...visualDesign,page:{...visualDesign.page,background:color}},'page-background')}/>)}
+          </div>
+        </div>
+        {canvasLayersOpen&&<div className="visual-inspector-group designer-layers">
+          <h3><Layers size={15}/> Layers</h3>
+          {(visualDesign.elements||[]).length===0&&<small>No added elements yet. Use Text, Image, Shape or Button on the left.</small>}
+          {(visualDesign.elements||[]).slice().sort((a,b)=>b.zIndex-a.zIndex).map(el=>
+            <button type="button" key={el.id} className={el.id===canvasSelection?.elementId?'layer-selected':''}
+              aria-label={'Select '+el.type+' layer '+el.id}
+              onClick={()=>{setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:el.id});setCanvasGroupId('')}}>
+              {el.type==='text'?<Type size={15}/>:el.type==='image'?<Image size={15}/>:el.type==='button'?<Link2 size={15}/>:<Square size={15}/>}
+              <span>{el.text?.slice(0,28)||el.type}</span>
+              {el.locked&&<LockKeyhole size={12}/>}
+              {el.hidden&&<EyeOff size={12}/>}
+            </button>)}
+        </div>}
         <div className="visual-inspector-group">
           <label>Repeatable section
             <select aria-label="Choose repeatable section" value={selectedCanvasGroup?.id||''} onChange={e=>{
@@ -1683,6 +1743,7 @@ export default function App(){
           <button type="button" className="visual-add" disabled={repeatEntries(selectedCanvasGroup).length>=selectedCanvasGroup.max_additions}
             onClick={()=>addRepeatEntry(selectedCanvasGroup)}><Plus size={15}/> Add another {selectedCanvasGroup.kind==='faqs'?'FAQ':selectedCanvasGroup.kind==='solutions'?'solution':'card'}</button>
         </div>}
+        {selectedCanvasElement&&canvasOverlayControls(selectedCanvasElement)}
         {canvasSelection?.itemId&&selectedCanvasGroup&&<div className="visual-inspector-group">
           <h3>{selectedCanvasItem?.title||'Added card'}</h3>
           {selectedCanvasGroup.kind==='solutions'&&<div className="visual-variant-buttons">
@@ -1714,6 +1775,8 @@ export default function App(){
             checked={!!visualDesign.items?.[canvasSelection.itemId]?.locked}
             onChange={e=>designPatch('items',canvasSelection.itemId,{locked:e.target.checked})}/>
             <LockKeyhole size={14}/> Lock this card</label>
+          <button type="button" className="designer-neutral-action" onClick={duplicateSelectedCard}><Copy size={14}/> Duplicate card</button>
+          {canvasSelection?.itemId&&canvasStyleControls('items',canvasSelection.itemId)}
         </div>}
         {selectedCanvasField&&<div className="visual-inspector-group">
           <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
@@ -1776,8 +1839,9 @@ export default function App(){
               ?<a className="editor-inspector-test-link" href={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
               :<small>For a section on this page, enter an anchor such as #enquiry.</small>}
           </label>}
+          {selectedCanvasField.mode==='page'&&canvasStyleControls('fields',canvasSelection?.fieldKey||selectedCanvasField.key)}
         </div>}
-        {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}
+        {!selectedCanvasGroup&&!selectedCanvasField&&!selectedCanvasElement&&<div className="visual-inspector-empty">Select an element on the page, or add text, an image, a shape or a button from the left toolbar.</div>}
         <small className="visual-inspector-note">Page-specific changes · Desktop widths adapt to tablet and mobile · Preview is not published</small>
       </aside>}
     </div>
