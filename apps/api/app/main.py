@@ -385,7 +385,7 @@ def template_preview(template_id:int,focus_field:str|None=None,db:Session=Depend
                 for other in list(soup.find_all(attrs={'data-we-section': True})):
                     if other.get('data-we-section')!=section:other.decompose()
             output=str(soup)
-    return HTMLResponse(output,headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+    return HTMLResponse(output,headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 class NewPage(BaseModel):
@@ -428,6 +428,32 @@ def page_template_with_repeaters(db:Session,p:Page):
     source=ObjectStore().get(source_key).decode('utf-8')
     _,sections=overlay_metadata(source,stored['sections'],stored['fields'])
     return {**stored,'sections':sections}
+
+
+@app.post('/api/pages/{page_id}/enable-link-icon-editing')
+def enable_link_and_icon_editing(page_id:int,payload:dict,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Explicit page-only opt-in, protecting approved templates and publications."""
+    p=get_page(db,page_id)
+    if p.archived:fail(409,'Restore this page before changing editing permissions')
+    if payload.get('edit_version')!=p.edit_version:
+        fail(409,'Page has changed. Reload before enabling editing.')
+    snapshot=p.template_snapshot or {**template_json(get_template(db,p.template_id)),
+                                     'object_key':get_template(db,p.template_id).object_key}
+    updated=[]
+    count=0
+    for field in snapshot['fields']:
+        if field.get('mode')=='static' and field.get('kind') in ('link','icon'):
+            updated.append({**field,'mode':'page'})
+            count+=1
+        else:updated.append(field)
+    if count:
+        p.template_snapshot={**snapshot,'fields':updated}
+        p.edit_version+=1
+        p.updated_at=utcnow()
+        audit(db,user,'enable_page_links_icons',str(page_id),{'count':count})
+        db.commit();db.refresh(p)
+    return {'page':page_json(p),'template':page_template_with_repeaters(db,p),
+            'enabled_count':count}
 
 
 @app.get('/api/pages/{page_id}')
@@ -650,7 +676,7 @@ def page_preview(page_id:int,section_id:str|None=None,db:Session=Depends(get_db)
     if section_id and section_id not in {x['id'] for x in (p.template_snapshot or template_json(get_template(db,p.template_id)))['sections']}:fail(404,'Unknown section')
     html=compiled(db,p,section_id)
     return HTMLResponse(html,headers={'X-Robots-Tag':'noindex, nofollow',
-      'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+      'Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 @app.post('/api/pages/{page_id}/preview',response_class=HTMLResponse)
@@ -671,7 +697,7 @@ def preview_unsaved(page_id:int,payload:PageUpdate,section_id:str|None=None,
             rendered=metadata_html(rendered,changes.get('title',p.title),changes.get('slug',p.slug),changes.get('seo',p.seo or {}),get_settings().public_site_url)
         except ValueError as exc:fail(422,str(exc))
     return HTMLResponse(rendered,headers={'X-Robots-Tag':'noindex, nofollow',
-      'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+      'Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 @app.post('/api/pages/{page_id}/publish')
