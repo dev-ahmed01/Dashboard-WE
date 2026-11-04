@@ -28,7 +28,7 @@ const json=(o:unknown)=>JSON.stringify(o)
 const label=(k:string)=>k.replaceAll('_',' ')
 
 
-type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields:Field[]}
+type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields:Field[];fixedDestination?:string}
 const isCtaText=(f:Field)=>f.attr==='text'&&(f.tag==='a'||f.tag==='button')
 const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replace(/\s+/g,' ').trim().length>n?'…':'')
 
@@ -64,6 +64,7 @@ function pageEditorBlocks(source:Field[]):EditorBlock[]{
       }
       card=null
       if(editable)lastCTA.fields.push(f)
+      else lastCTA.fixedDestination=f.default||'No destination specified'
       continue
     }
     if(f.kind==='icon'){
@@ -361,6 +362,7 @@ export default function App(){
         <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
       </div>
       {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
+      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code></div>}
       {icons.length>0&&<details className="editor-context-icon">
         <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
         <p>The original icon stays in place unless you choose a replacement image.</p>
