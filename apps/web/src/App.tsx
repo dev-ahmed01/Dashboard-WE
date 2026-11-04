@@ -506,7 +506,7 @@ export default function App(){
     })
   }
   function iconChoiceControl(pickerId:string,value:string,onValue:(v:string)=>void){
-    const custom=customIconPickers.includes(pickerId)||/^https?:\/\//i.test(value)
+    const custom=customIconPickers.includes(pickerId)||/^(https?:\/\/|\/(?!\/))/i.test(value)
     const selected=custom?'custom':value.startsWith('icon:')?value:'original'
     return <div className="editor-simple-icon-choice">
       <label>Choose icon
@@ -523,7 +523,7 @@ export default function App(){
       </label>
       {custom&&<><label>Icon image address
         <input type="url" aria-label={'Icon image URL '+pickerId} placeholder="https://example.com/icon.png"
-          value={/^https?:\/\//i.test(value)?value:''}
+          value={/^(https?:\/\/|\/(?!\/))/i.test(value)?value:''}
           onChange={event=>onValue(event.target.value)}/>
         <small>Use a direct PNG, JPG or WebP image URL—not a webpage or video link.</small>
       </label>
