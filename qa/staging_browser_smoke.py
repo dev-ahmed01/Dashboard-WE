@@ -246,33 +246,73 @@ def run():
         inspector=page.locator(".visual-inspector")
         expect(inspector.get_by_label("Selected element content")).to_be_visible()
         inspector.get_by_label("Selected element content").fill("Visual editor headline")
-        inspector.get_by_label("Selected font size").evaluate("""(el) => {
-          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(el,'44');el.dispatchEvent(new Event('input',{bubbles:true}));
-          el.dispatchEvent(new Event('change',{bubbles:true}));
-        }""")
+        inspector.get_by_label("Font size", exact=True).fill("44")
         expect(frame.get_by_text("Visual editor headline")).to_be_visible(timeout=15000)
         expect(frame.locator('h1')).to_have_attribute("style", __import__('re').compile(r'font-size:44px'))
-        inspector.get_by_label("Lock selected text").check()
+        inspector.get_by_label("Lock selected element").check()
         expect(inspector.get_by_text("This element is locked", exact=False)).to_be_visible()
-        inspector.get_by_label("Lock selected text").uncheck()
-        # Repeater section can expand from 2 original cards + 1 existing addition
-        # to 4 cards, then change the grid to four equal columns.
+        inspector.get_by_label("Lock selected element").uncheck()
+        # Never expose the Cards per row selector: page editors resize actual
+        # cards in the design canvas without needing layout jargon.
+        assert page.get_by_text("Cards per row").count()==0
         inspector.get_by_label("Choose repeatable section").select_option(index=1)
-        expect(inspector.get_by_label("Cards per row")).to_be_visible()
-        inspector.get_by_label("Cards per row").select_option("4")
         inspector.get_by_role("button", name="Add another card").click()
         expect(frame.locator('.cards > article')).to_have_count(4,timeout=15000)
         # Select a card and apply a size override without affecting other cards.
         frame.locator('.cards > article').first.click(position={'x':15,'y':15})
         expect(inspector.get_by_label("Selected card width")).to_be_visible()
         inspector.get_by_label("Selected card width").select_option("2")
-        inspector.get_by_label("Selected card height").evaluate("""(el) => {
-          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(el,'400');el.dispatchEvent(new Event('input',{bubbles:true}));
-          el.dispatchEvent(new Event('change',{bubbles:true}));
-        }""")
+        inspector.get_by_label("Height",exact=True).fill("400")
         expect(frame.locator('.cards > article').first).to_have_attribute("style", __import__('re').compile(r'grid-column:span 2.*height:400px'))
+        # V23: Canva-style tools work on the SAME draft and render live.
+        page.get_by_role("button", name="Add text", exact=True).click()
+        expect(frame.locator('[data-we-design-element]')).to_have_count(1,timeout=15000)
+        inspector.get_by_label("Overlay text", exact=True).fill("Flexible office CTA statement")
+        expect(frame.get_by_text("Flexible office CTA statement")).to_be_visible(timeout=15000)
+        inspector.get_by_label("Overlay Horizontal position").fill("85")
+        expect(frame.locator('[data-we-design-element]')).to_have_attribute(
+          "style",__import__('re').compile(r'left:85px'))
+        page.get_by_role("button", name="Undo design change").click()
+        expect(frame.locator('[data-we-design-element]')).to_have_attribute(
+          "style",__import__('re').compile(r'left:32px'))
+        page.get_by_role("button", name="Redo design change").click()
+        expect(frame.locator('[data-we-design-element]')).to_have_attribute(
+          "style",__import__('re').compile(r'left:85px'))
+        inspector.get_by_role("button", name="Duplicate").click()
+        expect(frame.locator('[data-we-design-element]')).to_have_count(2,timeout=15000)
+        inspector.get_by_label("Lock overlay").check()
+        assert inspector.get_by_role("button", name="Delete").is_disabled()
+        inspector.get_by_label("Lock overlay").uncheck()
+        inspector.get_by_role("button", name="Delete").click()
+        expect(frame.locator('[data-we-design-element]')).to_have_count(1,timeout=15000)
+        page.get_by_role("button", name="Add shape").click()
+        expect(frame.locator('[data-we-design-element]')).to_have_count(2,timeout=15000)
+        if page.get_by_role("button", name="Show layers").get_attribute("aria-pressed")=="false":
+            page.get_by_role("button", name="Show layers").click()
+        expect(inspector.locator(".designer-layers")).to_be_visible()
+        page.get_by_role("button", name="Toggle alignment grid").click()
+        page.get_by_label("Preview device").select_option("mobile")
+        page.get_by_label("Canvas zoom").select_option("75")
+        page.get_by_label("Preview device").select_option("desktop")
+        page.get_by_label("Canvas zoom").select_option("100")
+        # Verify keyboard nudging from a real focused page element.
+        frame.locator('[data-we-design-element]').last.click()
+        page.keyboard.press("ArrowRight")
+        expect(frame.locator('[data-we-design-element]').last).to_have_attribute(
+          "style",__import__('re').compile(r'left:33px'))
+        # Drag the on-page corner handle to resize the selected shape.
+        # This must persist in the server-rendered preview, not just the DOM.
+        last_shape=frame.locator('[data-we-design-element]').last
+        resize=frame.locator('[data-we-resize-handle]')
+        expect(resize).to_be_visible(timeout=15000)
+        box=resize.bounding_box()
+        assert box is not None
+        page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+        page.mouse.down()
+        page.mouse.move(box['x']+box['width']/2+50,box['y']+box['height']/2+40,steps=9)
+        page.mouse.up()
+        expect(last_shape).to_have_attribute(
+          "style",__import__('re').compile(r'width:2\d\dpx!important'),timeout=15000)
         page.screenshot(path=str(OUT/"04_visual_editor.png"))
         page.get_by_role("button", name="Close preview").click()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()

@@ -1,9 +1,26 @@
 import {useEffect, useRef, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
-type VisualDesign={groups?:Record<string,{columns?:number;gap?:number}>,items?:Record<string,{span?:number;height?:number;locked?:boolean}>,fields?:Record<string,{fontPx?:number;locked?:boolean}>}
+type DesignStyle={
+  span?:number;height?:number;locked?:boolean;order?:number;widthPx?:number;heightPx?:number;
+  x?:number;y?:number;rotate?:number;opacity?:number;zIndex?:number;
+  radius?:number;padding?:number;fontPx?:number;fontWeight?:number;letterSpacing?:number;
+  lineHeight?:number;color?:string;background?:string;fontFamily?:string;textAlign?:string;hidden?:boolean
+}
+type CanvasElement={
+  id:string;type:'text'|'image'|'shape'|'button';sectionId:string;
+  text?:string;url?:string;x:number;y:number;width:number;height:number;
+  fontSize:number;fontFamily:string;fontWeight:number;color:string;background:string;
+  opacity:number;rotate:number;radius:number;textAlign:string;zIndex:number;
+  locked?:boolean;hidden?:boolean
+}
+type VisualDesign={
+  groups?:Record<string,{columns?:number;gap?:number}>,
+  items?:Record<string,DesignStyle>,fields?:Record<string,DesignStyle>,
+  page?:{background?:string},elements?:CanvasElement[]
+}
 type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
 type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
@@ -224,9 +241,19 @@ export default function App(){
   const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
   const [canvasMode,setCanvasMode]=useState(false)
-  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string}|null>(null)
+  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string;elementId?:string}|null>(null)
   const [canvasGroupId,setCanvasGroupId]=useState('')
   const [canvasFontBaseline,setCanvasFontBaseline]=useState(20)
+  const [canvasZoom,setCanvasZoom]=useState(100)
+  const [canvasDevice,setCanvasDevice]=useState<'desktop'|'tablet'|'mobile'>('desktop')
+  const [canvasGrid,setCanvasGrid]=useState(false)
+  const [canvasLayersOpen,setCanvasLayersOpen]=useState(false)
+  const [canvasInspectTarget,setCanvasInspectTarget]=useState<'card'|'text'>('card')
+  const [canvasUndoCounter,setCanvasUndoCounter]=useState(0)
+  const canvasUndoRef=useRef<Record<string,string>[]>([])
+  const canvasRedoRef=useRef<Record<string,string>[]>([])
+  const canvasLastHistoryRef=useRef<{key:string;time:number}>({key:'',time:0})
+
   const [previewSection,setPreviewSection]=useState('')
   const previewFrameRef=useRef<HTMLIFrameElement|null>(null)
   const previewScrollRef=useRef(0)
@@ -261,6 +288,7 @@ export default function App(){
   const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
+  const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
@@ -437,16 +465,120 @@ export default function App(){
     accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null)
   })}
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
-  const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
-  function designPatch(category:'groups'|'items'|'fields',key:string,patch:Record<string,number|boolean>){
-    setEditor(current=>{
-      if(!current)return current
-      let prior:Record<string,Record<string,Record<string,number|boolean>>>={}
-      try{prior=JSON.parse(current.page.values.__design__||'{}')}catch{}
-      const next={...prior,[category]:{...(prior[category]||{}),
-        [key]:{...(prior[category]?.[key]||{}),...patch}}}
-      return {...current,page:{...current.page,values:{...current.page.values,__design__:JSON.stringify(next)}}}
-    })
+  function changeCanvasValues(next:Record<string,string>,key='change'){
+    if(!editor||JSON.stringify(next)===JSON.stringify(editor.page.values))return
+    if(canvasMode){
+      const now=Date.now()
+      const last=canvasLastHistoryRef.current
+      if(last.key!==key||now-last.time>650){
+        canvasUndoRef.current=[...canvasUndoRef.current.slice(-69),structuredClone(editor.page.values)]
+      }
+      canvasRedoRef.current=[]
+      canvasLastHistoryRef.current={key,time:now}
+      setCanvasUndoCounter(n=>n+1)
+    }
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:next}}:cur)
+  }
+  function changeField(key:string,val:string){
+    if(!editor)return
+    changeCanvasValues({...editor.page.values,[key]:val},'field-'+key)
+  }
+  function undoCanvas(){
+    const previous=canvasUndoRef.current.pop()
+    if(!editor||!previous)return
+    canvasRedoRef.current.push(structuredClone(editor.page.values))
+    canvasLastHistoryRef.current={key:'',time:0}
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:previous}}:cur)
+    setCanvasUndoCounter(n=>n+1)
+  }
+  function redoCanvas(){
+    const next=canvasRedoRef.current.pop()
+    if(!editor||!next)return
+    canvasUndoRef.current.push(structuredClone(editor.page.values))
+    canvasLastHistoryRef.current={key:'',time:0}
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:next}}:cur)
+    setCanvasUndoCounter(n=>n+1)
+  }
+  function commitDesign(next:VisualDesign,key='style'){
+    if(!editor)return
+    changeCanvasValues({...editor.page.values,__design__:JSON.stringify(next)},key)
+  }
+  function designPatch(category:'groups'|'items'|'fields',key:string,patch:DesignStyle|Record<string,number|boolean>){
+    commitDesign({...visualDesign,[category]:{...(visualDesign[category]||{}),
+      [key]:{...(visualDesign[category]?.[key]||{}),...patch}}},category+'-'+key)
+  }
+  function designRemove(category:'items'|'fields',key:string){
+    const options={...(visualDesign[category]||{})}
+    delete options[key]
+    commitDesign({...visualDesign,[category]:options},'reset-'+key)
+  }
+  function overlayPatch(id:string,patch:Partial<CanvasElement>){
+    if(!id)return
+    const elements=(visualDesign.elements||[]).map(el=>el.id===id?{...el,...patch}:el)
+    commitDesign({...visualDesign,elements},'overlay-'+id)
+  }
+  function overlayAdd(type:CanvasElement['type']){
+    if(!editor||((visualDesign.elements||[]).length>=50))return
+    const frame=previewFrameRef.current
+    const doc=frame?.contentDocument
+    const selection=doc?.elementFromPoint(120,Math.min(220,(frame?.clientHeight||400)-30))
+      ?.closest('[data-we-section]')
+    const sectionId=selection?.getAttribute('data-we-section')||
+      selectedCanvasGroup?.section_id||editor.template.sections[0]?.id
+    if(!sectionId)return
+    const id='ov_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)
+    const entry:CanvasElement={
+      id,type,sectionId,x:32,y:100,width:type==='shape'?180:type==='image'?230:260,
+      height:type==='image'?160:type==='shape'?120:type==='button'?55:90,
+      text:type==='text'?'Double-click to edit text':type==='button'?'New button':type==='image'?'Uploaded image':'',
+      url:type==='button'?'#enquiry':type==='image'?'https://placehold.co/500x300/png':'',
+      fontSize:type==='text'?28:18,fontFamily:'Poppins',fontWeight:600,
+      color:'#161616',background:type==='button'?'#ED2024':type==='shape'?'#FFB900':'#FFFFFF',
+      opacity:100,rotate:0,radius:12,textAlign:'center',zIndex:10,
+    }
+    commitDesign({...visualDesign,elements:[...(visualDesign.elements||[]),entry]},'add-'+id)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:id})
+    setCanvasGroupId('')
+    setCanvasLayersOpen(true)
+  }
+  function overlayDuplicate(){
+    if(!selectedCanvasElement||(visualDesign.elements||[]).length>=50)return
+    const copy={...selectedCanvasElement,id:'ov_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),
+      x:Math.min(2350,selectedCanvasElement.x+24),y:Math.min(11950,selectedCanvasElement.y+24),locked:false}
+    commitDesign({...visualDesign,elements:[...(visualDesign.elements||[]),copy]},'duplicate-'+copy.id)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:copy.id})
+  }
+  function overlayRemove(){
+    if(!selectedCanvasElement||selectedCanvasElement.locked)return
+    commitDesign({...visualDesign,elements:(visualDesign.elements||[]).filter(el=>el.id!==selectedCanvasElement.id)},'remove-'+selectedCanvasElement.id)
+    setCanvasSelection(null)
+  }
+  function duplicateSelectedCard(){
+    if(!selectedCanvasGroup||!canvasSelection?.itemId)return
+    const entries=repeatEntries(selectedCanvasGroup)
+    if(entries.length >= Math.min(selectedCanvasGroup.max_additions||12,12))return
+    const item=selectedCanvasItem
+    const index=Number(canvasSelection.itemId.split('_added_')[1])-1
+    const clone:Record<string,string>={}
+    if(!item && index>=0 && entries[index]){
+      Object.assign(clone,entries[index])
+    }else if(item){
+      const target=selectedCanvasGroup.items[selectedCanvasGroup.items.length-1]
+      const source=item.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k)).filter((f):f is Field=>!!f&&f.mode==='page')
+      const dest=target.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k)).filter((f):f is Field=>!!f&&f.mode==='page')
+      source.forEach((f,i)=>{
+        const out=dest[i]
+        if(!out)return
+        const value=editor?.page.values[f.key]??f.default
+        if(f.kind!=='image'&&f.kind!=='icon'&&value.length<2500)clone[out.key]=value
+        else if((f.kind==='image'||f.kind==='icon')&&!value.startsWith('data:')&&value.length<2500)clone[out.key]=value
+      })
+      if(selectedCanvasGroup.kind==='solutions')
+        clone.__variant=editor?.page.values['__variant__'+selectedCanvasGroup.id+'__'+item.id]||item.variant||'regular'
+    }
+    putRepeatEntries(selectedCanvasGroup,[...entries,clone])
+    const id=selectedCanvasGroup.id+'_added_'+(entries.length+1)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:selectedCanvasGroup.id,itemId:id})
   }
   function isFieldLocked(key:string){
     if(visualDesign.fields?.[key]?.locked)return true
@@ -538,15 +670,50 @@ export default function App(){
     attachPreviewLinks(frame)
     if(!canvasMode)return
     const doc=frame.contentDocument
-    if(!doc)return
+    const win=frame.contentWindow
+    if(!doc||!win)return
     const style=doc.createElement('style')
-    style.textContent='[data-we-field],[data-we-link-field],[data-we-repeat-item]{cursor:crosshair!important;}[data-we-field]:hover,[data-we-link-field]:hover,[data-we-repeat-item]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 6px rgba(237,32,36,.13)!important;}'
+    style.textContent=[
+      '[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-design-element]{cursor:move!important;}',
+      '[data-we-field]:hover,[data-we-repeat-item]:hover,[data-we-design-element]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}',
+      '[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 5px rgba(237,32,36,.13)!important;}',
+      '[data-we-resize-handle]{position:absolute;display:block;width:16px;height:16px;border-radius:5px;border:2px solid #fff;background:#ed2024;z-index:999999;cursor:nwse-resize;padding:0;box-shadow:0 2px 10px #16161655;}',
+      '[data-we-design-element]:focus{outline:3px solid #ed2024!important}',
+      canvasGrid?'body{background-image:linear-gradient(#cccccc32 1px,transparent 1px),linear-gradient(90deg,#cccccc32 1px,transparent 1px)!important;background-size:24px 24px!important;}':''
+    ].join('\n')
     ;(doc.head||doc.body).appendChild(style)
+    let handle:HTMLButtonElement|null=null
+    let currentNode:HTMLElement|null=null
+    function drawHandle(node:HTMLElement|null){
+      handle?.remove()
+      handle=null
+      currentNode=node
+      if(!node||!doc?.body)return
+      const rect=node.getBoundingClientRect()
+      if(rect.width<5||rect.height<5)return
+      handle=doc.createElement('button')
+      handle.type='button'
+      handle.setAttribute('data-we-resize-handle','true')
+      handle.setAttribute('aria-label','Drag to resize selected element')
+      handle.style.left=(rect.right+(win?.scrollX||0)-9)+'px'
+      handle.style.top=(rect.bottom+(win?.scrollY||0)-9)+'px'
+      doc.body.appendChild(handle)
+    }
+    function selectedTarget(){
+      if(canvasSelection?.elementId)return doc?.querySelector('[data-we-design-element="'+canvasSelection.elementId+'"]') as HTMLElement|null
+      if(canvasSelection?.fieldKey)return doc?.querySelector('[data-we-field="'+canvasSelection.fieldKey+'"]') as HTMLElement|null
+      if(canvasSelection?.itemId)return doc?.querySelector('[data-we-repeat-item="'+canvasSelection.itemId+'"]') as HTMLElement|null
+      return null
+    }
+    const restore=selectedTarget()
+    if(restore){restore.setAttribute('data-we-canvas-selected','true');drawHandle(restore)}
     doc.addEventListener('click',event=>{
       const target=event.target as Element
-      const clickable=target.closest?.('[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
+      if(target.closest?.('[data-we-resize-handle]')){event.preventDefault();event.stopPropagation();return}
+      const clickable=target.closest?.('[data-we-design-element],[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
       if(!clickable)return
       event.preventDefault();event.stopPropagation()
+      const overlay=clickable.closest('[data-we-design-element]')
       const item=clickable.closest('[data-we-repeat-item]')
       const group=clickable.closest('[data-we-repeat-group]')
       const field=clickable.closest('[data-we-field],[data-we-link-field]')
@@ -554,15 +721,164 @@ export default function App(){
       const linkKey=field?.getAttribute('data-we-link-field')||''
       const itemId=item?.getAttribute('data-we-repeat-item')||''
       const groupId=group?.getAttribute('data-we-repeat-group')||''
-      const raw=field?doc.defaultView?.getComputedStyle(field).fontSize:''
-      if(raw)setCanvasFontBaseline(Math.max(10,Math.min(100,Math.round(parseFloat(raw)||20))))
+      const elementId=overlay?.getAttribute('data-we-design-element')||''
+      const raw=field?win.getComputedStyle(field).fontSize:''
+      if(raw)setCanvasFontBaseline(Math.max(8,Math.min(120,Math.round(parseFloat(raw)||20))))
       setCanvasGroupId(groupId)
-      setCanvasSelection({fieldKey,linkKey,groupId,itemId})
+      setCanvasSelection({fieldKey:elementId?'':fieldKey,linkKey:elementId?'':linkKey,
+        groupId:elementId?'':groupId,itemId:elementId?'':itemId,elementId})
+      setCanvasInspectTarget('card')
       doc.querySelectorAll('[data-we-canvas-selected]').forEach(el=>el.removeAttribute('data-we-canvas-selected'))
-      ;(field||item||group)?.setAttribute('data-we-canvas-selected','true')
+      const chosen=(overlay||field||item||group) as HTMLElement
+      chosen?.setAttribute('data-we-canvas-selected','true')
+      drawHandle(chosen||null)
     },true)
-    if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
+    type DragSession={
+      node:HTMLElement;kind:'overlay'|'item'|'field';id:string;
+      startX:number;startY:number;baseX:number;baseY:number;
+      baseW:number;baseH:number;resize:boolean;moved:boolean
+    }
+    let drag:DragSession|null=null
+    const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,Math.round(n)))
+    doc.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return
+      const target=event.target as HTMLElement
+      const resize=!!target.closest?.('[data-we-resize-handle]')
+      const picked=resize?currentNode:target.closest?.('[data-we-design-element],[data-we-field],[data-we-repeat-item]') as HTMLElement|null
+      if(!picked)return
+      const overlay=picked.closest('[data-we-design-element]')
+      const item=picked.closest('[data-we-repeat-item]')
+      const field=picked.closest('[data-we-field]')
+      const kind=overlay?'overlay':field?'field':'item'
+      const id=(overlay?.getAttribute('data-we-design-element')||
+        field?.getAttribute('data-we-field')||item?.getAttribute('data-we-repeat-item')||'')
+      const el=visualDesign.elements?.find(x=>x.id===id)
+      if(kind==='overlay'&&(!el||el.locked))return
+      const settings=kind==='item'?visualDesign.items?.[id]:visualDesign.fields?.[id]
+      if(kind!=='overlay'&&(settings?.locked||(
+        kind==='field'&&!editor?.template.fields.some(f=>f.key===id&&f.mode==='page')&&
+        !id.includes('_added_'))))return
+      const rect=picked.getBoundingClientRect()
+      drag={
+        node:picked,kind,id,startX:event.clientX,startY:event.clientY,
+        baseX:kind==='overlay'?(el?.x||0):(settings?.x||0),
+        baseY:kind==='overlay'?(el?.y||0):(settings?.y||0),
+        baseW:kind==='overlay'?(el?.width||rect.width):(settings?.widthPx||Math.round(rect.width)),
+        baseH:kind==='overlay'?(el?.height||rect.height):(settings?.heightPx||Math.round(rect.height)),
+        resize,moved:false,
+      }
+      if(resize){event.preventDefault();event.stopPropagation()}
+    },true)
+    doc.addEventListener('pointermove',event=>{
+      if(!drag)return
+      const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY
+      if(!drag.moved&&Math.hypot(dx,dy)<4)return
+      drag.moved=true
+      event.preventDefault()
+      if(drag.resize){
+        drag.node.style.width=clamp(drag.baseW+dx,30,1800)+'px'
+        drag.node.style.height=clamp(drag.baseH+dy,20,1000)+'px'
+      }else if(drag.kind==='overlay'){
+        drag.node.style.left=clamp(drag.baseX+dx,0,2400)+'px'
+        drag.node.style.top=clamp(drag.baseY+dy,0,12000)+'px'
+      }else{
+        drag.node.style.translate=clamp(drag.baseX+dx,-600,600)+'px '+clamp(drag.baseY+dy,-600,600)+'px'
+      }
+      drawHandle(drag.node)
+    },true)
+    doc.addEventListener('pointerup',event=>{
+      const session=drag
+      drag=null
+      if(!session?.moved)return
+      event.preventDefault();event.stopPropagation()
+      const dx=event.clientX-session.startX,dy=event.clientY-session.startY
+      if(session.resize){
+        const width=clamp(session.baseW+dx,30,1800)
+        const height=clamp(session.baseH+dy,20,1000)
+        if(session.kind==='overlay'){
+          overlayPatch(session.id,{width,height})
+        }else if(session.kind==='item'){
+          designPatch('items',session.id,{widthPx:width,heightPx:height})
+        }else{
+          designPatch('fields',session.id,{widthPx:width,heightPx:height})
+        }
+      }else{
+        const x=session.baseX+dx,y=session.baseY+dy
+        if(session.kind==='overlay'){
+          overlayPatch(session.id,{x:clamp(x,0,2400),y:clamp(y,0,12000)})
+        }else{
+          designPatch(session.kind==='item'?'items':'fields',session.id,{
+            x:clamp(x,-600,600),y:clamp(y,-600,600)
+          })
+        }
+      }
+    },true)
+    doc.addEventListener('pointercancel',()=>{drag=null},true)
+    doc.addEventListener('dblclick',event=>{
+      const node=(event.target as Element).closest?.('[data-we-design-element]') as HTMLElement|null
+      if(!node)return
+      const id=node.getAttribute('data-we-design-element')||''
+      const entry=visualDesign.elements?.find(el=>el.id===id)
+      if(entry&&!entry.locked&&(entry.type==='text'||entry.type==='button')){
+        event.preventDefault();event.stopPropagation()
+        const value=window.prompt('Edit text',entry.text||'')
+        if(value!==null)overlayPatch(id,{text:value.slice(0,1000)})
+      }
+    },true)
+    if(previewScrollRef.current)win.scrollTo(0,previewScrollRef.current)
   }
+  useEffect(()=>{
+    if(!canvasMode)return
+    const handler=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement
+      if(target.closest('input,textarea,select,[contenteditable="true"]'))return
+      const meta=event.ctrlKey||event.metaKey
+      if(meta&&event.key.toLowerCase()==='z'){
+        event.preventDefault();if(event.shiftKey)redoCanvas();else undoCanvas();return
+      }
+      if(meta&&event.key.toLowerCase()==='y'){event.preventDefault();redoCanvas();return}
+      if(meta&&event.key.toLowerCase()==='d'){
+        if(selectedCanvasElement||canvasSelection?.itemId){
+          event.preventDefault();if(selectedCanvasElement)overlayDuplicate();else duplicateSelectedCard()
+        }
+        return
+      }
+      if((event.key==='Delete'||event.key==='Backspace')&&selectedCanvasElement&&!selectedCanvasElement.locked){
+        event.preventDefault();overlayRemove();return
+      }
+      const arrows:{[key:string]:[number,number]}={
+        ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],
+      }
+      const direction=arrows[event.key]
+      if(!direction)return
+      const delta=event.shiftKey?10:1
+      if(selectedCanvasElement&&!selectedCanvasElement.locked){
+        event.preventDefault()
+        overlayPatch(selectedCanvasElement.id,{
+          x:Math.max(0,Math.min(2400,selectedCanvasElement.x+direction[0]*delta)),
+          y:Math.max(0,Math.min(12000,selectedCanvasElement.y+direction[1]*delta))
+        })
+      }else if(canvasSelection?.itemId||selectedCanvasField?.mode==='page'){
+        const group=canvasSelection?.itemId?'items':'fields'
+        const id=canvasSelection?.itemId||selectedCanvasField?.key||''
+        const opts=group==='items'?visualDesign.items?.[id]:visualDesign.fields?.[id]
+        if(!opts?.locked){
+          event.preventDefault()
+          designPatch(group,id,{
+            x:Math.max(-600,Math.min(600,(opts?.x||0)+direction[0]*delta)),
+            y:Math.max(-600,Math.min(600,(opts?.y||0)+direction[1]*delta))
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown',handler)
+    const frameDocument=previewFrameRef.current?.contentDocument
+    frameDocument?.addEventListener('keydown',handler)
+    return()=>{
+      window.removeEventListener('keydown',handler)
+      frameDocument?.removeEventListener('keydown',handler)
+    }
+  },[canvasMode,editor,canvasSelection,visualDesign,preview])
   async function enableLinksAndIconsOnThisPage(){
     if(!editor||user?.role!=='admin')return
     if(dirty){showError('Save this draft first, then enable editing for its links and icons.');return}
@@ -669,14 +985,7 @@ export default function App(){
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
         <div className="editor-repeat-heading-controls">
-          {['highlights','solutions','other_solutions','cards'].includes(group.kind)&&<label className="editor-repeat-columns">
-            Cards per row
-            <select aria-label={'Columns for '+group.name} value={visualDesign.groups?.[group.id]?.columns||
-              (group.kind==='highlights'?4:group.kind==='other_solutions'?5:4)}
-              onChange={e=>designPatch('groups',group.id,{columns:Number(e.target.value)})}>
-              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>}
+
 
         </div>
       </div>
@@ -766,6 +1075,179 @@ export default function App(){
       </details>}
     </div>
   }
+  function canvasStyleControls(category:'items'|'fields',id:string){
+    const options=category==='items'?visualDesign.items?.[id]||{}:visualDesign.fields?.[id]||{}
+    const patch=(next:DesignStyle)=>designPatch(category,id,next)
+    const numberInput=(title:string,key:keyof DesignStyle,min:number,max:number,fallback:number,unit='px')=>
+      <label key={key} className="designer-number-field">{title}
+        <div className="designer-unit-input">
+          <input type="number" aria-label={title} min={min} max={max} value={Number(options[key]??fallback)}
+            onChange={e=>patch({[key]:Math.max(min,Math.min(max,Math.round(Number(e.target.value)||0)))})}/>
+          <span>{unit}</span>
+        </div>
+      </label>
+    return <div className="designer-property-stack">
+      <div className="designer-property-section">
+        <h3><Move size={15}/> Position & size</h3>
+        {category==='items'&&<label>Card grid width
+          <select aria-label="Selected card width" value={options.span??1}
+            onChange={e=>patch({span:Number(e.target.value)})}>
+            <option value={1}>Regular (1 column)</option>
+            <option value={2}>Wide (2 columns)</option>
+            <option value={3}>Extra wide (3 columns)</option>
+            <option value={4}>Full width (4 columns)</option>
+          </select>
+        </label>}
+        <div className="designer-property-grid">
+          {numberInput('Move horizontally','x',-600,600,0)}
+          {numberInput('Move vertically','y',-600,600,0)}
+          {numberInput('Width','widthPx',30,1800,category==='items'?300:300)}
+          {numberInput('Height','heightPx',20,1000,category==='items'?300:80)}
+          {numberInput('Rotate','rotate',-180,180,0,'°')}
+          {numberInput('Corner radius','radius',0,120,0)}
+        </div>
+      </div>
+      <div className="designer-property-section">
+        <h3><Type size={15}/> Appearance</h3>
+        <div className="designer-property-grid">
+          <label>Text color<input aria-label="Text color" type="color" value={options.color||'#161616'} onChange={e=>patch({color:e.target.value})}/></label>
+          <label>Fill color<input aria-label="Fill color" type="color" value={options.background||'#FFFFFF'} onChange={e=>patch({background:e.target.value})}/></label>
+        </div>
+        <label>Typeface
+          <select aria-label="Typeface" value={options.fontFamily||'Poppins'} onChange={e=>patch({fontFamily:e.target.value})}>
+            {['Poppins','Bricolage Grotesque','Arial','Georgia','Verdana'].map(f=><option key={f}>{f}</option>)}
+          </select>
+        </label>
+        <label>Text alignment
+          <select aria-label="Text alignment" value={options.textAlign||'left'} onChange={e=>patch({textAlign:e.target.value})}>
+            {['left','center','right','justify'].map(a=><option key={a} value={a}>{a[0].toUpperCase()+a.slice(1)}</option>)}
+          </select>
+        </label>
+        <div className="designer-property-grid">
+          {numberInput('Font size','fontPx',8,120,canvasFontBaseline)}
+          {numberInput('Font weight','fontWeight',400,800,600,'')}
+          {numberInput('Letter spacing','letterSpacing',-5,20,0)}
+          {numberInput('Line height','lineHeight',80,250,130,'%')}
+          {numberInput('Padding','padding',0,80,0)}
+        </div>
+        <label>Opacity: {options.opacity??100}%
+          <input type="range" aria-label="Element opacity" min="0" max="100" value={options.opacity??100}
+            onChange={e=>patch({opacity:Number(e.target.value)})}/>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Layers size={15}/> Layer & visibility</h3>
+        <div className="designer-property-grid">
+          {numberInput('Layer order','zIndex',0,50,0,'')}
+          {category==='items'&&numberInput('Card order','order',0,80,0,'')}
+        </div>
+        <label className="visual-lock-row"><input type="checkbox" checked={!!options.locked}
+          aria-label="Lock selected element" onChange={e=>patch({locked:e.target.checked})}/>
+          <LockKeyhole size={14}/> Lock element</label>
+        <label className="visual-lock-row"><input type="checkbox" checked={!!options.hidden}
+          aria-label="Hide selected element" onChange={e=>patch({hidden:e.target.checked})}/>
+          <EyeOff size={14}/> Hide from page</label>
+        <button type="button" className="designer-neutral-action" onClick={()=>designRemove(category,id)}>
+          <RotateCw size={15}/> Reset styling
+        </button>
+      </div>
+    </div>
+  }
+  function canvasOverlayControls(el:CanvasElement){
+    const set=(p:Partial<CanvasElement>)=>overlayPatch(el.id,p)
+    const num=(title:string,key:'x'|'y'|'width'|'height'|'rotate'|'radius'|'fontSize'|'opacity'|'zIndex',
+      min:number,max:number,unit='px')=>
+      <label className="designer-number-field">{title}
+        <div className="designer-unit-input"><input type="number" aria-label={'Overlay '+title}
+          min={min} max={max} value={el[key]}
+          onChange={e=>set({[key]:Math.max(min,Math.min(max,Math.round(Number(e.target.value)||0)))})}/>
+          <span>{unit}</span></div>
+      </label>
+    return <div className="designer-property-stack">
+      <div className="designer-property-section">
+        <h3>{el.type==='text'?'Text':el.type==='image'?'Image':el.type==='button'?'Button':'Shape'} properties</h3>
+        {(el.type==='text'||el.type==='button')&&<label>Text
+          <textarea aria-label="Overlay text" value={el.text||''} rows={3}
+            disabled={!!el.locked} maxLength={1000} onChange={e=>set({text:e.target.value})}/>
+        </label>}
+        {(el.type==='image'||el.type==='button')&&<label>{el.type==='image'?'Image URL':'Button link'}
+          <input aria-label={el.type==='image'?'Overlay image URL':'Overlay button URL'}
+            disabled={!!el.locked} value={el.url||''} onChange={e=>set({url:e.target.value})}/>
+        </label>}
+        {el.type==='image'&&<label>Upload a photo
+          <input aria-label="Upload overlay image" type="file" accept="image/png,image/jpeg,image/webp"
+            disabled={!!el.locked} onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>set({url}))}/>
+        </label>}
+        <label>Move to section
+          <select aria-label="Overlay section" disabled={!!el.locked} value={el.sectionId}
+            onChange={e=>set({sectionId:e.target.value})}>
+            {editor?.template.sections.map(sec=><option key={sec.id} value={sec.id}>{sec.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Move size={15}/> Position & dimensions</h3>
+        <div className="designer-property-grid">
+          {num('Horizontal position','x',0,2400)}
+          {num('Vertical position','y',0,12000)}
+          {num('Width','width',30,1800)}
+          {num('Height','height',20,1000)}
+          {num('Rotation','rotate',-180,180,'°')}
+          {num('Corners','radius',0,120)}
+        </div>
+        <small>Drag on the page to move; use the red corner handle to resize. Arrow keys move precisely, Shift + arrows move 10px.</small>
+      </div>
+      <div className="designer-property-section">
+        <h3><Type size={15}/> Style</h3>
+        <div className="designer-property-grid">
+          <label>Text color<input type="color" aria-label="Overlay text color" value={el.color}
+            disabled={!!el.locked} onChange={e=>set({color:e.target.value})}/></label>
+          <label>Fill color<input type="color" aria-label="Overlay fill color" value={el.background}
+            disabled={!!el.locked} onChange={e=>set({background:e.target.value})}/></label>
+          {num('Text size','fontSize',8,120)}
+          {num('Opacity','opacity',0,100,'%')}
+        </div>
+        <label>Typeface
+          <select aria-label="Overlay font" value={el.fontFamily} disabled={!!el.locked}
+            onChange={e=>set({fontFamily:e.target.value})}>
+            {['Poppins','Bricolage Grotesque','Arial','Georgia','Verdana'].map(name=><option key={name}>{name}</option>)}
+          </select>
+        </label>
+        <label>Weight
+          <select aria-label="Overlay font weight" value={el.fontWeight} disabled={!!el.locked}
+            onChange={e=>set({fontWeight:Number(e.target.value)})}>
+            {[400,500,600,700,800].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>Alignment
+          <select aria-label="Overlay text alignment" value={el.textAlign} disabled={!!el.locked}
+            onChange={e=>set({textAlign:e.target.value})}>
+            {['left','center','right','justify'].map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="designer-property-section">
+        <h3><Layers size={15}/> Layer actions</h3>
+        <div className="designer-property-grid">
+          <button type="button" className="designer-neutral-action" disabled={!!el.locked||el.zIndex>=50}
+            onClick={()=>set({zIndex:Math.min(50,el.zIndex+1)})}><ArrowUp size={14}/> Forward</button>
+          <button type="button" className="designer-neutral-action" disabled={!!el.locked||el.zIndex<=0}
+            onClick={()=>set({zIndex:Math.max(0,el.zIndex-1)})}><ArrowDown size={14}/> Backward</button>
+        </div>
+        <label className="visual-lock-row"><input type="checkbox" aria-label="Lock overlay" checked={!!el.locked}
+          onChange={e=>set({locked:e.target.checked})}/><LockKeyhole size={14}/> Lock element</label>
+        <label className="visual-lock-row"><input type="checkbox" aria-label="Hide overlay" checked={!!el.hidden}
+          onChange={e=>set({hidden:e.target.checked})}/><EyeOff size={14}/> Hide element</label>
+        <div className="designer-property-grid">
+          <button type="button" className="designer-neutral-action" onClick={overlayDuplicate}
+            disabled={(visualDesign.elements||[]).length>=50}><Copy size={15}/> Duplicate</button>
+          <button type="button" className="designer-neutral-action danger" disabled={!!el.locked}
+            onClick={overlayRemove}><Trash2 size={15}/> Delete</button>
+        </div>
+      </div>
+    </div>
+  }
+
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
   const categoryPages=visiblePages.filter(p=>{
@@ -1184,19 +1666,98 @@ export default function App(){
     <div className="preview-head">
       <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
       <div className="visual-head-actions">
+        {canvasMode&&<>
+          <button type="button" title="Undo (Ctrl + Z)" aria-label="Undo design change" disabled={canvasUndoRef.current.length===0}
+            onClick={undoCanvas}><Undo2 size={17}/><span className="designer-desktop-label">Undo</span></button>
+          <button type="button" title="Redo (Ctrl + Y)" aria-label="Redo design change" disabled={canvasRedoRef.current.length===0}
+            onClick={redoCanvas}><Redo2 size={17}/><span className="designer-desktop-label">Redo</span></button>
+          <button type="button" aria-pressed={canvasGrid} aria-label="Toggle alignment grid" title="Alignment grid"
+            onClick={()=>{setCanvasGrid(v=>!v);setPreviewRefresh(n=>n+1)}}><Grid3X3 size={16}/></button>
+          <select aria-label="Preview device" className="designer-device-switch" value={canvasDevice} onChange={e=>setCanvasDevice(e.target.value as typeof canvasDevice)}>
+            <option value="desktop">Desktop</option><option value="tablet">Tablet</option><option value="mobile">Mobile</option>
+          </select>
+          <select aria-label="Canvas zoom" className="designer-zoom-switch" value={canvasZoom} onChange={e=>setCanvasZoom(Number(e.target.value))}>
+            {[50,75,90,100,125,150].map(v=><option key={v} value={v}>{v}%</option>)}
+          </select>
+        </>}
         <button type="button" className={canvasMode?'visual-mode-on':'visual-mode-off'} onClick={()=>{
           setCanvasMode(mode=>!mode);setCanvasSelection(null);setCanvasGroupId('');previewScrollRef.current=0
-        }}><Eye size={16}/>{canvasMode?'Exit visual editing':'Edit design'}</button>
+        }}><Eye size={16}/>{canvasMode?'Exit editor':'Edit design'}</button>
         {canvasMode&&<button type="button" className="visual-save" disabled={!dirty||busy} onClick={savePage}><Save size={15}/> Save draft</button>}
         <button type="button" onClick={()=>{setPreview(null);setCanvasMode(false);setCanvasSelection(null)}} aria-label="Close preview"><X size={23}/></button>
       </div>
     </div>
-    <div className="visual-main">
+    <div className={'visual-main '+(canvasMode?'designer-workspace':'')}>
+      {canvasMode&&<nav className="designer-toolrail" aria-label="Add elements">
+        <button type="button" title="Select and drag elements" aria-label="Select tool" className="tool-active"
+          onClick={()=>setCanvasSelection(null)}><MousePointer2 size={19}/><span>Select</span></button>
+        <button type="button" title="Add text" aria-label="Add text" onClick={()=>overlayAdd('text')}>
+          <Type size={20}/><span>Text</span></button>
+        <button type="button" title="Add image" aria-label="Add image" onClick={()=>overlayAdd('image')}>
+          <Image size={19}/><span>Image</span></button>
+        <button type="button" title="Add rectangle or shape" aria-label="Add shape" onClick={()=>overlayAdd('shape')}>
+          <Square size={19}/><span>Shape</span></button>
+        <button type="button" title="Add button or link" aria-label="Add button" onClick={()=>overlayAdd('button')}>
+          <Link2 size={19}/><span>Button</span></button>
+        <button type="button" title="Show layers" aria-label="Show layers" aria-pressed={canvasLayersOpen}
+          onClick={()=>setCanvasLayersOpen(v=>!v)}><Layers size={19}/><span>Layers</span></button>
+      </nav>}
       <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox="allow-same-origin"
+        style={canvasMode?{width:canvasDevice==='desktop'?'100%':canvasDevice==='tablet'?'768px':'390px',maxWidth:'100%',zoom:canvasZoom/100,
+          flex:canvasDevice==='desktop'?'1 1 auto':'none'}:undefined}
         srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
-        <p>Click a heading, picture, button or card in the page to select it. Edit the draft without changing the template.</p>
+        <p>Click any editable element. Drag to move, drag the red corner to resize, or use the controls below. Changes stay in your draft.</p>
+        <div className="designer-info-bar" title={'Draft design revision '+canvasUndoCounter}>
+          <span>Editor ready</span><small>Ctrl+Z undo · Ctrl+D duplicate · Delete remove</small>
+        </div>
+        <div className="visual-inspector-group">
+          <h3>Page settings</h3>
+          <label>Page background
+            <input aria-label="Page background color" type="color"
+              value={visualDesign.page?.background||'#FFFFFF'}
+              onChange={e=>commitDesign({...visualDesign,page:{...visualDesign.page,background:e.target.value}},'page-background')}/>
+          </label>
+          <small>Brand presets</small>
+          <div className="designer-swatches">
+            {['#ED2024','#161616','#FFB900','#FFFFFF','#FFF4F2'].map(color=>
+              <button key={color} type="button" title={'Set page background '+color} aria-label={'Choose '+color+' background'}
+                style={{background:color}} onClick={()=>commitDesign({...visualDesign,page:{...visualDesign.page,background:color}},'page-background')}/>)}
+          </div>
+        </div>
+        {canvasLayersOpen&&<div className="visual-inspector-group designer-layers">
+          <h3><Layers size={15}/> Layers</h3>
+          {(visualDesign.elements||[]).length===0&&<small>No added elements yet. Use Text, Image, Shape or Button on the left.</small>}
+          <details className="designer-existing-layers">
+            <summary>Page cards & text</summary>
+            <div className="designer-existing-layer-list">
+              {allRepeaters.filter(g=>!g.parent_item_id).flatMap(group=>
+                group.items.map(item=><button type="button" key={item.id}
+                  className={canvasSelection?.itemId===item.id?'layer-selected':''}
+                  onClick={()=>{setCanvasSelection({fieldKey:'',linkKey:'',groupId:group.id,itemId:item.id});setCanvasGroupId(group.id)}}>
+                  <Layers size={13}/><span>{item.title||group.name}</span>
+                  {visualDesign.items?.[item.id]?.locked&&<LockKeyhole size={12}/>}
+                  {visualDesign.items?.[item.id]?.hidden&&<EyeOff size={12}/>}
+                </button>))}
+              {editor?.template.fields.filter(f=>f.mode==='page'&&(f.tag==='h1'||f.tag==='h2'||f.tag==='h3')).map(f=>
+                <button type="button" key={f.key} className={canvasSelection?.fieldKey===f.key?'layer-selected':''}
+                  onClick={()=>setCanvasSelection({fieldKey:f.key,linkKey:'',itemId:'',groupId:''})}>
+                  <Type size={13}/><span>{f.label.slice(0,50)}</span>
+                  {visualDesign.fields?.[f.key]?.hidden&&<EyeOff size={12}/>}
+                </button>)}
+            </div>
+          </details>
+          {(visualDesign.elements||[]).slice().sort((a,b)=>b.zIndex-a.zIndex).map(el=>
+            <button type="button" key={el.id} className={el.id===canvasSelection?.elementId?'layer-selected':''}
+              aria-label={'Select '+el.type+' layer '+el.id}
+              onClick={()=>{setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:el.id});setCanvasGroupId('')}}>
+              {el.type==='text'?<Type size={15}/>:el.type==='image'?<Image size={15}/>:el.type==='button'?<Link2 size={15}/>:<Square size={15}/>}
+              <span>{el.text?.slice(0,28)||el.type}</span>
+              {el.locked&&<LockKeyhole size={12}/>}
+              {el.hidden&&<EyeOff size={12}/>}
+            </button>)}
+        </div>}
         <div className="visual-inspector-group">
           <label>Repeatable section
             <select aria-label="Choose repeatable section" value={selectedCanvasGroup?.id||''} onChange={e=>{
@@ -1209,13 +1770,7 @@ export default function App(){
         </div>
         {selectedCanvasGroup&&<div className="visual-inspector-group">
           <h3>{selectedCanvasGroup.name}</h3>
-          <label>Cards per desktop row
-            <select aria-label="Cards per row" value={visualDesign.groups?.[selectedCanvasGroup.id]?.columns||
-                (selectedCanvasGroup.kind==='highlights'?4:selectedCanvasGroup.kind==='solutions'?4:selectedCanvasGroup.kind==='other_solutions'?5:1)}
-              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{columns:Number(e.target.value)})}>
-              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n} per row</option>)}
-            </select>
-          </label>
+
           <label>Space between cards: {visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}px
             <input type="range" min="0" max="48" step="2" aria-label="Card spacing"
               value={visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}
@@ -1224,7 +1779,12 @@ export default function App(){
           <button type="button" className="visual-add" disabled={repeatEntries(selectedCanvasGroup).length>=selectedCanvasGroup.max_additions}
             onClick={()=>addRepeatEntry(selectedCanvasGroup)}><Plus size={15}/> Add another {selectedCanvasGroup.kind==='faqs'?'FAQ':selectedCanvasGroup.kind==='solutions'?'solution':'card'}</button>
         </div>}
-        {canvasSelection?.itemId&&selectedCanvasGroup&&<div className="visual-inspector-group">
+        {selectedCanvasElement&&canvasOverlayControls(selectedCanvasElement)}
+        {canvasSelection?.itemId&&selectedCanvasField&&<div className="designer-inspect-switch">
+          <button type="button" aria-pressed={canvasInspectTarget==='card'} onClick={()=>setCanvasInspectTarget('card')}>Card design</button>
+          <button type="button" aria-pressed={canvasInspectTarget==='text'} onClick={()=>setCanvasInspectTarget('text')}>Selected text</button>
+        </div>}
+        {canvasSelection?.itemId&&selectedCanvasGroup&&canvasInspectTarget!=='text'&&<div className="visual-inspector-group">
           <h3>{selectedCanvasItem?.title||'Added card'}</h3>
           {selectedCanvasGroup.kind==='solutions'&&<div className="visual-variant-buttons">
             <span>Card layout</span>
@@ -1237,28 +1797,12 @@ export default function App(){
                   if(index>=0)updateRepeatEntry(selectedCanvasGroup,index,'__variant',variant)}
               }}>{variant[0].toUpperCase()+variant.slice(1)}</button>)}
           </div>}
-          <label>Card width
-            <select aria-label="Selected card width" value={visualDesign.items?.[canvasSelection.itemId]?.span??(selectedCanvasItem?.variant==='highlight'?2:1)}
-              onChange={e=>designPatch('items',canvasSelection.itemId,{span:Number(e.target.value)})}>
-              <option value={1}>Regular · 1 column</option>
-              <option value={2}>Wide · 2 columns</option>
-              <option value={3}>Extra wide · 3 columns</option>
-              <option value={4}>Full width · 4 columns</option>
-            </select>
-          </label>
-          <label>Card height: {visualDesign.items?.[canvasSelection.itemId]?.height??300}px
-            <input type="range" aria-label="Selected card height" min="150" max="600" step="10"
-              value={visualDesign.items?.[canvasSelection.itemId]?.height??300}
-              onChange={e=>designPatch('items',canvasSelection.itemId,{height:Number(e.target.value)})}/>
-          </label>
-          <label className="visual-lock-row"><input type="checkbox" aria-label="Lock selected card"
-            checked={!!visualDesign.items?.[canvasSelection.itemId]?.locked}
-            onChange={e=>designPatch('items',canvasSelection.itemId,{locked:e.target.checked})}/>
-            <LockKeyhole size={14}/> Lock this card</label>
+          <button type="button" className="designer-neutral-action" onClick={duplicateSelectedCard}><Copy size={14}/> Duplicate card</button>
+          {canvasSelection?.itemId&&canvasStyleControls('items',canvasSelection.itemId)}
         </div>}
-        {selectedCanvasField&&<div className="visual-inspector-group">
+        {selectedCanvasField&&(!canvasSelection?.itemId||canvasInspectTarget==='text')&&<div className="visual-inspector-group">
           <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
-          {selectedCanvasField.mode==='page'&&!isFieldLocked(selectedCanvasField.key)
+          {selectedCanvasField.mode==='page'&&!isFieldLocked(canvasSelection?.fieldKey||selectedCanvasField.key)
             ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
               {selectedCanvasField.kind==='image'&&<img className="visual-inspector-image" alt="Selected page image"
                 src={extraIndex>=0&&selectedCanvasGroup
@@ -1300,16 +1844,7 @@ export default function App(){
                     else changeField(selectedCanvasField.key,e.target.value)
                   }}/>}
             </label>
-            :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
-          {selectedCanvasField.mode==='page'&&<label>Font size: {visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}px
-            <input aria-label="Selected font size" type="range" min="10" max="100" step="1"
-              value={visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}
-              onChange={e=>designPatch('fields',selectedCanvasField.key,{fontPx:Number(e.target.value)})}/>
-          </label>}
-          {selectedCanvasField.mode==='page'&&<label className="visual-lock-row">
-            <input type="checkbox" aria-label="Lock selected text" checked={isFieldLocked(selectedCanvasField.key)}
-              onChange={e=>designPatch('fields',selectedCanvasField.key,{locked:e.target.checked})}/>
-            <LockKeyhole size={14}/> Lock this element</label>}
+            :<p>{isFieldLocked(canvasSelection?.fieldKey||selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
           {selectedCanvasLink?.mode==='page'&&<label>Button destination
             <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
               onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
@@ -1317,8 +1852,9 @@ export default function App(){
               ?<a className="editor-inspector-test-link" href={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
               :<small>For a section on this page, enter an anchor such as #enquiry.</small>}
           </label>}
+          {selectedCanvasField.mode==='page'&&canvasStyleControls('fields',canvasSelection?.fieldKey||selectedCanvasField.key)}
         </div>}
-        {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}
+        {!selectedCanvasGroup&&!selectedCanvasField&&!selectedCanvasElement&&<div className="visual-inspector-empty">Select an element on the page, or add text, an image, a shape or a button from the left toolbar.</div>}
         <small className="visual-inspector-note">Page-specific changes · Desktop widths adapt to tablet and mobile · Preview is not published</small>
       </aside>}
     </div>
