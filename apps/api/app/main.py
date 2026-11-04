@@ -52,7 +52,7 @@ def template_json(t: Template):
 
 
 def page_json(p: Page):
-    return {'id':p.id,'template_id':p.template_id,'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat(),
+    return {'id':p.id,'template_id':p.template_id,'template_name':(p.template_snapshot or {}).get('name',''),'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat(),
             'edit_version':p.edit_version,'archived':p.archived,
             'has_unpublished_changes':bool(p.published_version and p.edit_version>p.published_edit_version)}
 
