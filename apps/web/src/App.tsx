@@ -521,7 +521,7 @@ export default function App(){
           <option value="custom">Use my own icon image URL</option>
         </select>
       </label>
-      {custom&&<label>Icon image address
+      {custom&&<><label>Icon image address
         <input type="url" aria-label={'Icon image URL '+pickerId} placeholder="https://example.com/icon.png"
           value={/^https?:\/\//i.test(value)?value:''}
           onChange={event=>onValue(event.target.value)}/>
@@ -530,7 +530,7 @@ export default function App(){
       <label>Or upload an icon from your computer
         <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={'Upload icon '+pickerId}
           onChange={e=>uploadPicture(e.target.files?.[0]||null,onValue)}/>
-      </label>
+      </label></>}
       <small className="editor-ordered-help">Your original arrow or symbol stays in place until you choose a replacement.</small>
     </div>
   }
@@ -1265,7 +1265,7 @@ export default function App(){
                   ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||selectedCanvasField.default
                   :editor?.page.values[selectedCanvasField.key]||selectedCanvasField.default}/>}
               {selectedCanvasField.kind==='image'
-                ?<input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
+                ?<><input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
                   value={extraIndex>=0&&selectedCanvasGroup
                     ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||''
                     :(editor?.page.values[selectedCanvasField.key]||'').startsWith('data:')?'':editor?.page.values[selectedCanvasField.key]||''}
@@ -1281,7 +1281,7 @@ export default function App(){
                         if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,url)
                         else changeField(selectedCanvasField.key,url)
                       })}/>
-                  </label></div>
+                  </label></div></>
                 :selectedCanvasField.kind==='icon'&&selectedCanvasField.attr==='icon_src'
                 ?iconChoiceControl('visual-'+selectedCanvasField.key,
                   extraIndex>=0&&selectedCanvasGroup
