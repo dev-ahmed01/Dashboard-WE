@@ -147,9 +147,6 @@ export default function App(){
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
   const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
   const [sectionPreviewError,setSectionPreviewError]=useState('')
-  const [inlinePreview,setInlinePreview]=useState('')
-  const [inlinePreviewError,setInlinePreviewError]=useState('')
-  const [inlinePreviewLoading,setInlinePreviewLoading]=useState(false)
   const [previewRefresh,setPreviewRefresh]=useState(0)
   const [newName,setNewName]=useState('')
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
@@ -183,21 +180,11 @@ export default function App(){
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
-  const activeSectionId=editor?(activeEditorSection===null?editor.template.sections[0]?.id:activeEditorSection):''
+  const editableSections=editor?editor.template.sections.filter(section=>
+    pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id)).length>0):[]
+  const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
-  useEffect(()=>{
-    if(!editor||!previewPayload){setInlinePreview('');setInlinePreviewError('');setInlinePreviewLoading(false);return}
-    let cancelled=false
-    setInlinePreviewLoading(true)
-    const timer=window.setTimeout(()=>{
-      html(`/api/pages/${editor.page.id}/preview`,JSON.parse(previewPayload))
-        .then(content=>{if(!cancelled){setInlinePreview(content);setInlinePreviewError('')}})
-        .catch(e=>{if(!cancelled)setInlinePreviewError(e instanceof Error?e.message:String(e))})
-        .finally(()=>{if(!cancelled)setInlinePreviewLoading(false)})
-    },450)
-    return()=>{cancelled=true;window.clearTimeout(timer)}
-  },[editor?.page.id,previewPayload,previewRefresh])
   useEffect(()=>{
     if(!editor||!previewPayload||!activeSectionId){
       setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
@@ -352,17 +339,34 @@ export default function App(){
   const changePage=(patch:Partial<Page>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,...patch}}:cur)
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
-  function editorFieldControl(field:Field,position:number){
-    const title=friendlyEditorLabel(field,position)
+  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
+    const title=fieldDisplayName(field,kind,position)
     const value=editor?.page.values[field.key]??field.default
-    return <label key={field.key} className={'editor-human-field '+(field.kind==='textarea'||field.kind==='image'||field.kind==='link'?'wide-field':'')}>
-      <span className="editor-human-field-name">{title}</span>
+    return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
+      <span className="editor-ordered-label">{title}</span>
       {field.kind==='textarea'
         ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
         :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='link'?'e.g. /contact/ or #enquiry':field.kind==='icon'?'Optional icon image URL':undefined}/>}
-      {editorHelp(field)&&<small className="editor-human-help">{editorHelp(field)}</small>}
+          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'?'https://.../icon.png':undefined}/>}
+      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
+  }
+  function editorBlockControl(block:EditorBlock,index:number){
+    const regular=block.fields.filter(f=>f.kind!=='icon')
+    const icons=block.fields.filter(f=>f.kind==='icon')
+    const kindLabel=block.kind==='card'?'Highlight card':block.kind==='cta'?'Button / CTA':block.kind==='image'?'Image':'Page content'
+    return <div className={'editor-ordered-block editor-block-'+block.kind} key={block.id}>
+      <div className="editor-ordered-block-header">
+        <span className="editor-ordered-step">{String(index+1).padStart(2,'0')}</span>
+        <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
+      </div>
+      {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
+      {icons.length>0&&<details className="editor-context-icon">
+        <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
+        <p>The original icon stays in place unless you choose a replacement image.</p>
+        <div className="editor-ordered-block-fields">{icons.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>
+      </details>}
+    </div>
   }
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
