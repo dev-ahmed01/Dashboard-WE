@@ -213,6 +213,41 @@ def run():
         frame = page.frame_locator('iframe[title="Website preview"]')
         expect(frame.get_by_text("Unsaved QA Hero")).to_be_visible(timeout=12000)
         page.screenshot(path=str(OUT/"04_unsaved_preview.png"))
+        # V21: Visual edit mode operates on the SAME draft as the page editor.
+        page.get_by_role("button", name="Edit design").click()
+        expect(page.locator(".visual-inspector")).to_be_visible()
+        frame.locator('h1').click()
+        inspector=page.locator(".visual-inspector")
+        expect(inspector.get_by_label("Selected element content")).to_be_visible()
+        inspector.get_by_label("Selected element content").fill("Visual editor headline")
+        inspector.get_by_label("Selected font size").evaluate("""(el) => {
+          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+          setter.call(el,'44');el.dispatchEvent(new Event('input',{bubbles:true}));
+          el.dispatchEvent(new Event('change',{bubbles:true}));
+        }""")
+        expect(frame.get_by_text("Visual editor headline")).to_be_visible(timeout=15000)
+        expect(frame.locator('h1')).to_have_attribute("style", __import__('re').compile(r'font-size:44px'))
+        inspector.get_by_label("Lock selected text").check()
+        expect(inspector.get_by_text("This element is locked", exact=False)).to_be_visible()
+        inspector.get_by_label("Lock selected text").uncheck()
+        # Repeater section can expand from 2 original cards + 1 existing addition
+        # to 4 cards, then change the grid to four equal columns.
+        inspector.get_by_label("Choose repeatable section").select_option(index=1)
+        expect(inspector.get_by_label("Cards per row")).to_be_visible()
+        inspector.get_by_label("Cards per row").select_option("4")
+        inspector.get_by_role("button", name="Add another card").click()
+        expect(frame.locator('.cards > article')).to_have_count(4,timeout=15000)
+        # Select a card and apply a size override without affecting other cards.
+        frame.locator('.cards > article').first.click(position={'x':15,'y':15})
+        expect(inspector.get_by_label("Selected card width")).to_be_visible()
+        inspector.get_by_label("Selected card width").select_option("2")
+        inspector.get_by_label("Selected card height").evaluate("""(el) => {
+          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+          setter.call(el,'400');el.dispatchEvent(new Event('input',{bubbles:true}));
+          el.dispatchEvent(new Event('change',{bubbles:true}));
+        }""")
+        expect(frame.locator('.cards > article').first).to_have_attribute("style", __import__('re').compile(r'grid-column:span 2.*height:400px'))
+        page.screenshot(path=str(OUT/"04_visual_editor.png"))
         page.get_by_role("button", name="Close preview").click()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()
         expect(page.get_by_text("Draft changes saved", exact=False)).to_be_visible()

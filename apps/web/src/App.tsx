@@ -1,8 +1,9 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
+type VisualDesign={groups?:Record<string,{columns?:number;gap?:number}>,items?:Record<string,{span?:number;height?:number;locked?:boolean}>,fields?:Record<string,{fontPx?:number;locked?:boolean}>}
 type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
 type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
@@ -132,6 +133,18 @@ function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):stri
   }
   return f.kind==='textarea'?'Description':f.label.replace(/^(?:Text|Paragraph|H[1-6] heading):\s*/i,'').slice(0,70)||'Text'
 }
+function repeaterFieldName(group:Repeater,field:Field,number:number):string{
+  if(field.kind==='image')return group.kind==='solutions'?'Background image':group.kind==='benefits'?'Benefit image':'Card image'
+  if(field.kind==='icon')return 'Icon (optional)'
+  if(field.kind==='link')return 'Link to anchor / destination'
+  if(group.kind==='benefit_bullets')return 'Bullet point '+number
+  if(group.kind==='faqs')return field.tag==='summary'?'Question':'Answer'
+  if(group.kind==='solutions')return 'Solution name'
+  if(group.kind==='other_solutions')return 'Solution name'
+  if(group.kind==='benefits')return field.tag?.startsWith('h')?'Benefit heading':'Benefit description'
+  if(group.kind==='highlights')return field.label.startsWith('Card title:')?'Card heading':'Card description'
+  return fieldDisplayName(field,'card',number)
+}
 function hintForField(field:Field):string{
   if(field.kind==='link'){
     if(field.default.startsWith('tel:'))return 'Phone link: tel:+91…'
@@ -189,6 +202,13 @@ export default function App(){
   const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
   const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
+  const [canvasMode,setCanvasMode]=useState(false)
+  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string}|null>(null)
+  const [canvasGroupId,setCanvasGroupId]=useState('')
+  const [canvasFontBaseline,setCanvasFontBaseline]=useState(20)
+  const [previewSection,setPreviewSection]=useState('')
+  const previewFrameRef=useRef<HTMLIFrameElement|null>(null)
+  const previewScrollRef=useRef(0)
   const [shared,setShared]=useState<Record<string,string>>({})
   const [sharedUsage,setSharedUsage]=useState<{key:string;pages:number;published_pages:number}[]>([])
   const [publicationInfo,setPublicationInfo]=useState<{published:{slug:string;seo:SEO;version:number}|null}|null>(null)
@@ -211,11 +231,37 @@ export default function App(){
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
+  const allRepeaters=editor?editor.template.sections.flatMap(sec=>sec.repeaters||[]):[]
+  const selectedCanvasGroup=allRepeaters.find(g=>g.id===(canvasSelection?.groupId||canvasGroupId))
+  const selectedCanvasItem=selectedCanvasGroup?.items.find(item=>item.id===canvasSelection?.itemId)
+  const extraSelection=selectedCanvasGroup&&canvasSelection?.fieldKey?.startsWith(selectedCanvasGroup.id+'_added_')?
+    canvasSelection.fieldKey.slice((selectedCanvasGroup.id+'_added_').length).match(/^(\d+)_(.+)$/):null
+  const extraIndex=extraSelection?Number(extraSelection[1])-1:-1
+  const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
+  const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
+  const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
+  // Visual preview is a sandboxed copy of the *same draft*, not a second data
+  // store. User changes update the draft and refresh the preview without saving.
+  useEffect(()=>{
+    if(!canvasMode||preview===null||!editor)return
+    let cancelled=false
+    const timer=window.setTimeout(()=>{
+      const qs=previewSection?'?section_id='+encodeURIComponent(previewSection):''
+      html('/api/pages/'+editor.page.id+'/preview'+qs,JSON.parse(previewPayload))
+        .then(result=>{
+          if(cancelled)return
+          previewScrollRef.current=previewFrameRef.current?.contentWindow?.scrollY||0
+          setPreview(result)
+        }).catch(e=>{if(!cancelled)showError(e)})
+    },380)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
+  },[previewPayload,canvasMode,previewSection,previewRefresh])
+
   useEffect(()=>{
     if(!editor||!previewPayload||!activeSectionId){
       setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
@@ -262,7 +308,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('')})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('');setCanvasMode(false);setCanvasSelection(null);setCanvasGroupId('')})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
@@ -355,6 +401,7 @@ export default function App(){
     })
   }
   async function fullPreview(section?:string){if(!editor)return;await action(async()=>{
+    setPreviewSection(section||'')
     const qs=section?`?section_id=${encodeURIComponent(section)}`:''
     const p=editor.page
     setPreview(await html(`/api/pages/${p.id}/preview${qs}`,{edit_version:p.edit_version,title:p.title,slug:p.slug,values:p.values,seo:p.seo}))
@@ -369,17 +416,84 @@ export default function App(){
   })}
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
-  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
-    const title=fieldDisplayName(field,kind,position)
+  function designPatch(category:'groups'|'items'|'fields',key:string,patch:Record<string,number|boolean>){
+    setEditor(current=>{
+      if(!current)return current
+      let prior:Record<string,Record<string,Record<string,number|boolean>>>={}
+      try{prior=JSON.parse(current.page.values.__design__||'{}')}catch{}
+      const next={...prior,[category]:{...(prior[category]||{}),
+        [key]:{...(prior[category]?.[key]||{}),...patch}}}
+      return {...current,page:{...current.page,values:{...current.page.values,__design__:JSON.stringify(next)}}}
+    })
+  }
+  function isFieldLocked(key:string){
+    if(visualDesign.fields?.[key]?.locked)return true
+    return allRepeaters.some(group=>group.items.some(item=>
+      item.field_keys.includes(key)&&!!visualDesign.items?.[item.id]?.locked))
+  }
+  function unsetField(key:string){
+    setEditor(current=>{
+      if(!current)return current
+      const vals={...current.page.values};delete vals[key]
+      return {...current,page:{...current.page,values:vals}}
+    })
+  }
+  function canvasLoaded(frame:HTMLIFrameElement){
+    if(!canvasMode)return
+    const doc=frame.contentDocument
+    if(!doc)return
+    const style=doc.createElement('style')
+    style.textContent='[data-we-field],[data-we-link-field],[data-we-repeat-item]{cursor:crosshair!important;}[data-we-field]:hover,[data-we-link-field]:hover,[data-we-repeat-item]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 6px rgba(237,32,36,.13)!important;}'
+    ;(doc.head||doc.body).appendChild(style)
+    doc.addEventListener('click',event=>{
+      const target=event.target as Element
+      const clickable=target.closest?.('[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
+      if(!clickable)return
+      event.preventDefault();event.stopPropagation()
+      const item=clickable.closest('[data-we-repeat-item]')
+      const group=clickable.closest('[data-we-repeat-group]')
+      const field=clickable.closest('[data-we-field],[data-we-link-field]')
+      const fieldKey=field?.getAttribute('data-we-field')||''
+      const linkKey=field?.getAttribute('data-we-link-field')||''
+      const itemId=item?.getAttribute('data-we-repeat-item')||''
+      const groupId=group?.getAttribute('data-we-repeat-group')||''
+      const raw=field?doc.defaultView?.getComputedStyle(field).fontSize:''
+      if(raw)setCanvasFontBaseline(Math.max(10,Math.min(100,Math.round(parseFloat(raw)||20))))
+      setCanvasGroupId(groupId)
+      setCanvasSelection({fieldKey,linkKey,groupId,itemId})
+      doc.querySelectorAll('[data-we-canvas-selected]').forEach(el=>el.removeAttribute('data-we-canvas-selected'))
+      ;(field||item||group)?.setAttribute('data-we-canvas-selected','true')
+    },true)
+    if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
+  }
+  async function enableRepeatersOnThisPage(){
+    if(!editor)return
+    if(dirty){showError('Save the current draft before refreshing repeater fields.');return}
+    await action(async()=>{
+      const updated=await api<{page:Page;template:Template;repeaters:number;new_fields:number}>(
+        '/api/pages/'+editor.page.id+'/upgrade-repeaters',
+        {method:'POST',body:json({edit_version:editor.page.edit_version})})
+      setEditor({page:updated.page,template:updated.template})
+      setSavedPage(structuredClone(updated.page))
+      setActiveEditorSection(null)
+      await refresh()
+      notify('Repeaters refreshed for this page: '+updated.repeaters+' groups and '+updated.new_fields+' newly detected fields.')
+    })
+  }
+  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind'],customLabel?:string){
+    const title=customLabel||fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
     const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
+      {field.kind==='image'&&field.default.startsWith('data:')&&<div className="editor-current-image"><img src={value.startsWith('data:')?value:field.default} alt="Current template image"/><small>Original image</small></div>}
       {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+        ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+        :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
+          onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
+          placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
+      {field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
     </label>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
@@ -429,7 +543,17 @@ export default function App(){
     return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
-        <span className="editor-repeat-count">{original+additions.length}</span>
+        <div className="editor-repeat-heading-controls">
+          {['highlights','solutions','other_solutions','cards'].includes(group.kind)&&<label className="editor-repeat-columns">
+            Cards per row
+            <select aria-label={'Columns for '+group.name} value={visualDesign.groups?.[group.id]?.columns||
+              (group.kind==='highlights'?4:group.kind==='other_solutions'?5:4)}
+              onChange={e=>designPatch('groups',group.id,{columns:Number(e.target.value)})}>
+              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>}
+          <span className="editor-repeat-count">{original+additions.length}</span>
+        </div>
       </div>
       <div className="editor-repeat-items">
         {group.items.map((item,index)=>{
@@ -445,7 +569,7 @@ export default function App(){
                 </div>
                 <small>Choose a layout above, then edit the image, name and link below.</small>
               </div>}
-              {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text'))}
+              {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text',repeaterFieldName(group,field,i+1)))}
               {subGroups.map(n=>renderRepeaterGroup(n,section,true))}
               {available.length===0&&subGroups.length===0&&<small>This template item is fixed.</small>}
             </div>
@@ -466,7 +590,7 @@ export default function App(){
                 <small>Choose a layout, then edit its image, name and destination below.</small>
               </div>}
               {fields.map((field,i)=>{
-                const title=fieldDisplayName(field,group.kind==='benefit_bullets'?'text':'card',i+1)
+                const title=repeaterFieldName(group,field,i+1)
                 const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
                 return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
                   {(field.kind==='textarea'||value.length>110)
@@ -476,7 +600,13 @@ export default function App(){
                   {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
                 </label>
               })}
-              <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove added {suffix}</button>
+              <div className="editor-repeat-actions">
+                <button type="button" className="outline compact" disabled={index===0}
+                  onClick={()=>{const next=[...additions];[next[index-1],next[index]]=[next[index],next[index-1]];putRepeatEntries(group,next)}}>Move up</button>
+                <button type="button" className="outline compact" disabled={index===additions.length-1}
+                  onClick={()=>{const next=[...additions];[next[index+1],next[index]]=[next[index],next[index+1]];putRepeatEntries(group,next)}}>Move down</button>
+                <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove {suffix}</button>
+              </div>
             </div>
           </details>
         })}
@@ -604,7 +734,7 @@ export default function App(){
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
@@ -914,6 +1044,128 @@ export default function App(){
     </form>
   </div>}
   {showPassword&&<div className="dialog-backdrop"><form className="dialog-card" onSubmit={e=>{e.preventDefault();rotatePassword()}}><h2>Change your password</h2><p>All existing sessions will be signed out after the change.</p><label>Current password<input type="password" value={oldPassword} required onChange={e=>setOldPassword(e.target.value)}/></label><label>New password (minimum 12 characters)<input type="password" value={newPassword} minLength={12} required onChange={e=>setNewPassword(e.target.value)}/></label><div className="button-group"><button type="button" className="outline" onClick={()=>setShowPassword(false)}>Cancel</button><button className="primary" disabled={busy}>Change password</button></div></form></div>}
-  {preview!==null&&<div className="preview-modal"><div className="preview-head"><div><strong>Full-page preview</strong><span>Sandboxed · Draft · Not indexed</span></div><button onClick={()=>setPreview(null)} aria-label="Close preview"><X size={23}/></button></div><iframe title="Website preview" sandbox="" srcDoc={preview}/></div>}
+  {preview!==null&&<div className={'preview-modal '+(canvasMode?'canvas-active':'')}>
+    <div className="preview-head">
+      <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
+      <div className="visual-head-actions">
+        <button type="button" className={canvasMode?'visual-mode-on':'visual-mode-off'} onClick={()=>{
+          setCanvasMode(mode=>!mode);setCanvasSelection(null);setCanvasGroupId('');previewScrollRef.current=0
+        }}><Eye size={16}/>{canvasMode?'Exit visual editing':'Edit design'}</button>
+        {canvasMode&&<button type="button" className="visual-save" disabled={!dirty||busy} onClick={savePage}><Save size={15}/> Save draft</button>}
+        <button type="button" onClick={()=>{setPreview(null);setCanvasMode(false);setCanvasSelection(null)}} aria-label="Close preview"><X size={23}/></button>
+      </div>
+    </div>
+    <div className="visual-main">
+      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
+        srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
+      {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
+        <h2>Design controls</h2>
+        <p>Click a heading, picture, button or card in the page to select it. Edit the draft without changing the template.</p>
+        <div className="visual-inspector-group">
+          <label>Repeatable section
+            <select aria-label="Choose repeatable section" value={selectedCanvasGroup?.id||''} onChange={e=>{
+              const gid=e.target.value;setCanvasGroupId(gid);setCanvasSelection({fieldKey:'',linkKey:'',itemId:'',groupId:gid})
+            }}>
+              <option value="">Select section</option>
+              {allRepeaters.filter(g=>!g.parent_item_id).map(g=><option key={g.id} value={g.id}>{g.name} · {g.count} existing</option>)}
+            </select>
+          </label>
+        </div>
+        {selectedCanvasGroup&&<div className="visual-inspector-group">
+          <h3>{selectedCanvasGroup.name}</h3>
+          <label>Cards per desktop row
+            <select aria-label="Cards per row" value={visualDesign.groups?.[selectedCanvasGroup.id]?.columns||
+                (selectedCanvasGroup.kind==='highlights'?4:selectedCanvasGroup.kind==='solutions'?4:selectedCanvasGroup.kind==='other_solutions'?5:1)}
+              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{columns:Number(e.target.value)})}>
+              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n} per row</option>)}
+            </select>
+          </label>
+          <label>Space between cards: {visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}px
+            <input type="range" min="0" max="48" step="2" aria-label="Card spacing"
+              value={visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}
+              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{gap:Number(e.target.value)})}/>
+          </label>
+          <button type="button" className="visual-add" disabled={repeatEntries(selectedCanvasGroup).length>=selectedCanvasGroup.max_additions}
+            onClick={()=>addRepeatEntry(selectedCanvasGroup)}><Plus size={15}/> Add another {selectedCanvasGroup.kind==='faqs'?'FAQ':selectedCanvasGroup.kind==='solutions'?'solution':'card'}</button>
+        </div>}
+        {canvasSelection?.itemId&&selectedCanvasGroup&&<div className="visual-inspector-group">
+          <h3>{selectedCanvasItem?.title||'Added card'}</h3>
+          {selectedCanvasGroup.kind==='solutions'&&<div className="visual-variant-buttons">
+            <span>Card layout</span>
+            {(['regular','highlight','generic'] as const).map(variant=><button type="button" key={variant}
+              aria-pressed={(selectedCanvasItem?editor?.page.values['__variant__'+selectedCanvasGroup.id+'__'+selectedCanvasItem.id]
+                ||selectedCanvasItem.variant:repeatEntries(selectedCanvasGroup)[Number(canvasSelection.itemId.split('_added_')[1])-1]?.__variant||'regular')===variant}
+              onClick={()=>{
+                if(selectedCanvasItem)changeField('__variant__'+selectedCanvasGroup.id+'__'+selectedCanvasItem.id,variant)
+                else{const index=Number(canvasSelection.itemId.split('_added_')[1])-1
+                  if(index>=0)updateRepeatEntry(selectedCanvasGroup,index,'__variant',variant)}
+              }}>{variant[0].toUpperCase()+variant.slice(1)}</button>)}
+          </div>}
+          <label>Card width
+            <select aria-label="Selected card width" value={visualDesign.items?.[canvasSelection.itemId]?.span??(selectedCanvasItem?.variant==='highlight'?2:1)}
+              onChange={e=>designPatch('items',canvasSelection.itemId,{span:Number(e.target.value)})}>
+              <option value={1}>Regular · 1 column</option>
+              <option value={2}>Wide · 2 columns</option>
+              <option value={3}>Extra wide · 3 columns</option>
+              <option value={4}>Full width · 4 columns</option>
+            </select>
+          </label>
+          <label>Card height: {visualDesign.items?.[canvasSelection.itemId]?.height??300}px
+            <input type="range" aria-label="Selected card height" min="150" max="600" step="10"
+              value={visualDesign.items?.[canvasSelection.itemId]?.height??300}
+              onChange={e=>designPatch('items',canvasSelection.itemId,{height:Number(e.target.value)})}/>
+          </label>
+          <label className="visual-lock-row"><input type="checkbox" aria-label="Lock selected card"
+            checked={!!visualDesign.items?.[canvasSelection.itemId]?.locked}
+            onChange={e=>designPatch('items',canvasSelection.itemId,{locked:e.target.checked})}/>
+            <LockKeyhole size={14}/> Lock this card</label>
+        </div>}
+        {selectedCanvasField&&<div className="visual-inspector-group">
+          <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
+          {selectedCanvasField.mode==='page'&&!isFieldLocked(selectedCanvasField.key)
+            ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
+              {selectedCanvasField.kind==='image'&&<img className="visual-inspector-image" alt="Selected page image"
+                src={extraIndex>=0&&selectedCanvasGroup
+                  ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||selectedCanvasField.default
+                  :editor?.page.values[selectedCanvasField.key]||selectedCanvasField.default}/>}
+              {selectedCanvasField.kind==='image'
+                ?<input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
+                  value={extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||''
+                    :(editor?.page.values[selectedCanvasField.key]||'').startsWith('data:')?'':editor?.page.values[selectedCanvasField.key]||''}
+                  onChange={e=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
+                    else if(!e.target.value)unsetField(selectedCanvasField.key)
+                    else changeField(selectedCanvasField.key,e.target.value)
+                  }}/>
+                :<textarea aria-label="Selected element content" rows={3}
+                  value={extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
+                    :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default}
+                  onChange={e=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
+                    else changeField(selectedCanvasField.key,e.target.value)
+                  }}/>}
+            </label>
+            :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
+          {selectedCanvasField.mode==='page'&&<label>Font size: {visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}px
+            <input aria-label="Selected font size" type="range" min="10" max="100" step="1"
+              value={visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}
+              onChange={e=>designPatch('fields',selectedCanvasField.key,{fontPx:Number(e.target.value)})}/>
+          </label>}
+          {selectedCanvasField.mode==='page'&&<label className="visual-lock-row">
+            <input type="checkbox" aria-label="Lock selected text" checked={isFieldLocked(selectedCanvasField.key)}
+              onChange={e=>designPatch('fields',selectedCanvasField.key,{locked:e.target.checked})}/>
+            <LockKeyhole size={14}/> Lock this element</label>}
+          {selectedCanvasLink?.mode==='page'&&<label>Button destination
+            <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
+              onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
+          </label>}
+        </div>}
+        {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}
+        <small className="visual-inspector-note">Page-specific changes · Desktop widths adapt to tablet and mobile · Preview is not published</small>
+      </aside>}
+    </div>
+  </div>}
   </div>
 }
