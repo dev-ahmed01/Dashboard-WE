@@ -1574,3 +1574,5 @@
 .editor-repeat-actions .editor-repeat-remove{margin-left:auto}
 .editor-repeat-actions .outline{font-size:11px;min-height:34px}
 @media(max-width:640px){.editor-repeat-heading-controls{gap:5px}.editor-repeat-columns{font-size:9px}.editor-repeat-actions .editor-repeat-remove{margin-left:0}}
+
+.visual-inspector-image{display:block;width:100%;max-height:160px;object-fit:cover;border-radius:9px;border:1px solid #e7dfda;background:#faf9f7}
