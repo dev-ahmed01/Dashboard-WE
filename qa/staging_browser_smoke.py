@@ -308,6 +308,19 @@ def run():
         page.keyboard.press("ArrowRight")
         expect(frame.locator('[data-we-design-element]').last).to_have_attribute(
           "style",__import__('re').compile(r'left:33px'))
+        # Drag the on-page corner handle to resize the selected shape.
+        # This must persist in the server-rendered preview, not just the DOM.
+        last_shape=frame.locator('[data-we-design-element]').last
+        resize=frame.locator('[data-we-resize-handle]')
+        expect(resize).to_be_visible(timeout=15000)
+        box=resize.bounding_box()
+        assert box is not None
+        page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+        page.mouse.down()
+        page.mouse.move(box['x']+box['width']/2+50,box['y']+box['height']/2+40,steps=9)
+        page.mouse.up()
+        expect(last_shape).to_have_attribute(
+          "style",__import__('re').compile(r'width:2\d\dpx!important'),timeout=15000)
         page.screenshot(path=str(OUT/"04_visual_editor.png"))
         page.get_by_role("button", name="Close preview").click()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()
