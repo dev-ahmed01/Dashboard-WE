@@ -22,7 +22,7 @@ from .db import get_db, SessionLocal
 from .models import User, Template, Page, Publication, SharedContent, Redirect, Media, AuditLog, utcnow
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
-from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, HEADINGS
+from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
 
@@ -549,7 +549,7 @@ def validate_repeater_value(key,value,t):
             if f['kind']=='link' and v and not is_safe_link(v):fail(422,'Unsafe repeated link URL')
             if f['kind']=='image' and not SAFE_URL.match(v):fail(422,'Unsafe repeated image URL')
             if f['kind']=='icon':
-                if f.get('attr')=='icon_src' and v and not SAFE_URL.match(v):
+                if f.get('attr')=='icon_src' and not is_safe_icon_value(v):
                     fail(422,'Unsafe repeated icon URL')
                 if f.get('attr')=='class' and not SAFE_CLASS.fullmatch(v):
                     fail(422,'Unsafe repeated icon class')
@@ -591,7 +591,7 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
             if field['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
             if field['kind']=='link' and value and not is_safe_link(value):fail(422,'Unsafe link destination')
             if field['kind']=='icon':
-                if field.get('attr')=='icon_src' and value and not SAFE_URL.match(value):fail(422,'Icon URL is not allowed')
+                if field.get('attr')=='icon_src' and not is_safe_icon_value(value):fail(422,'Icon URL is not allowed')
                 if field.get('attr')=='class' and not SAFE_CLASS.fullmatch(value):fail(422,'Icon class is not allowed')
             newvals[key]=value
         changes['values']=newvals
