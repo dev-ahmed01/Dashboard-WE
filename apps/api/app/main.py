@@ -213,7 +213,6 @@ def remove_templates(db:Session,user:User,selected:list[Template]):
         used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id==t.id)) or 0
         if used:
             t.is_deleted=True
-            t.approved=False
             retained+=1
         else:
             unused_keys.append(t.object_key)
