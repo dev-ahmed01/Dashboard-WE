@@ -286,8 +286,8 @@ export default function App(){
   const extraIndex=extraSelection?Number(extraSelection[1])-1:-1
   const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
-  const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
+  const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
@@ -464,16 +464,120 @@ export default function App(){
     accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null)
   })}
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
-  const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
-  function designPatch(category:'groups'|'items'|'fields',key:string,patch:Record<string,number|boolean>){
-    setEditor(current=>{
-      if(!current)return current
-      let prior:Record<string,Record<string,Record<string,number|boolean>>>={}
-      try{prior=JSON.parse(current.page.values.__design__||'{}')}catch{}
-      const next={...prior,[category]:{...(prior[category]||{}),
-        [key]:{...(prior[category]?.[key]||{}),...patch}}}
-      return {...current,page:{...current.page,values:{...current.page.values,__design__:JSON.stringify(next)}}}
-    })
+  function changeCanvasValues(next:Record<string,string>,key='change'){
+    if(!editor||JSON.stringify(next)===JSON.stringify(editor.page.values))return
+    if(canvasMode){
+      const now=Date.now()
+      const last=canvasLastHistoryRef.current
+      if(last.key!==key||now-last.time>650){
+        canvasUndoRef.current=[...canvasUndoRef.current.slice(-69),structuredClone(editor.page.values)]
+      }
+      canvasRedoRef.current=[]
+      canvasLastHistoryRef.current={key,time:now}
+      setCanvasUndoCounter(n=>n+1)
+    }
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:next}}:cur)
+  }
+  function changeField(key:string,val:string){
+    if(!editor)return
+    changeCanvasValues({...editor.page.values,[key]:val},'field-'+key)
+  }
+  function undoCanvas(){
+    const previous=canvasUndoRef.current.pop()
+    if(!editor||!previous)return
+    canvasRedoRef.current.push(structuredClone(editor.page.values))
+    canvasLastHistoryRef.current={key:'',time:0}
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:previous}}:cur)
+    setCanvasUndoCounter(n=>n+1)
+  }
+  function redoCanvas(){
+    const next=canvasRedoRef.current.pop()
+    if(!editor||!next)return
+    canvasUndoRef.current.push(structuredClone(editor.page.values))
+    canvasLastHistoryRef.current={key:'',time:0}
+    setEditor(cur=>cur?{...cur,page:{...cur.page,values:next}}:cur)
+    setCanvasUndoCounter(n=>n+1)
+  }
+  function commitDesign(next:VisualDesign,key='style'){
+    if(!editor)return
+    changeCanvasValues({...editor.page.values,__design__:JSON.stringify(next)},key)
+  }
+  function designPatch(category:'groups'|'items'|'fields',key:string,patch:DesignStyle|Record<string,number|boolean>){
+    commitDesign({...visualDesign,[category]:{...(visualDesign[category]||{}),
+      [key]:{...(visualDesign[category]?.[key]||{}),...patch}}},category+'-'+key)
+  }
+  function designRemove(category:'items'|'fields',key:string){
+    const options={...(visualDesign[category]||{})}
+    delete options[key]
+    commitDesign({...visualDesign,[category]:options},'reset-'+key)
+  }
+  function overlayPatch(id:string,patch:Partial<CanvasElement>){
+    if(!id)return
+    const elements=(visualDesign.elements||[]).map(el=>el.id===id?{...el,...patch}:el)
+    commitDesign({...visualDesign,elements},'overlay-'+id)
+  }
+  function overlayAdd(type:CanvasElement['type']){
+    if(!editor||((visualDesign.elements||[]).length>=50))return
+    const frame=previewFrameRef.current
+    const doc=frame?.contentDocument
+    const selection=doc?.elementFromPoint(120,Math.min(220,(frame?.clientHeight||400)-30))
+      ?.closest('[data-we-section]')
+    const sectionId=selection?.getAttribute('data-we-section')||
+      selectedCanvasGroup?.section_id||editor.template.sections[0]?.id
+    if(!sectionId)return
+    const id='ov_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7)
+    const entry:CanvasElement={
+      id,type,sectionId,x:32,y:100,width:type==='shape'?180:type==='image'?230:260,
+      height:type==='image'?160:type==='shape'?120:type==='button'?55:90,
+      text:type==='text'?'Double-click to edit text':type==='button'?'New button':type==='image'?'Uploaded image':'',
+      url:type==='button'?'#enquiry':type==='image'?'https://placehold.co/500x300/png':'',
+      fontSize:type==='text'?28:18,fontFamily:'Poppins',fontWeight:600,
+      color:'#161616',background:type==='button'?'#ED2024':type==='shape'?'#FFB900':'#FFFFFF',
+      opacity:100,rotate:0,radius:12,textAlign:'center',zIndex:10,
+    }
+    commitDesign({...visualDesign,elements:[...(visualDesign.elements||[]),entry]},'add-'+id)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:id})
+    setCanvasGroupId('')
+    setCanvasLayersOpen(true)
+  }
+  function overlayDuplicate(){
+    if(!selectedCanvasElement||(visualDesign.elements||[]).length>=50)return
+    const copy={...selectedCanvasElement,id:'ov_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),
+      x:Math.min(2350,selectedCanvasElement.x+24),y:Math.min(11950,selectedCanvasElement.y+24),locked:false}
+    commitDesign({...visualDesign,elements:[...(visualDesign.elements||[]),copy]},'duplicate-'+copy.id)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:'',itemId:'',elementId:copy.id})
+  }
+  function overlayRemove(){
+    if(!selectedCanvasElement||selectedCanvasElement.locked)return
+    commitDesign({...visualDesign,elements:(visualDesign.elements||[]).filter(el=>el.id!==selectedCanvasElement.id)},'remove-'+selectedCanvasElement.id)
+    setCanvasSelection(null)
+  }
+  function duplicateSelectedCard(){
+    if(!selectedCanvasGroup||!canvasSelection?.itemId)return
+    const entries=repeatEntries(selectedCanvasGroup)
+    if(entries.length >= Math.min(selectedCanvasGroup.max_additions||12,12))return
+    const item=selectedCanvasItem
+    const index=Number(canvasSelection.itemId.split('_added_')[1])-1
+    const clone:Record<string,string>={}
+    if(!item && index>=0 && entries[index]){
+      Object.assign(clone,entries[index])
+    }else if(item){
+      const target=selectedCanvasGroup.items[selectedCanvasGroup.items.length-1]
+      const source=item.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k)).filter((f):f is Field=>!!f&&f.mode==='page')
+      const dest=target.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k)).filter((f):f is Field=>!!f&&f.mode==='page')
+      source.forEach((f,i)=>{
+        const out=dest[i]
+        if(!out)return
+        const value=editor?.page.values[f.key]??f.default
+        if(f.kind!=='image'&&f.kind!=='icon'&&value.length<2500)clone[out.key]=value
+        else if((f.kind==='image'||f.kind==='icon')&&!value.startsWith('data:')&&value.length<2500)clone[out.key]=value
+      })
+      if(selectedCanvasGroup.kind==='solutions')
+        clone.__variant=editor?.page.values['__variant__'+selectedCanvasGroup.id+'__'+item.id]||item.variant||'regular'
+    }
+    putRepeatEntries(selectedCanvasGroup,[...entries,clone])
+    const id=selectedCanvasGroup.id+'_added_'+(entries.length+1)
+    setCanvasSelection({fieldKey:'',linkKey:'',groupId:selectedCanvasGroup.id,itemId:id})
   }
   function isFieldLocked(key:string){
     if(visualDesign.fields?.[key]?.locked)return true
