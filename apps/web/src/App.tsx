@@ -192,6 +192,7 @@ export default function App(){
   const [canvasMode,setCanvasMode]=useState(false)
   const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string}|null>(null)
   const [canvasGroupId,setCanvasGroupId]=useState('')
+  const [canvasFontBaseline,setCanvasFontBaseline]=useState(20)
   const [previewSection,setPreviewSection]=useState('')
   const previewFrameRef=useRef<HTMLIFrameElement|null>(null)
   const previewScrollRef=useRef(0)
@@ -403,6 +404,70 @@ export default function App(){
   })}
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
+  function designPatch(category:'groups'|'items'|'fields',key:string,patch:Record<string,number|boolean>){
+    setEditor(current=>{
+      if(!current)return current
+      let prior:Record<string,Record<string,Record<string,number|boolean>>>={}
+      try{prior=JSON.parse(current.page.values.__design__||'{}')}catch{}
+      const next={...prior,[category]:{...(prior[category]||{}),
+        [key]:{...(prior[category]?.[key]||{}),...patch}}}
+      return {...current,page:{...current.page,values:{...current.page.values,__design__:JSON.stringify(next)}}}
+    })
+  }
+  function isFieldLocked(key:string){
+    if(visualDesign.fields?.[key]?.locked)return true
+    return allRepeaters.some(group=>group.items.some(item=>
+      item.field_keys.includes(key)&&!!visualDesign.items?.[item.id]?.locked))
+  }
+  function unsetField(key:string){
+    setEditor(current=>{
+      if(!current)return current
+      const vals={...current.page.values};delete vals[key]
+      return {...current,page:{...current.page,values:vals}}
+    })
+  }
+  function canvasLoaded(frame:HTMLIFrameElement){
+    if(!canvasMode)return
+    const doc=frame.contentDocument
+    if(!doc)return
+    const style=doc.createElement('style')
+    style.textContent='[data-we-field],[data-we-link-field],[data-we-repeat-item]{cursor:crosshair!important;}[data-we-field]:hover,[data-we-link-field]:hover,[data-we-repeat-item]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 6px rgba(237,32,36,.13)!important;}'
+    ;(doc.head||doc.body).appendChild(style)
+    doc.addEventListener('click',event=>{
+      const target=event.target as Element
+      const clickable=target.closest?.('[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
+      if(!clickable)return
+      event.preventDefault();event.stopPropagation()
+      const item=clickable.closest('[data-we-repeat-item]')
+      const group=clickable.closest('[data-we-repeat-group]')
+      const field=clickable.closest('[data-we-field],[data-we-link-field]')
+      const fieldKey=field?.getAttribute('data-we-field')||''
+      const linkKey=field?.getAttribute('data-we-link-field')||''
+      const itemId=item?.getAttribute('data-we-repeat-item')||''
+      const groupId=group?.getAttribute('data-we-repeat-group')||''
+      const raw=field?doc.defaultView?.getComputedStyle(field).fontSize:''
+      if(raw)setCanvasFontBaseline(Math.max(10,Math.min(100,Math.round(parseFloat(raw)||20))))
+      setCanvasGroupId(groupId)
+      setCanvasSelection({fieldKey,linkKey,groupId,itemId})
+      doc.querySelectorAll('[data-we-canvas-selected]').forEach(el=>el.removeAttribute('data-we-canvas-selected'))
+      ;(field||item||group)?.setAttribute('data-we-canvas-selected','true')
+    },true)
+    if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
+  }
+  async function enableRepeatersOnThisPage(){
+    if(!editor)return
+    if(dirty){showError('Save the current draft before refreshing repeater fields.');return}
+    await action(async()=>{
+      const updated=await api<{page:Page;template:Template;repeaters:number;new_fields:number}>(
+        '/api/pages/'+editor.page.id+'/upgrade-repeaters',
+        {method:'POST',body:json({edit_version:editor.page.edit_version})})
+      setEditor({page:updated.page,template:updated.template})
+      setSavedPage(structuredClone(updated.page))
+      setActiveEditorSection(null)
+      await refresh()
+      notify('Repeaters refreshed for this page: '+updated.repeaters+' groups and '+updated.new_fields+' newly detected fields.')
+    })
+  }
   function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
     const title=fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
