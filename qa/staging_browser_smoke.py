@@ -205,8 +205,8 @@ def run():
         # Arrow icon is preserved even after the CTA text is rewritten.
         page.locator(".editor-block-cta").first.get_by_label("Button text").fill("Schedule a callback")
         expect(side_frame.get_by_text("Schedule a callback")).to_be_visible(timeout=15000)
-        arrow=side_frame.locator("a.btn .pill-arr")
-        expect(arrow).to_have_text("↗")
+        # The original CTA's inline SVG must not be erased with its label.
+        expect(side_frame.locator('a[href="#enquiry"] svg')).to_have_count(1)
         page.screenshot(path=str(OUT/"03_page_editor_repeaters.png"))
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
