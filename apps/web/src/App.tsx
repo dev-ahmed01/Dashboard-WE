@@ -407,7 +407,7 @@ export default function App(){
   function deleteRepeatEntry(group:Repeater,index:number){
     putRepeatEntries(group,repeatEntries(group).filter((_,i)=>i!==index))
   }
-  function existingItemFields(group:Repeater,item:RepeaterItem,section:Section){
+  function existingItemFields(item:RepeaterItem,section:Section){
     const nested=variableRepeaterGroups(section,editor?.template.fields||[])
       .filter(x=>x.parent_item_id===item.id)
     const nestedKeys=new Set(nested.flatMap(g=>g.items.flatMap(it=>it.field_keys)))
@@ -426,7 +426,7 @@ export default function App(){
       </div>
       <div className="editor-repeat-items">
         {group.items.map((item,index)=>{
-          const available=existingItemFields(group,item,section)
+          const available=existingItemFields(item,section)
           const subGroups=(section.repeaters||[]).filter(g=>g.parent_item_id===item.id&&variableRepeaterGroups(section,editor?.template.fields||[]).includes(g))
           return <details className="editor-repeat-item" key={item.id}>
             <summary><span className="editor-repeat-item-num">{String(index+1).padStart(2,'0')}</span><span>{item.title||suffix+' '+(index+1)}</span><ChevronRight size={15}/></summary>
