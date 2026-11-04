@@ -192,83 +192,63 @@ def overview(db:Session=Depends(get_db),_:User=Depends(current_user)):
 
 @app.get('/api/templates')
 def templates(db:Session=Depends(get_db),_:User=Depends(current_user)):
-    return [template_json(t) for t in db.scalars(select(Template).order_by(Template.id.desc())).all()]
+    return [template_json(t) for t in db.scalars(select(Template).where(Template.is_deleted==False).order_by(Template.id.desc())).all()]
 
 
 class DeleteTemplatesRequest(BaseModel):
-    confirmation: str
+    confirm: bool = False
+
+
+def remove_templates(db:Session,user:User,selected:list[Template]):
+    """Delete unused templates; hide templates still referenced by pages.
+
+    A page's snapshot and its source HTML are immutable. Hiding the originating
+    template from this library must not delete those records or object keys.
+    """
+    if not selected:
+        return {'removed':0,'retained_for_pages':0,'storage_cleanup_failed':0}
+    unused_keys=[]
+    retained=0
+    for t in selected:
+        used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id==t.id)) or 0
+        if used:
+            t.is_deleted=True
+            t.approved=False
+            retained+=1
+        else:
+            unused_keys.append(t.object_key)
+            db.delete(t)
+    audit(db,user,'template_library_remove','templates',{'ids':[t.id for t in selected],'retained_for_pages':retained})
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        fail(409,'Could not remove templates. No changes were saved.')
+    failed=0
+    try:
+        store=ObjectStore() if unused_keys else None
+    except Exception:
+        failed=len(set(unused_keys));store=None
+    if store:
+        for key in set(unused_keys):
+            try:store.delete(key)
+            except Exception:failed+=1
+    return {'removed':len(selected),'retained_for_pages':retained,'storage_cleanup_failed':failed}
 
 
 @app.delete('/api/templates')
 def delete_all_templates(payload:DeleteTemplatesRequest,db:Session=Depends(get_db),user:User=Depends(admin)):
-    """Remove the entire test template library, but never strand existing pages.
-
-    A template referenced by any draft, published, or archived page blocks the
-    entire operation. Storage is cleaned after a successful DB transaction.
-    """
-    if payload.confirmation != 'DELETE ALL TEMPLATES':
-        fail(422,'Type DELETE ALL TEMPLATES to confirm deletion')
-    templates_to_delete=db.scalars(select(Template).order_by(Template.id)).all()
-    if not templates_to_delete:
-        return {'deleted':0,'storage_cleanup_failed':0}
-    template_ids=[t.id for t in templates_to_delete]
-    used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id.in_(template_ids))) or 0
-    if used:
-        fail(409,f'Cannot delete templates: {used} existing page(s), including archived or published pages, still reference them. No templates were deleted.')
-    keys=[t.object_key for t in templates_to_delete]
-    for t in templates_to_delete:
-        db.delete(t)
-    audit(db,user,'templates_delete_all','templates',{'count':len(template_ids),'ids':template_ids})
-    # Database constraints also prevent races with concurrent page creation.
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        fail(409,'Unable to delete templates while they are referenced. No templates were deleted.')
-    failed=0
-    unique_keys=set(keys)
-    try:
-        store=ObjectStore()
-    except Exception:
-        failed=len(unique_keys)
-    else:
-        for key in unique_keys:
-            try:
-                store.delete(key)
-            except Exception:
-                # Database rows were already deleted. Report incomplete object cleanup.
-                failed+=1
-    return {'deleted':len(template_ids),'storage_cleanup_failed':failed}
+    if not payload.confirm:fail(422,'Please confirm template removal')
+    selected=db.scalars(select(Template).where(Template.is_deleted==False).order_by(Template.id)).all()
+    return remove_templates(db,user,selected)
 
 
 @app.delete('/api/templates/{template_id}')
 def delete_one_template(template_id:int,payload:DeleteTemplatesRequest,db:Session=Depends(get_db),user:User=Depends(admin)):
-    """Delete one unreferenced template after an exact-name confirmation.
-
-    Never cascade into pages (including archived drafts and published snapshots).
-    """
+    if not payload.confirm:fail(422,'Please confirm template removal')
     t=get_template(db,template_id)
-    confirmation=f'DELETE {t.name}'
-    if payload.confirmation!=confirmation:
-        fail(422,'Type '+confirmation+' to confirm deletion')
-    used=db.scalar(select(func.count()).select_from(Page).where(Page.template_id==t.id)) or 0
-    if used:
-        fail(409,f'Cannot delete {t.name}: {used} page(s), including archived or published pages, still use this template. No data was deleted.')
-    key=t.object_key
-    name=t.name
-    db.delete(t)
-    audit(db,user,'template_delete',str(template_id),{'name':name})
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        fail(409,'Unable to delete a template while existing pages reference it. No data was deleted.')
-    failed=0
-    try:
-        ObjectStore().delete(key)
-    except Exception:
-        failed=1
-    return {'deleted':1,'template_id':template_id,'storage_cleanup_failed':failed}
+    if t.is_deleted:fail(404,'Template is already removed from the library')
+    return remove_templates(db,user,[t])
 
 
 @app.post('/api/templates/import',status_code=201)
@@ -412,6 +392,7 @@ class NewPage(BaseModel):
 @app.post('/api/pages',status_code=201)
 def create_page(payload:NewPage,db:Session=Depends(get_db),user:User=Depends(current_user)):
     t=get_template(db,payload.template_id)
+    if t.is_deleted:fail(409,'This template was removed from the library. Choose an active template.')
     if not t.approved:fail(409,'Approve the template field mapping before creating pages')
     base=re.sub(r'[^a-z0-9]+','-',payload.name.lower()).strip('-') or 'page'
     slug=base;i=2
