@@ -98,6 +98,11 @@ export default function App(){
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
   const [collapsedSections,setCollapsedSections]=useState<string[]>([])
+  const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
+  const [focusedPreviewField,setFocusedPreviewField]=useState('')
+  const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
+  const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
+  const [sectionPreviewError,setSectionPreviewError]=useState('')
   const [inlinePreview,setInlinePreview]=useState('')
   const [inlinePreviewError,setInlinePreviewError]=useState('')
   const [inlinePreviewLoading,setInlinePreviewLoading]=useState(false)
@@ -130,11 +135,11 @@ export default function App(){
   const [selectedTemplatePreview,setSelectedTemplatePreview]=useState('')
   const [templateDragActive,setTemplateDragActive]=useState(false)
   const [deletingTemplate,setDeletingTemplate]=useState<Template|'all'|null>(null)
-  const [deletePhrase,setDeletePhrase]=useState('')
   const [deleteError,setDeleteError]=useState('')
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
+  const activeSectionId=editor?(activeEditorSection===null?editor.template.sections[0]?.id:activeEditorSection):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
   useEffect(()=>{
@@ -149,6 +154,26 @@ export default function App(){
     },450)
     return()=>{cancelled=true;window.clearTimeout(timer)}
   },[editor?.page.id,previewPayload,previewRefresh])
+  useEffect(()=>{
+    if(!editor||!previewPayload||!activeSectionId){
+      setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
+    }
+    let cancelled=false
+    setSectionPreviewLoading(true)
+    const timer=window.setTimeout(()=>{
+      html('/api/pages/'+editor.page.id+'/preview?section_id='+encodeURIComponent(activeSectionId),JSON.parse(previewPayload))
+        .then(content=>{
+          if(cancelled)return
+          const key=/^[a-z0-9_-]+$/i.test(focusedPreviewField)?focusedPreviewField:''
+          const css=key?'<style>[data-we-field="'+key+'"],[data-we-link-field="'+key+'"]{outline:3px solid #ed2024!important;outline-offset:3px!important;background:rgba(255,185,0,.22)!important;scroll-margin-top:90px!important}</style>':''
+          setSectionPreviewHtml(css?content.replace('</head>',css+'</head>'):content)
+          setSectionPreviewError('')
+        })
+        .catch(e=>{if(!cancelled)setSectionPreviewError(e instanceof Error?e.message:String(e))})
+        .finally(()=>{if(!cancelled)setSectionPreviewLoading(false)})
+    },320)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
+  },[editor?.page.id,activeSectionId,previewPayload,previewRefresh,focusedPreviewField])
   useEffect(()=>{
     let active=true
     if(!selectedTemplate){setSelectedTemplatePreview('');return}
@@ -175,7 +200,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([])})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([]);setActiveEditorSection(null);setFocusedPreviewField('')})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
@@ -200,26 +225,24 @@ export default function App(){
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
   function openDeleteDialog(target:Template|'all'){
-    setDeletingTemplate(target);setDeletePhrase('');setDeleteError('')
+    setDeletingTemplate(target);setDeleteError('')
   }
-  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeletePhrase('');setDeleteError('')}
+  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeleteError('')}
   async function confirmTemplateDeletion(){
     if(!deletingTemplate||busy)return
     const target=deletingTemplate
-    const phrase=target==='all'?'DELETE ALL TEMPLATES':'DELETE '+target.name
-    if(deletePhrase!==phrase)return
     setBusy(true);setDeleteError('');setError('')
     try{
       const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
-      const result=await api<{deleted:number;storage_cleanup_failed:number}>(endpoint,{
-        method:'DELETE',body:json({confirmation:deletePhrase})
+      const result=await api<{removed:number;retained_for_pages:number;storage_cleanup_failed:number}>(endpoint,{
+        method:'DELETE',body:json({confirm:true})
       })
       if(target==='all'||mappingId===target.id){setMappingId(null);setUploaded(null);setOpenMappingSection(null);setSectionModeBackups({})}
       if(target==='all'||selectedTemplate===target.id)setSelectedTemplate(null)
       await refresh()
-      setDeletingTemplate(null);setDeletePhrase('')
-      notify(result.deleted+' template'+(result.deleted===1?'':'s')+' deleted.'+
-        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage object(s) could not be removed.':''))
+      setDeletingTemplate(null)
+      notify(result.removed+' template'+(result.removed===1?'':'s')+' removed from your library. Existing pages are preserved.'+
+        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' unused storage object(s) could not be removed.':''))
     }catch(e){
       setDeleteError(e instanceof Error?e.message:String(e))
     }finally{setBusy(false)}
@@ -704,14 +727,11 @@ export default function App(){
     <form className="dialog-card template-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="template-delete-title" onSubmit={e=>{e.preventDefault();confirmTemplateDeletion()}}>
       <div className="template-delete-icon"><Trash2 size={23}/></div>
       <h2 id="template-delete-title">{deletingTemplate==='all'?'Delete all templates?':'Delete this template?'}</h2>
-      <p>{deletingTemplate==='all'?'This permanently deletes the uploaded template library.':'This permanently deletes "'+deletingTemplate.name+'".'}</p>
-      <p className="template-delete-warning">Templates already used by any page—including archived or published pages—are protected. If a page depends on a selected template, the deletion is blocked and nothing is removed.</p>
-      <label>To confirm, type <strong>{deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name}</strong>
-        <input autoFocus type="text" placeholder="Type the confirmation phrase" autoComplete="off" spellCheck={false} value={deletePhrase} onChange={e=>setDeletePhrase(e.target.value)}/>
-      </label>
+      <p>{deletingTemplate==='all'?'Remove all templates from the active library?':'Remove "'+deletingTemplate.name+'" from the active library?'}</p>
+      <p className="template-delete-warning">Are you sure? This removes the template from your active library. Pages already created from it, including published pages, keep their original content and can still be edited.</p>
       {deleteError&&<div className="template-delete-error" role="alert">{deleteError}</div>}
       <div className="button-group"><button type="button" className="outline" onClick={closeDeleteDialog} disabled={busy}>Cancel</button>
-        <button type="submit" className="primary template-confirm-delete" disabled={busy||deletePhrase!==(deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name)}><Trash2 size={15}/> {busy?'Deleting…':'Delete permanently'}</button>
+        <button type="submit" className="primary template-confirm-delete" disabled={busy}><Trash2 size={15}/> {busy?'Removing…':deletingTemplate==='all'?'Remove all templates':'Remove template'}</button>
       </div>
     </form>
   </div>}
