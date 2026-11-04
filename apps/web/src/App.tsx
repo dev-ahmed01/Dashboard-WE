@@ -1796,7 +1796,7 @@ export default function App(){
         </div>}
         {selectedCanvasField&&<div className="visual-inspector-group">
           <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
-          {selectedCanvasField.mode==='page'&&!isFieldLocked(selectedCanvasField.key)
+          {selectedCanvasField.mode==='page'&&!isFieldLocked(canvasSelection?.fieldKey||selectedCanvasField.key)
             ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
               {selectedCanvasField.kind==='image'&&<img className="visual-inspector-image" alt="Selected page image"
                 src={extraIndex>=0&&selectedCanvasGroup
@@ -1838,7 +1838,7 @@ export default function App(){
                     else changeField(selectedCanvasField.key,e.target.value)
                   }}/>}
             </label>
-            :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
+            :<p>{isFieldLocked(canvasSelection?.fieldKey||selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
           {selectedCanvasLink?.mode==='page'&&<label>Button destination
             <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
               onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
