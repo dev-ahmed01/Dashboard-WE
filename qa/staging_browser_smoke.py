@@ -67,22 +67,25 @@ def run():
         <section class="hero" data-we-section="hero" data-we-name="Hero">
         <h1 data-we-field="hero_heading" data-we-label="Main headline">Original office headline</h1>
         <p>Locked original supporting content</p>
-         <div class="cards"><article><div class="card-title">Offices in prime locations</div><p>Move-in ready locations</p></article><article><div class="card-title">Multiple pricing plans</div><p>Flexible pricing</p></article></div>
-         <a href="#enquiry">Request a callback</a></section>
+         <div class="cards"><article><div class="card-title">Offices in prime locations</div><svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg><p>Move-in ready locations</p></article><article><div class="card-title">Multiple pricing plans</div><svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg><p>Flexible pricing</p></article></div>
+         <a href="#enquiry">Request a callback <svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg></a>
+         <a href="tel:+919814953954">Call now</a></section>
         <section data-we-section="benefits" data-we-name="Benefits">
-        <h2>Flexible benefits</h2><p>Static benefit description</p></section>
+        <h2>Flexible benefits</h2><p>Editable benefit description</p></section>
+        <section data-we-section="faq" data-we-name="FAQs">
+        <h2>Questions answered</h2><p>This section remains static</p></section>
         </main></body></html>"""
         page.locator('input[type="file"]').set_input_files(
             {"name":"staging-smoke.html","mimeType":"text/html","buffer":html.encode()}
         )
         page.get_by_placeholder("e.g. Managed Office Category").fill("Staging Template")
         page.get_by_role("button", name="Detect and map sections").click()
-        expect(page.get_by_text("2 structural sections detected", exact=False)).to_be_visible(timeout=15000)
+        expect(page.get_by_text("3 structural sections detected", exact=False)).to_be_visible(timeout=15000)
         expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
         expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
         assert px(".category-panel-header h2") == 18, "Upload panels should use 18px section titles"
         cards = page.locator(".category-section-card")
-        expect(cards).to_have_count(2)
+        expect(cards).to_have_count(3)
         assert page.locator(".category-mapping-fullwidth").bounding_box()["width"] > page.locator(".category-page").bounding_box()["width"] * .95
         mapping_bounds = page.locator(".category-mapping-fullwidth").bounding_box()
         preview_bounds = page.locator(".category-preview-below").bounding_box()
@@ -125,6 +128,15 @@ def run():
         assert ctas.count()==2, "Expected separate extracted button text and link"
         for i in range(ctas.count()):
             ctas.nth(i).locator("select[aria-label^='Behavior:']").select_option("page")
+        # Keep the Call now destination static to verify it remains visible
+        # but cannot be changed in the page editor.
+        call_link=cards.first.locator(".map-field").filter(has_text="Link destination: Call now")
+        expect(call_link).to_have_count(1)
+        call_link.locator("select[aria-label^='Behavior:']").select_option("static")
+        # Keep the FAQs section fully Static, but make Benefits editable.
+        cards.nth(1).get_by_role("button", name="View more").click()
+        cards.nth(1).get_by_role("switch", name="Keep Benefits static").uncheck()
+        cards.first.get_by_role("button", name="View more").click()
         page.locator(".approve input[type=checkbox]").check()
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
         page.get_by_role("button", name="Save template configuration").click()
@@ -150,41 +162,45 @@ def run():
         page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
         expect(page.locator("#section-editing")).to_be_visible()
-        # The unmodified Benefits section was saved as Static, so Add Page
-        # must not expose any editable content controls for it.
-        static_block=page.locator(".editor-section-block").nth(1)
-        expect(static_block.get_by_text("Fixed content · reused from template")).to_be_visible()
-        expect(static_block.locator(".editor-fields-grid")).to_have_count(0)
+        # Only variable sections appear; the third (FAQs) is fully Static.
+        expect(page.locator(".editor-section-block")).to_have_count(2)
+        expect(page.locator(".editor-section-block").get_by_text("FAQs")).to_have_count(0)
         expect(page.locator("#seo-settings")).to_be_visible()
-        expect(page.locator(".editor-field-group").first.get_by_text("Headings & text")).to_be_visible()
-        expect(page.locator(".editor-actions-group summary")).to_be_visible()
-        expect(page.get_by_text("Highlight card title — Offices in prime locations")).to_be_visible()
-        expect(page.get_by_text("Highlight card title — Multiple pricing plans")).to_be_visible()
+        expect(page.get_by_label("URL slug")).to_have_count(0)
+        expect(page.locator("#page-preview")).to_have_count(0)
+        expect(page.locator(".editor-ordered-block").first).to_be_visible()
+        assert page.locator(".editor-ordered-block").count() >= 4
+        expect(page.locator(".editor-block-card")).to_have_count(2)
+        expect(page.locator(".editor-block-card").first.get_by_text("Offices in prime locations")).to_be_visible()
+        expect(page.locator(".editor-block-card").nth(1).get_by_text("Multiple pricing plans")).to_be_visible()
+        expect(page.locator(".editor-block-cta")).to_have_count(2)
+        expect(page.locator(".editor-block-cta").first.locator("strong")).to_have_text("Request a callback")
+        expect(page.locator(".editor-block-cta").nth(1).locator("strong")).to_have_text("Call now")
+        expect(page.locator(".editor-block-cta").nth(1).locator(".editor-fixed-destination code")).to_have_text("tel:+919814953954")
+        expect(page.locator(".editor-block-cta input[aria-label='Button destination']")).to_have_value("#enquiry")
+        assert page.locator(".editor-block-card").first.bounding_box()["y"] < page.locator(".editor-block-cta").first.bounding_box()["y"], "Cards must follow source HTML order"
+        # All three SVGs are contextual; none is an anonymous input by default.
+        expect(page.locator(".editor-context-icon")).to_have_count(3)
+        expect(page.locator(".editor-context-icon input:visible")).to_have_count(0)
+        page.locator(".editor-block-card").first.locator(".editor-context-icon summary").click()
+        expect(page.locator(".editor-block-card").first.locator(".editor-context-icon input")).to_be_visible()
+        page.locator(".editor-block-card").first.locator(".editor-context-icon summary").click()
+        expect(page.locator(".editor-context-icon input:visible")).to_have_count(0)
         expect(page.locator(".editor-side-preview")).to_be_visible()
         side_bounds=page.locator(".editor-side-preview").bounding_box()
         fields_bounds=page.locator(".editor-section-rows").bounding_box()
         assert side_bounds["x"]>=fields_bounds["x"]+fields_bounds["width"]-2, "Side preview must appear to the right"
         side_frame=page.frame_locator('iframe[title="Selected section preview"]')
         expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
-        # Selecting another card switches preview to that section and closes Hero.
+        # Side preview follows the selected editable section.
         page.locator(".editor-section-toggle").nth(1).click()
         expect(side_frame.get_by_text("Flexible benefits")).to_be_visible(timeout=15000)
         page.locator(".editor-section-toggle").first.click()
         expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
-        page.locator(".editor-actions-group summary").click()
-        expect(page.locator(".editor-action-card")).to_have_count(1)
-        expect(page.locator(".editor-action-card-head strong")).to_have_text("Request a callback")
-        expect(page.locator(".editor-action-card input")).to_have_count(2)
-        expect(page.locator("#seo-settings").get_by_text("Publication checklist (local CMS)")).to_have_count(0)
-        expect(page.locator("#page-preview")).to_be_visible()
-        positions = [page.locator(f"#{name}").bounding_box() for name in ("section-editing", "seo-settings", "page-preview")]
-        assert all(position is not None for position in positions), "Editor panels must be rendered"
-        assert positions[0]["y"] < positions[1]["y"] < positions[2]["y"], "Expected content, SEO, then preview"
-        assert positions[0]["width"] > page.locator(".content").bounding_box()["width"] * .75, "Editor must fill available width"
         page.screenshot(path=str(OUT/"03_page_editor.png"))
-        page.locator(".editor-fields-grid input").first.fill("Unsaved QA Hero")
+        page.get_by_label("Main headline").fill("Unsaved QA Hero")
         expect(page.get_by_text("Unsaved changes", exact=True)).to_be_visible()
-        expect(page.frame_locator('iframe[title="Inline page preview"]').get_by_text("Unsaved QA Hero")).to_be_visible(timeout=15000)
+        expect(side_frame.get_by_text("Unsaved QA Hero")).to_be_visible(timeout=15000)
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
         frame = page.frame_locator('iframe[title="Website preview"]')

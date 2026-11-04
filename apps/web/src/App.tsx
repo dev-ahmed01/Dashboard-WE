@@ -27,54 +27,100 @@ async function html(path:string,payload?:unknown):Promise<string>{
 const json=(o:unknown)=>JSON.stringify(o)
 const label=(k:string)=>k.replaceAll('_',' ')
 
-type EditorAction={id:string;name:string;fields:Field[]}
-type EditorGroups={content:Field[];actions:EditorAction[];media:Field[]}
 
-/** Keep a CTA's text and destination next to each other, based on the
- * importer's stable extraction order (text immediately precedes its link).
- * This works on saved V14+ templates without changing database records. */
-function editorGroups(fields:Field[]):EditorGroups{
-  const used=new Set<string>()
-  const actions:EditorAction[]=[]
-  const cta=(f:Field)=>f.kind==='link'||((f.tag==='a'||f.tag==='button')&&f.attr==='text')
-  fields.forEach((f,i)=>{
-    if(!cta(f)||used.has(f.key))return
-    const pair:Field[]=[f];used.add(f.key)
-    const prev=fields[i-1],next=fields[i+1]
-    if(f.kind==='link'&&prev&&!used.has(prev.key)&&prev.attr==='text'&&cta(prev)){
-      pair.unshift(prev);used.add(prev.key)
-    }else if(f.attr==='text'&&next&&!used.has(next.key)&&next.kind==='link'){
-      pair.push(next);used.add(next.key)
+type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields:Field[];fixedDestination?:string}
+const isCtaText=(f:Field)=>f.attr==='text'&&(f.tag==='a'||f.tag==='button')
+const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replace(/\s+/g,' ').trim().length>n?'…':'')
+
+/** Order the editor as the real HTML is ordered: headline, calls-to-action,
+ * then repeated highlight cards, descriptions and images. Static content is
+ * used only to identify a block. It never produces an editable input. */
+function pageEditorBlocks(source:Field[]):EditorBlock[]{
+  const blocks:EditorBlock[]=[]
+  let card:EditorBlock|null=null
+  let lastCTA:EditorBlock|null=null
+  for(const f of source){
+    const editable=f.mode==='page'
+    const isCardTitle=/^Card title:/i.test(f.label)
+    if(isCardTitle){
+      card={id:f.key,kind:'card',title:excerpt(f.default,65)||'Highlight card',fields:[]}
+      blocks.push(card);lastCTA=null
+      if(editable)card.fields.push(f)
+      continue
     }
-    const textField=pair.find(x=>x.attr==='text')
-    const raw=(textField?.default||f.label.replace(/^(?:Link destination|Button link|Button text|Link text):\s*/i,'')).replace(/\s+/g,' ').trim()
-    const name=raw.length>55?raw.slice(0,55).trim()+'…':raw||'Untitled button'
-    actions.push({id:pair[0].key,name,fields:pair})
-  })
-  return {
-    content:fields.filter(f=>!used.has(f.key)&&f.kind!=='image'&&f.kind!=='icon'),
-    actions,
-    media:fields.filter(f=>!used.has(f.key)&&(f.kind==='image'||f.kind==='icon'))
+    if(isCtaText(f)){
+      card=null
+      lastCTA={id:f.key,kind:'cta',title:excerpt(f.default,60)||'Button',fields:[]}
+      blocks.push(lastCTA)
+      if(editable)lastCTA.fields.push(f)
+      continue
+    }
+    if(f.kind==='link'){
+      // Importer emits a button's text immediately before its destination.
+      // Even if the text is static, pair its editable link with the named CTA.
+      if(!lastCTA||lastCTA.fields.some(x=>x.kind==='link')){
+        lastCTA={id:f.key,kind:'cta',title:excerpt(f.label.replace(/^.*?:\s*/,''),60)||'Button',fields:[]}
+        blocks.push(lastCTA)
+      }
+      card=null
+      if(editable)lastCTA.fields.push(f)
+      else lastCTA.fixedDestination=f.default||'No destination specified'
+      continue
+    }
+    if(f.kind==='icon'){
+      // SVGs are usually decorative. Do not produce five anonymous URL
+      // inputs; attach configurable icons to their actual card or CTA instead.
+      if(editable){
+        if(card)card.fields.push(f)
+        else if(lastCTA)lastCTA.fields.push(f)
+      }
+      continue
+    }
+    lastCTA=null
+    if(f.kind==='image'){
+      if(card){if(editable)card.fields.push(f)}
+      else if(editable)blocks.push({id:f.key,kind:'image',title:excerpt(f.label.replace(/^Image:\s*/,''),65)||'Image',fields:[f]})
+      continue
+    }
+    if(card && f.tag && /^h[1-6]$/.test(f.tag))card=null
+    if(card){
+      if(editable)card.fields.push(f)
+      continue
+    }
+    if(editable){
+      const title=/^Card title:/i.test(f.label)?excerpt(f.default,60)
+        :f.tag==='h1'?'Main headline':f.tag&&/^h[2-6]$/.test(f.tag)?'Section heading'
+        :excerpt(f.default,64)||'Text'
+      blocks.push({id:f.key,kind:'text',title,fields:[f]})
+    }
   }
+  return blocks.filter(b=>b.fields.length>0)
 }
-function friendlyEditorLabel(field:Field,position:number):string{
-  if(field.kind==='link')return 'Where this button goes'
-  if(field.kind==='icon')return field.attr==='icon_src'?'Replacement icon image URL':'Icon style'
-  if(field.kind==='image')return 'Image URL'
-  if(field.attr==='text'&&(field.tag==='a'||field.tag==='button'))return 'Button text'
-  if(field.label.startsWith('Card title:'))return 'Highlight card title — '+field.default.slice(0,42)
-  if(field.tag==='h1')return 'Main headline (H1)'
-  if(field.tag&&/^h[2-6]$/.test(field.tag))return 'Heading ('+field.tag.toUpperCase()+')'
-  if(field.tag==='p')return 'Paragraph '+position
-  if(field.tag==='li')return 'Bullet point '+position
-  if(field.tag==='label')return 'Form label '+position
-  return field.kind==='textarea'?'Long description '+position:'Text '+position
+function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):string{
+  if(f.kind==='link')return 'Button destination'
+  if(f.kind==='icon')return f.attr==='class'?'Icon class (advanced)':'Replacement icon image URL'
+  if(f.kind==='image')return kind==='card'?'Card image':'Image'
+  if(isCtaText(f))return 'Button text'
+  if(/^Card title:/i.test(f.label))return 'Card heading'
+  if(kind==='card'&&f.tag==='p')return 'Card description'
+  if(f.tag==='h1')return 'Main headline'
+  if(f.tag&&/^h[2-6]$/.test(f.tag))return 'Section heading ('+f.tag.toUpperCase()+')'
+  if(f.tag==='li')return 'List item '+position
+  if(f.tag==='p'){
+    const val=excerpt(f.default,42)
+    return val?'Text: '+val:'Paragraph'
+  }
+  return f.kind==='textarea'?'Description':f.label.replace(/^(?:Text|Paragraph|H[1-6] heading):\s*/i,'').slice(0,70)||'Text'
 }
-function editorHelp(field:Field):string{
-  if(field.kind==='link')return 'Use #enquiry for a section, /contact/ for a page, or a full https:// address.'
-  if(field.kind==='icon')return field.attr==='icon_src'?'Leave blank to keep the existing icon. To replace it, paste an image URL.':'Enter icon CSS class names only.'
-  if(field.kind==='image')return 'Paste the URL of an uploaded or approved image.'
-  return field.default?'Currently: '+(field.default.length>105?field.default.slice(0,105).trim()+'…':field.default):''
+function hintForField(field:Field):string{
+  if(field.kind==='link'){
+    if(field.default.startsWith('tel:'))return 'Phone link: tel:+91…'
+    if(field.default.startsWith('#'))return 'Section link: #enquiry'
+    return 'Enter a page path (/contact/), section (#enquiry), phone (tel:+91…), or full https:// URL.'
+  }
+  if(field.kind==='image')return 'Use the URL of your uploaded image.'
+  if(field.kind==='icon')return field.attr==='class'?'Keep the original value unless you know the CSS icon class used by this template.':'Leave blank to keep the original icon. To replace it, enter a PNG, JPEG or WebP image URL.'
+  return ''
 }
 
 export default function App(){
@@ -103,9 +149,6 @@ export default function App(){
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
   const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
   const [sectionPreviewError,setSectionPreviewError]=useState('')
-  const [inlinePreview,setInlinePreview]=useState('')
-  const [inlinePreviewError,setInlinePreviewError]=useState('')
-  const [inlinePreviewLoading,setInlinePreviewLoading]=useState(false)
   const [previewRefresh,setPreviewRefresh]=useState(0)
   const [newName,setNewName]=useState('')
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
@@ -139,21 +182,11 @@ export default function App(){
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
-  const activeSectionId=editor?(activeEditorSection===null?editor.template.sections[0]?.id:activeEditorSection):''
+  const editableSections=editor?editor.template.sections.filter(section=>
+    pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id)).length>0):[]
+  const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
-  useEffect(()=>{
-    if(!editor||!previewPayload){setInlinePreview('');setInlinePreviewError('');setInlinePreviewLoading(false);return}
-    let cancelled=false
-    setInlinePreviewLoading(true)
-    const timer=window.setTimeout(()=>{
-      html(`/api/pages/${editor.page.id}/preview`,JSON.parse(previewPayload))
-        .then(content=>{if(!cancelled){setInlinePreview(content);setInlinePreviewError('')}})
-        .catch(e=>{if(!cancelled)setInlinePreviewError(e instanceof Error?e.message:String(e))})
-        .finally(()=>{if(!cancelled)setInlinePreviewLoading(false)})
-    },450)
-    return()=>{cancelled=true;window.clearTimeout(timer)}
-  },[editor?.page.id,previewPayload,previewRefresh])
   useEffect(()=>{
     if(!editor||!previewPayload||!activeSectionId){
       setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
@@ -305,20 +338,37 @@ export default function App(){
     setOldPassword('');setNewPassword('');setShowPassword(false);notify('Password changed. Sign in again with your new password.')
     accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null)
   })}
-  const changePage=(patch:Partial<Page>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,...patch}}:cur)
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
-  function editorFieldControl(field:Field,position:number){
-    const title=friendlyEditorLabel(field,position)
+  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
+    const title=fieldDisplayName(field,kind,position)
     const value=editor?.page.values[field.key]??field.default
-    return <label key={field.key} className={'editor-human-field '+(field.kind==='textarea'||field.kind==='image'||field.kind==='link'?'wide-field':'')}>
-      <span className="editor-human-field-name">{title}</span>
+    return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
+      <span className="editor-ordered-label">{title}</span>
       {field.kind==='textarea'
         ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
         :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='link'?'e.g. /contact/ or #enquiry':field.kind==='icon'?'Optional icon image URL':undefined}/>}
-      {editorHelp(field)&&<small className="editor-human-help">{editorHelp(field)}</small>}
+          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
+      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
+  }
+  function editorBlockControl(block:EditorBlock,index:number){
+    const regular=block.fields.filter(f=>f.kind!=='icon')
+    const icons=block.fields.filter(f=>f.kind==='icon')
+    const kindLabel=block.kind==='card'?'Highlight card':block.kind==='cta'?'Button / CTA':block.kind==='image'?'Image':'Page content'
+    return <div className={'editor-ordered-block editor-block-'+block.kind} key={block.id}>
+      <div className="editor-ordered-block-header">
+        <span className="editor-ordered-step">{String(index+1).padStart(2,'0')}</span>
+        <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
+      </div>
+      {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
+      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code></div>}
+      {icons.length>0&&<details className="editor-context-icon">
+        <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
+        <p>The original icon stays in place unless you choose a replacement image.</p>
+        <div className="editor-ordered-block-fields">{icons.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>
+      </details>}
+    </div>
   }
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
@@ -426,45 +476,30 @@ export default function App(){
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
-        <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Only fields approved as page-variable can be changed. The original HTML layout stays intact.</p></div>
-        <span className="editor-field-total">{editor.template.fields.filter(f=>f.mode==='page').length} editable fields</span>
+        <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Edit each part in the same order it appears on the page. Choose a field to highlight it in the preview.</p></div>
+        <span className="editor-field-total">{editableSections.length} editable sections</span>
       </div>
       <div className="editor-content-workspace"><div className="editor-section-rows">
-        {editor.template.sections.map((section,i)=>{
-          const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
-          const groups=editorGroups(fields)
-          const collapsed=section.id!==activeSectionId
-          return <div className="editor-section-block" key={section.id}>
-            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>{setActiveEditorSection(collapsed?section.id:'');setFocusedPreviewField('')}}>
-              <span className="editor-section-no">{String(i+1).padStart(2,'0')}</span>
-              <span className="editor-section-name"><strong>{section.name}</strong><small>{fields.length?`${fields.length} editable field${fields.length===1?'':'s'}`:'Fixed content · reused from template'}</small></span>
-              {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
-              <ChevronRight size={17} className={`section-chevron ${collapsed?'':'expanded'}`}/>
-            </button>
-            {!collapsed&&fields.length>0&&<div className="editor-friendly-groups">
-              {groups.content.length>0&&<details className="editor-field-group" open>
-                <summary><span><strong>Headings & text</strong><small>Page headlines, descriptions and bullet points</small></span><span className="editor-group-count">{groups.content.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-fields-grid">{groups.content.map((f,i)=>editorFieldControl(f,i+1))}</div>
-              </details>}
-              {groups.actions.length>0&&<details className="editor-field-group editor-actions-group">
-                <summary><span><strong>Buttons & links</strong><small>Change button wording and where each button takes visitors</small></span><span className="editor-group-count">{groups.actions.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-action-collection">{groups.actions.map((item,i)=><div className="editor-action-card" key={item.id}>
-                  <div className="editor-action-card-head"><span className="editor-action-no">{String(i+1).padStart(2,'0')}</span><div><strong>{item.name}</strong><small>Button {i+1} · Edit text or destination below</small></div></div>
-                  <div className="editor-fields-grid">{item.fields.map((field,j)=>editorFieldControl(field,j+1))}</div>
-                </div>)}</div>
-              </details>}
-              {groups.media.length>0&&<details className="editor-field-group editor-media-group">
-                <summary><span><strong>Images & icons</strong><small>Replace visuals only when you need a different image or icon</small></span><span className="editor-group-count">{groups.media.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-fields-grid">{groups.media.map((f,i)=>editorFieldControl(f,i+1))}</div>
-              </details>}
-            </div>}
-          </div>
-        })}
-      </div>
-      <aside className="editor-side-preview" aria-label="Live section preview">
+         {editableSections.map(section=>{
+           const blocks=pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id))
+           const sectionOpen=section.id===activeSectionId
+           return <div className="editor-section-block" key={section.id}>
+             <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
+               <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{blocks.length} editable {blocks.length===1?'element':'elements'} · Page order</small></span>
+               <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
+             </button>
+             {sectionOpen&&<div className="editor-page-ordered-list">
+               {blocks.map((block,i)=>editorBlockControl(block,i))}
+             </div>}
+           </div>
+         })}
+         {editableSections.length===0&&<div className="editor-no-variable"><LockKeyhole size={20}/><strong>No editable sections</strong><p>Everything in this template is set to Static. Choose a template with Variable fields to edit page content.</p></div>}
+       </div>
+       <aside className="editor-side-preview" aria-label="Live section preview">
         <div className="editor-side-preview-head">
           <div><strong>Section preview</strong><small>{editor.template.sections.find(x=>x.id===activeSectionId)?.name||'Choose a section'}</small></div>
-          {activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}
+          <div className="editor-side-preview-actions"><button type="button" className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)}>Refresh</button>{activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}</div>
         </div>
         <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
         <div className="editor-side-preview-window">
@@ -484,7 +519,7 @@ export default function App(){
       <div className="form-stack seo-form-stack">
 
         {publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}
-        <div className="seo-primary-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label>URL slug<input value={editor.page.slug} onChange={e=>changePage({slug:e.target.value})}/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
+        <div className="seo-primary-fields seo-simple-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
         <div className="two-col seo-switches">
           <label className="seo-toggle-card">
             <span className="seo-toggle-copy"><strong>Allow indexing</strong><small>{editor.page.seo.noindex?'Off · Ask search engines not to show this page in results.':'On · Allow search engines to include this page in results.'}</small></span>
@@ -500,14 +535,7 @@ export default function App(){
       </div>
     </section>
 
-    <section className="edit-panel editor-preview-panel" id="page-preview" aria-labelledby="preview-heading">
-      <div className="panel-heading"><div><div className="small-label">03 / RESULT</div><h2 id="preview-heading">Page Preview</h2><p>See the full page below. Content and SEO edits appear here automatically without saving.</p></div><div className="button-group"><button className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)} disabled={inlinePreviewLoading}>Refresh preview</button><button className="outline compact" onClick={()=>fullPreview()} disabled={busy}>Expand preview <ArrowUpRight size={15}/></button></div></div>
-      <div className="inline-preview-bar"><span aria-live="polite">{inlinePreviewLoading?'Updating preview…':inlinePreviewError?'Preview unavailable':'Preview is up to date'}</span><span>Desktop · Full page · Draft only</span></div>
-      <div className="inline-preview-frame">{inlinePreview&&<iframe title="Inline page preview" sandbox="" srcDoc={inlinePreview}/>}{!inlinePreview&&<div className="inline-preview-empty">{inlinePreviewLoading?'Generating page preview…':inlinePreviewError||'Preparing preview…'}</div>}</div>
-      {inlinePreviewError&&<div className="inline-preview-error" role="alert">{inlinePreviewError} <button className="quiet-action" onClick={()=>setPreviewRefresh(n=>n+1)}>Try again</button></div>}
-      <div className="editor-preview-foot"><span>Preview changes are not published to WordPress.</span><div className="button-group"><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
-    </section>
-  </div></>:
+    </div></>:
   <>
   {nav==='Category'&&<div className="category-page">
     <div className="category-heading">
