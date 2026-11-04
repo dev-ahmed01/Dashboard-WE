@@ -1566,3 +1566,11 @@
   .visual-head-actions button{font-size:11px;padding:7px;min-height:32px}
   .preview-head{padding:10px}
 }
+
+.editor-repeat-heading-controls{display:flex;align-items:center;gap:10px}
+.editor-repeat-columns{display:flex;align-items:center;gap:7px;font-size:10px;color:#746a62;font-weight:650}
+.editor-repeat-columns select{min-width:49px;height:31px;border:1px solid #e4dbd6;border-radius:8px;padding:4px 6px;background:#fff;font-size:11px;color:#2e2622}
+.editor-repeat-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.editor-repeat-actions .editor-repeat-remove{margin-left:auto}
+.editor-repeat-actions .outline{font-size:11px;min-height:34px}
+@media(max-width:640px){.editor-repeat-heading-controls{gap:5px}.editor-repeat-columns{font-size:9px}.editor-repeat-actions .editor-repeat-remove{margin-left:0}}
