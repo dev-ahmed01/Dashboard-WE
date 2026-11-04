@@ -597,16 +597,18 @@ export default function App(){
       </div>
       <div className="editor-content-workspace"><div className="editor-section-rows">
          {editableSections.map(section=>{
-           const blocks=pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id))
+           const ordered=sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id))
            const sectionOpen=section.id===activeSectionId
-           return <div className="editor-section-block" key={section.id}>
+           return <div className="editor-section-block" key={section.id} id={'edit-section-'+section.id}>
              <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
                <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
-               <span className="editor-section-name"><strong>{section.name}</strong><small>{blocks.length} editable {blocks.length===1?'element':'elements'} · Page order</small></span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length} content {ordered.items.length===1?'group':'groups'} · Original page order</small></span>
                <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
              </button>
              {sectionOpen&&<div className="editor-page-ordered-list">
-               {blocks.map((block,i)=>editorBlockControl(block,i))}
+               {ordered.items.map((part,i)=>part.kind==='group'&&part.group
+                 ?renderRepeaterGroup(part.group,section)
+                 :part.block?editorBlockControl(part.block,i):null)}
              </div>}
            </div>
          })}
