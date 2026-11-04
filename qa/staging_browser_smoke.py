@@ -133,6 +133,10 @@ def run():
         call_link=cards.first.locator(".map-field").filter(has_text="Link destination: Call now")
         expect(call_link).to_have_count(1)
         call_link.locator("select[aria-label^='Behavior:']").select_option("static")
+        # The callback CTA icon is independently editable, not a raw SVG URL.
+        svg_fields=cards.first.locator(".map-field").filter(has_text="SVG icon")
+        assert svg_fields.count()>=3
+        svg_fields.last.locator("select[aria-label^='Behavior:']").select_option("page")
         # Keep the FAQs section fully Static, but make Benefits editable.
         cards.nth(1).get_by_role("button", name="View more").click()
         cards.nth(1).get_by_role("switch", name="Keep Benefits static").uncheck()
@@ -178,6 +182,21 @@ def run():
         expect(page.locator(".editor-block-cta").nth(1).locator("strong")).to_have_text("Call now")
         expect(page.locator(".editor-block-cta").nth(1).locator(".editor-fixed-destination code")).to_have_text("tel:+919814953954")
         expect(page.locator(".editor-block-cta input[aria-label='Button destination']")).to_have_value("#enquiry")
+        # Link editing must update the real href, even for an HTTPS URL whose
+        # destination cannot be embedded inside the local CMS preview.
+        recording="https://kommodo.ai/i/sCYKuA1fO4ob1o92TkHk"
+        page.locator(".editor-block-cta").first.get_by_label("Button destination").fill(recording)
+        expect(page.locator(".editor-block-cta").first.get_by_role("link", name="Test this link")).to_have_attribute("href",recording)
+        expect(page.locator(".editor-repeat-count")).to_have_count(0)
+        side_frame=page.frame_locator('iframe[title="Selected section preview"]')
+        expect(side_frame.locator('a[href="'+recording+'"]')).to_have_count(1,timeout=15000)
+        # SVG icon picker has recognizable names; changes immediately render
+        # a real inline SVG and the original CTA label remains intact.
+        cta_icon=page.locator(".editor-block-cta").first.locator(".editor-context-icon")
+        cta_icon.locator("summary").click()
+        cta_icon.get_by_label("Choose icon",exact=False).select_option("icon:arrow-up-right")
+        expect(side_frame.locator('a[href="'+recording+'"] svg path')).to_have_count(2,timeout=15000)
+        expect(page.locator(".editor-block-cta").first.get_by_label("Button destination")).to_have_value(recording)
         # A newly added card is saved as a repeater and updates the live preview.
         highlights.get_by_role("button", name="Add another card").click()
         new_card=highlights.locator(".editor-repeat-item.added").first
@@ -206,7 +225,7 @@ def run():
         page.locator(".editor-block-cta").first.get_by_label("Button text").fill("Schedule a callback")
         expect(side_frame.get_by_text("Schedule a callback")).to_be_visible(timeout=15000)
         # The original CTA's inline SVG must not be erased with its label.
-        expect(side_frame.locator('a[href="#enquiry"] svg')).to_have_count(1)
+        expect(side_frame.locator('a[href="'+recording+'"] svg path')).to_have_count(2)
         page.screenshot(path=str(OUT/"03_page_editor_repeaters.png"))
         page.get_by_role("button", name="Full-page preview").click()
         expect(page.locator(".preview-modal")).to_be_visible()
