@@ -248,6 +248,7 @@ export default function App(){
   const [canvasDevice,setCanvasDevice]=useState<'desktop'|'tablet'|'mobile'>('desktop')
   const [canvasGrid,setCanvasGrid]=useState(false)
   const [canvasLayersOpen,setCanvasLayersOpen]=useState(false)
+  const [canvasInspectTarget,setCanvasInspectTarget]=useState<'card'|'text'>('card')
   const [canvasUndoCounter,setCanvasUndoCounter]=useState(0)
   const canvasUndoRef=useRef<Record<string,string>[]>([])
   const canvasRedoRef=useRef<Record<string,string>[]>([])
@@ -726,6 +727,7 @@ export default function App(){
       setCanvasGroupId(groupId)
       setCanvasSelection({fieldKey:elementId?'':fieldKey,linkKey:elementId?'':linkKey,
         groupId:elementId?'':groupId,itemId:elementId?'':itemId,elementId})
+      setCanvasInspectTarget('card')
       doc.querySelectorAll('[data-we-canvas-selected]').forEach(el=>el.removeAttribute('data-we-canvas-selected'))
       const chosen=(overlay||field||item||group) as HTMLElement
       chosen?.setAttribute('data-we-canvas-selected','true')
@@ -1778,7 +1780,11 @@ export default function App(){
             onClick={()=>addRepeatEntry(selectedCanvasGroup)}><Plus size={15}/> Add another {selectedCanvasGroup.kind==='faqs'?'FAQ':selectedCanvasGroup.kind==='solutions'?'solution':'card'}</button>
         </div>}
         {selectedCanvasElement&&canvasOverlayControls(selectedCanvasElement)}
-        {canvasSelection?.itemId&&selectedCanvasGroup&&<div className="visual-inspector-group">
+        {canvasSelection?.itemId&&selectedCanvasField&&<div className="designer-inspect-switch">
+          <button type="button" aria-pressed={canvasInspectTarget==='card'} onClick={()=>setCanvasInspectTarget('card')}>Card design</button>
+          <button type="button" aria-pressed={canvasInspectTarget==='text'} onClick={()=>setCanvasInspectTarget('text')}>Selected text</button>
+        </div>}
+        {canvasSelection?.itemId&&selectedCanvasGroup&&canvasInspectTarget!=='text'&&<div className="visual-inspector-group">
           <h3>{selectedCanvasItem?.title||'Added card'}</h3>
           {selectedCanvasGroup.kind==='solutions'&&<div className="visual-variant-buttons">
             <span>Card layout</span>
@@ -1794,7 +1800,7 @@ export default function App(){
           <button type="button" className="designer-neutral-action" onClick={duplicateSelectedCard}><Copy size={14}/> Duplicate card</button>
           {canvasSelection?.itemId&&canvasStyleControls('items',canvasSelection.itemId)}
         </div>}
-        {selectedCanvasField&&<div className="visual-inspector-group">
+        {selectedCanvasField&&(!canvasSelection?.itemId||canvasInspectTarget==='text')&&<div className="visual-inspector-group">
           <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
           {selectedCanvasField.mode==='page'&&!isFieldLocked(canvasSelection?.fieldKey||selectedCanvasField.key)
             ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
