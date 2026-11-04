@@ -6,7 +6,7 @@ type Field={key:string;section_id:string;label:string;kind:string;attr:string;de
 type Section={id:string;name:string;order:number}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;canonical_override:string;og_title?:string;og_description?:string}
-type Page={id:number;template_id:number;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
+type Page={id:number;template_id:number;template_name?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
 type Nav='Category'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
 type Tab='All Pages'|'Add Page'|'Upload Template'
 
@@ -548,7 +548,7 @@ export default function App(){
         {categoryPages.map(p=><div className="category-table-row" key={p.id}>
           <input type="checkbox" aria-label={'Select '+p.title} checked={selectedPageIds.includes(p.id)} onChange={e=>setSelectedPageIds(ids=>e.target.checked?[...ids,p.id]:ids.filter(id=>id!==p.id))}/>
           <div className="category-page-name"><strong>{p.title}</strong><span>{'/'+p.slug+'/'}</span></div>
-          <div className="category-template-name">{templates.find(t=>t.id===p.template_id)?.name||'Unavailable template'}</div>
+          <div className="category-template-name">{templates.find(t=>t.id===p.template_id)?.name||p.template_name||'Previously removed template'}</div>
           <div><span className={'category-status '+(p.status==='published'?'category-published':'category-draft')}>{p.status==='published'?'Published':'Draft'}</span>{p.has_unpublished_changes&&<small className="category-draft-indicator">Unpublished changes</small>}</div>
           <time dateTime={p.updated_at}>{new Date(p.updated_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</time>
           <details className="category-actions"><summary aria-label={'Actions for '+p.title}><MoreHorizontal size={20}/></summary><div className="category-action-menu">
