@@ -68,7 +68,8 @@ def run():
         <h1 data-we-field="hero_heading" data-we-label="Main headline">Original office headline</h1>
         <p>Locked original supporting content</p>
          <div class="cards"><article><div class="card-title">Offices in prime locations</div><svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg><p>Move-in ready locations</p></article><article><div class="card-title">Multiple pricing plans</div><svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg><p>Flexible pricing</p></article></div>
-         <a href="#enquiry">Request a callback <svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg></a></section>
+         <a href="#enquiry">Request a callback <svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg></a>
+         <a href="tel:+919814953954">Call now</a></section>
         <section data-we-section="benefits" data-we-name="Benefits">
         <h2>Flexible benefits</h2><p>Editable benefit description</p></section>
         <section data-we-section="faq" data-we-name="FAQs">
@@ -127,6 +128,11 @@ def run():
         assert ctas.count()==2, "Expected separate extracted button text and link"
         for i in range(ctas.count()):
             ctas.nth(i).locator("select[aria-label^='Behavior:']").select_option("page")
+        # Keep the Call now destination static to verify it remains visible
+        # but cannot be changed in the page editor.
+        call_link=cards.first.locator(".map-field").filter(has_text="Link destination: Call now")
+        expect(call_link).to_have_count(1)
+        call_link.locator("select[aria-label^='Behavior:']").select_option("static")
         # Keep the FAQs section fully Static, but make Benefits editable.
         cards.nth(1).get_by_role("button", name="View more").click()
         cards.nth(1).get_by_role("switch", name="Keep Benefits static").uncheck()
@@ -167,8 +173,10 @@ def run():
         expect(page.locator(".editor-block-card")).to_have_count(2)
         expect(page.locator(".editor-block-card").first.get_by_text("Offices in prime locations")).to_be_visible()
         expect(page.locator(".editor-block-card").nth(1).get_by_text("Multiple pricing plans")).to_be_visible()
-        expect(page.locator(".editor-block-cta")).to_have_count(1)
-        expect(page.locator(".editor-block-cta strong")).to_have_text("Request a callback")
+        expect(page.locator(".editor-block-cta")).to_have_count(2)
+        expect(page.locator(".editor-block-cta").first.locator("strong")).to_have_text("Request a callback")
+        expect(page.locator(".editor-block-cta").nth(1).locator("strong")).to_have_text("Call now")
+        expect(page.locator(".editor-block-cta").nth(1).locator(".editor-fixed-destination code")).to_have_text("tel:+919814953954")
         expect(page.locator(".editor-block-cta input[aria-label='Button destination']")).to_have_value("#enquiry")
         assert page.locator(".editor-block-card").first.bounding_box()["y"] < page.locator(".editor-block-cta").first.bounding_box()["y"], "Cards must follow source HTML order"
         # All three SVGs are contextual; none is an anonymous input by default.
