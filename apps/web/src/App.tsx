@@ -669,15 +669,50 @@ export default function App(){
     attachPreviewLinks(frame)
     if(!canvasMode)return
     const doc=frame.contentDocument
-    if(!doc)return
+    const win=frame.contentWindow
+    if(!doc||!win)return
     const style=doc.createElement('style')
-    style.textContent='[data-we-field],[data-we-link-field],[data-we-repeat-item]{cursor:crosshair!important;}[data-we-field]:hover,[data-we-link-field]:hover,[data-we-repeat-item]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 6px rgba(237,32,36,.13)!important;}'
+    style.textContent=[
+      '[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-design-element]{cursor:move!important;}',
+      '[data-we-field]:hover,[data-we-repeat-item]:hover,[data-we-design-element]:hover{outline:2px dashed #ed2024!important;outline-offset:3px!important;}',
+      '[data-we-canvas-selected]{outline:3px solid #ed2024!important;outline-offset:3px!important;box-shadow:0 0 0 5px rgba(237,32,36,.13)!important;}',
+      '[data-we-resize-handle]{position:absolute;display:block;width:16px;height:16px;border-radius:5px;border:2px solid #fff;background:#ed2024;z-index:999999;cursor:nwse-resize;padding:0;box-shadow:0 2px 10px #16161655;}',
+      '[data-we-design-element]:focus{outline:3px solid #ed2024!important}',
+      canvasGrid?'body{background-image:linear-gradient(#cccccc32 1px,transparent 1px),linear-gradient(90deg,#cccccc32 1px,transparent 1px)!important;background-size:24px 24px!important;}':''
+    ].join('\n')
     ;(doc.head||doc.body).appendChild(style)
+    let handle:HTMLElement|null=null
+    let currentNode:HTMLElement|null=null
+    function drawHandle(node:HTMLElement|null){
+      handle?.remove()
+      handle=null
+      currentNode=node
+      if(!node||!doc?.body)return
+      const rect=node.getBoundingClientRect()
+      if(rect.width<5||rect.height<5)return
+      handle=doc.createElement('button')
+      handle.type='button'
+      handle.setAttribute('data-we-resize-handle','true')
+      handle.setAttribute('aria-label','Drag to resize selected element')
+      handle.style.left=(rect.right+win.scrollX-9)+'px'
+      handle.style.top=(rect.bottom+win.scrollY-9)+'px'
+      doc.body.appendChild(handle)
+    }
+    function selectedTarget(){
+      if(canvasSelection?.elementId)return doc?.querySelector('[data-we-design-element="'+canvasSelection.elementId+'"]') as HTMLElement|null
+      if(canvasSelection?.fieldKey)return doc?.querySelector('[data-we-field="'+canvasSelection.fieldKey+'"]') as HTMLElement|null
+      if(canvasSelection?.itemId)return doc?.querySelector('[data-we-repeat-item="'+canvasSelection.itemId+'"]') as HTMLElement|null
+      return null
+    }
+    const restore=selectedTarget()
+    if(restore){restore.setAttribute('data-we-canvas-selected','true');drawHandle(restore)}
     doc.addEventListener('click',event=>{
       const target=event.target as Element
-      const clickable=target.closest?.('[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
+      if(target.closest?.('[data-we-resize-handle]')){event.preventDefault();event.stopPropagation();return}
+      const clickable=target.closest?.('[data-we-design-element],[data-we-field],[data-we-link-field],[data-we-repeat-item],[data-we-repeat-group]')
       if(!clickable)return
       event.preventDefault();event.stopPropagation()
+      const overlay=clickable.closest('[data-we-design-element]')
       const item=clickable.closest('[data-we-repeat-item]')
       const group=clickable.closest('[data-we-repeat-group]')
       const field=clickable.closest('[data-we-field],[data-we-link-field]')
@@ -685,15 +720,158 @@ export default function App(){
       const linkKey=field?.getAttribute('data-we-link-field')||''
       const itemId=item?.getAttribute('data-we-repeat-item')||''
       const groupId=group?.getAttribute('data-we-repeat-group')||''
-      const raw=field?doc.defaultView?.getComputedStyle(field).fontSize:''
-      if(raw)setCanvasFontBaseline(Math.max(10,Math.min(100,Math.round(parseFloat(raw)||20))))
+      const elementId=overlay?.getAttribute('data-we-design-element')||''
+      const raw=field?win.getComputedStyle(field).fontSize:''
+      if(raw)setCanvasFontBaseline(Math.max(8,Math.min(120,Math.round(parseFloat(raw)||20))))
       setCanvasGroupId(groupId)
-      setCanvasSelection({fieldKey,linkKey,groupId,itemId})
+      setCanvasSelection({fieldKey:elementId?'':fieldKey,linkKey:elementId?'':linkKey,
+        groupId:elementId?'':groupId,itemId:elementId?'':itemId,elementId})
       doc.querySelectorAll('[data-we-canvas-selected]').forEach(el=>el.removeAttribute('data-we-canvas-selected'))
-      ;(field||item||group)?.setAttribute('data-we-canvas-selected','true')
+      const chosen=(overlay||field||item||group) as HTMLElement
+      chosen?.setAttribute('data-we-canvas-selected','true')
+      drawHandle(chosen||null)
     },true)
-    if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
+    type DragSession={
+      node:HTMLElement;kind:'overlay'|'item'|'field';id:string;
+      startX:number;startY:number;baseX:number;baseY:number;
+      baseW:number;baseH:number;resize:boolean;moved:boolean
+    }
+    let drag:DragSession|null=null
+    const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,Math.round(n)))
+    doc.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return
+      const target=event.target as HTMLElement
+      const resize=!!target.closest?.('[data-we-resize-handle]')
+      const picked=resize?currentNode:target.closest?.('[data-we-design-element],[data-we-field],[data-we-repeat-item]') as HTMLElement|null
+      if(!picked)return
+      const overlay=picked.closest('[data-we-design-element]')
+      const item=picked.closest('[data-we-repeat-item]')
+      const field=picked.closest('[data-we-field]')
+      const kind=overlay?'overlay':field?'field':'item'
+      const id=(overlay?.getAttribute('data-we-design-element')||
+        field?.getAttribute('data-we-field')||item?.getAttribute('data-we-repeat-item')||'')
+      const el=visualDesign.elements?.find(x=>x.id===id)
+      if(kind==='overlay'&&(!el||el.locked))return
+      const settings=kind==='item'?visualDesign.items?.[id]:visualDesign.fields?.[id]
+      if(kind!=='overlay'&&(settings?.locked||(
+        kind==='field'&&!editor?.template.fields.some(f=>f.key===id&&f.mode==='page')&&
+        !id.includes('_added_'))))return
+      const rect=picked.getBoundingClientRect()
+      drag={
+        node:picked,kind,id,startX:event.clientX,startY:event.clientY,
+        baseX:kind==='overlay'?(el?.x||0):(settings?.x||0),
+        baseY:kind==='overlay'?(el?.y||0):(settings?.y||0),
+        baseW:kind==='overlay'?(el?.width||rect.width):(settings?.widthPx||Math.round(rect.width)),
+        baseH:kind==='overlay'?(el?.height||rect.height):(settings?.heightPx||Math.round(rect.height)),
+        resize,moved:false,
+      }
+      if(resize){event.preventDefault();event.stopPropagation()}
+    },true)
+    doc.addEventListener('pointermove',event=>{
+      if(!drag)return
+      const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY
+      if(!drag.moved&&Math.hypot(dx,dy)<4)return
+      drag.moved=true
+      event.preventDefault()
+      if(drag.resize){
+        drag.node.style.width=clamp(drag.baseW+dx,30,1800)+'px'
+        drag.node.style.height=clamp(drag.baseH+dy,20,1000)+'px'
+      }else if(drag.kind==='overlay'){
+        drag.node.style.left=clamp(drag.baseX+dx,0,2400)+'px'
+        drag.node.style.top=clamp(drag.baseY+dy,0,12000)+'px'
+      }else{
+        drag.node.style.translate=clamp(drag.baseX+dx,-600,600)+'px '+clamp(drag.baseY+dy,-600,600)+'px'
+      }
+      drawHandle(drag.node)
+    },true)
+    doc.addEventListener('pointerup',event=>{
+      const session=drag
+      drag=null
+      if(!session?.moved)return
+      event.preventDefault();event.stopPropagation()
+      const dx=event.clientX-session.startX,dy=event.clientY-session.startY
+      if(session.resize){
+        const width=clamp(session.baseW+dx,30,1800)
+        const height=clamp(session.baseH+dy,20,1000)
+        if(session.kind==='overlay'){
+          overlayPatch(session.id,{width,height})
+        }else if(session.kind==='item'){
+          designPatch('items',session.id,{widthPx:width,heightPx:height})
+        }else{
+          designPatch('fields',session.id,{widthPx:width,heightPx:height})
+        }
+      }else{
+        const x=session.baseX+dx,y=session.baseY+dy
+        if(session.kind==='overlay'){
+          overlayPatch(session.id,{x:clamp(x,0,2400),y:clamp(y,0,12000)})
+        }else{
+          designPatch(session.kind==='item'?'items':'fields',session.id,{
+            x:clamp(x,-600,600),y:clamp(y,-600,600)
+          })
+        }
+      }
+    },true)
+    doc.addEventListener('pointercancel',()=>{drag=null},true)
+    doc.addEventListener('dblclick',event=>{
+      const node=(event.target as Element).closest?.('[data-we-design-element]') as HTMLElement|null
+      if(!node)return
+      const id=node.getAttribute('data-we-design-element')||''
+      const entry=visualDesign.elements?.find(el=>el.id===id)
+      if(entry&&!entry.locked&&(entry.type==='text'||entry.type==='button')){
+        event.preventDefault();event.stopPropagation()
+        const value=window.prompt('Edit text',entry.text||'')
+        if(value!==null)overlayPatch(id,{text:value.slice(0,1000)})
+      }
+    },true)
+    if(previewScrollRef.current)win.scrollTo(0,previewScrollRef.current)
   }
+  useEffect(()=>{
+    if(!canvasMode)return
+    const handler=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement
+      if(target.closest('input,textarea,select,[contenteditable="true"]'))return
+      const meta=event.ctrlKey||event.metaKey
+      if(meta&&event.key.toLowerCase()==='z'){
+        event.preventDefault();if(event.shiftKey)redoCanvas();else undoCanvas();return
+      }
+      if(meta&&event.key.toLowerCase()==='y'){event.preventDefault();redoCanvas();return}
+      if(meta&&event.key.toLowerCase()==='d'){
+        if(selectedCanvasElement||canvasSelection?.itemId){
+          event.preventDefault();if(selectedCanvasElement)overlayDuplicate();else duplicateSelectedCard()
+        }
+        return
+      }
+      if((event.key==='Delete'||event.key==='Backspace')&&selectedCanvasElement&&!selectedCanvasElement.locked){
+        event.preventDefault();overlayRemove();return
+      }
+      const arrows:{[key:string]:[number,number]}={
+        ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],
+      }
+      const direction=arrows[event.key]
+      if(!direction)return
+      const delta=event.shiftKey?10:1
+      if(selectedCanvasElement&&!selectedCanvasElement.locked){
+        event.preventDefault()
+        overlayPatch(selectedCanvasElement.id,{
+          x:Math.max(0,Math.min(2400,selectedCanvasElement.x+direction[0]*delta)),
+          y:Math.max(0,Math.min(12000,selectedCanvasElement.y+direction[1]*delta))
+        })
+      }else if(canvasSelection?.itemId||selectedCanvasField?.mode==='page'){
+        const group=canvasSelection?.itemId?'items':'fields'
+        const id=canvasSelection?.itemId||selectedCanvasField?.key||''
+        const opts=group==='items'?visualDesign.items?.[id]:visualDesign.fields?.[id]
+        if(!opts?.locked){
+          event.preventDefault()
+          designPatch(group,id,{
+            x:Math.max(-600,Math.min(600,(opts?.x||0)+direction[0]*delta)),
+            y:Math.max(-600,Math.min(600,(opts?.y||0)+direction[1]*delta))
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown',handler)
+    return()=>window.removeEventListener('keydown',handler)
+  },[canvasMode,editor,canvasSelection,visualDesign])
   async function enableLinksAndIconsOnThisPage(){
     if(!editor||user?.role!=='admin')return
     if(dirty){showError('Save this draft first, then enable editing for its links and icons.');return}
