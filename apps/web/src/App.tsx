@@ -35,6 +35,25 @@ type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields
 const isCtaText=(f:Field)=>f.attr==='text'&&(f.tag==='a'||f.tag==='button')
 const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replace(/\s+/g,' ').trim().length>n?'…':'')
 
+const SIMPLE_ICONS=[
+  {value:'icon:arrow-up-right',label:'Arrow up-right ↗'},
+  {value:'icon:arrow-right',label:'Arrow right →'},
+  {value:'icon:phone',label:'Phone'},
+  {value:'icon:map-pin',label:'Location pin'},
+  {value:'icon:check',label:'Check mark'},
+  {value:'icon:calendar',label:'Calendar'},
+  {value:'icon:chevron-right',label:'Chevron'},
+  {value:'icon:layers',label:'Layers'},
+]
+function isTestableHref(url:string){
+  const trimmed=url.trim()
+  return /^(https?:\/\/[^ \r\n\t]+|mailto:[^ \r\n\t]+|tel:[+0-9() -]+)$/i.test(trimmed)
+}
+function isSafePreviewHref(url:string){
+  return isTestableHref(url)||url.startsWith('#')||(url.startsWith('/')&&!url.startsWith('//'))
+}
+
+
 /** Order the editor as the real HTML is ordered: headline, calls-to-action,
  * then repeated highlight cards, descriptions and images. Static content is
  * used only to identify a block. It never produces an editable input. */
@@ -187,7 +206,9 @@ export default function App(){
     return()=>window.cancelAnimationFrame(frame)
   },[activeEditorSection])
 
-  const [focusedPreviewField,setFocusedPreviewField]=useState('')
+  const [customIconPickers,setCustomIconPickers]=useState<string[]>([])
+  const [linkFeedback,setLinkFeedback]=useState('')
+    const [focusedPreviewField,setFocusedPreviewField]=useState('')
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
   const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
   const [sectionPreviewError,setSectionPreviewError]=useState('')
@@ -240,6 +261,7 @@ export default function App(){
   const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
+  const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
@@ -438,7 +460,82 @@ export default function App(){
       return {...current,page:{...current.page,values:vals}}
     })
   }
+  function attachPreviewLinks(frame:HTMLIFrameElement){
+    // Source HTML is sandboxed without scripting. Listen from the parent so
+    // links open safely in another tab instead of replacing the preview.
+    const doc=frame.contentDocument
+    if(!doc)return
+    doc.addEventListener('click',event=>{
+      if(canvasMode)return // visual editor uses click-to-select instead
+      const node=event.target as Element
+      const link=node.closest?.('a[href]')
+      if(!link)return
+      const href=(link.getAttribute('href')||'').trim()
+      if(href.startsWith('#')){
+        event.preventDefault()
+        const id=href.slice(1)
+        const target=id?doc.getElementById(id):null
+        if(target){target.scrollIntoView({behavior:'smooth',block:'start'});setLinkFeedback('Jumped to '+href)}
+        else setLinkFeedback('This button links to '+href+'. Use the full-page preview to locate that section.')
+        return
+      }
+      event.preventDefault()
+      if(!isSafePreviewHref(href)){setLinkFeedback('This destination is not a permitted link.');return}
+      if(isTestableHref(href)){
+        // Call directly from the user click, preserving the browser gesture.
+        window.open(href,'_blank','noopener,noreferrer')
+        setLinkFeedback('Opened '+href+' in a separate tab. The CMS preview stays here.')
+      }else{
+        window.open(href,'_blank','noopener,noreferrer')
+        setLinkFeedback('Opened the local route in a separate tab.')
+      }
+    },true)
+  }
+  async function uploadPicture(file:File|null,onReady:(url:string)=>void){
+    if(!file)return
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      showError('Choose a JPG, PNG or WebP image.');return
+    }
+    await action(async()=>{
+      const data=new FormData()
+      data.append('file',file)
+      data.append('alt_text',file.name.replace(/\.[^.]+$/,'').replace(/[-_]+/g,' '))
+      const result=await api<{id:number;url:string}>('/api/media',{method:'POST',body:data})
+      onReady(result.url)
+      notify('Image uploaded. The preview now uses your image. Save draft to keep it.')
+    })
+  }
+  function iconChoiceControl(pickerId:string,value:string,onValue:(v:string)=>void){
+    const custom=customIconPickers.includes(pickerId)||/^(https?:\/\/|\/(?!\/))/i.test(value)
+    const selected=custom?'custom':value.startsWith('icon:')?value:'original'
+    return <div className="editor-simple-icon-choice">
+      <label>Choose icon
+        <select aria-label={'Choose icon '+pickerId} value={selected} onChange={event=>{
+          const v=event.target.value
+          if(v==='custom'){setCustomIconPickers(prev=>prev.includes(pickerId)?prev:[...prev,pickerId]);return}
+          setCustomIconPickers(prev=>prev.filter(id=>id!==pickerId))
+          onValue(v==='original'?'':v)
+        }}>
+          <option value="original">Keep original icon</option>
+          {SIMPLE_ICONS.map(icon=><option key={icon.value} value={icon.value}>{icon.label}</option>)}
+          <option value="custom">Use my own icon image URL</option>
+        </select>
+      </label>
+      {custom&&<><label>Icon image address
+        <input type="url" aria-label={'Icon image URL '+pickerId} placeholder="https://example.com/icon.png"
+          value={/^(https?:\/\/|\/(?!\/))/i.test(value)?value:''}
+          onChange={event=>onValue(event.target.value)}/>
+        <small>Use a direct PNG, JPG or WebP image URL—not a webpage or video link.</small>
+      </label>
+      <label>Or upload an icon from your computer
+        <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={'Upload icon '+pickerId}
+          onChange={e=>uploadPicture(e.target.files?.[0]||null,onValue)}/>
+      </label></>}
+      <small className="editor-ordered-help">Your original arrow or symbol stays in place until you choose a replacement.</small>
+    </div>
+  }
   function canvasLoaded(frame:HTMLIFrameElement){
+    attachPreviewLinks(frame)
     if(!canvasMode)return
     const doc=frame.contentDocument
     if(!doc)return
@@ -466,6 +563,20 @@ export default function App(){
     },true)
     if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
   }
+  async function enableLinksAndIconsOnThisPage(){
+    if(!editor||user?.role!=='admin')return
+    if(dirty){showError('Save this draft first, then enable editing for its links and icons.');return}
+    if(!window.confirm('Make fixed CTA links and icons editable on THIS page only? The approved template and published website will not change.'))return
+    await action(async()=>{
+      const latest=await api<{page:Page;template:Template;enabled_count:number}>(
+        '/api/pages/'+editor.page.id+'/enable-link-icon-editing',
+        {method:'POST',body:json({edit_version:editor.page.edit_version})})
+      setEditor({page:latest.page,template:latest.template})
+      setSavedPage(structuredClone(latest.page))
+      await refresh()
+      notify(latest.enabled_count+' button links and icons are now editable on this page.')
+    })
+  }
   async function enableRepeatersOnThisPage(){
     if(!editor)return
     if(dirty){showError('Save the current draft before refreshing repeater fields.');return}
@@ -484,17 +595,31 @@ export default function App(){
     const title=customLabel||fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
     const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
-    return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
+    return <div key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
       {field.kind==='image'&&field.default.startsWith('data:')&&<div className="editor-current-image"><img src={value.startsWith('data:')?value:field.default} alt="Current template image"/><small>Original image</small></div>}
-      {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
-          onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {field.kind==='icon'&&field.attr==='icon_src'
+        ?iconChoiceControl(field.key,value,v=>changeField(field.key,v))
+        :field.kind==='textarea'
+          ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+          :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
+            onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
+            placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':undefined}/>}
+      {field.kind==='image'&&<div className="editor-easy-image-upload">
+        <label>Or upload a replacement photo (JPG, PNG or WebP)
+          <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={'Upload photo for '+title}
+            onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>changeField(field.key,url))}/>
+        </label>
+      </div>}
+      {field.kind==='link'&&<div className="editor-link-check">
+        {isTestableHref(value)?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>:
+         value.startsWith('#')?<small>Goes to the {value} section on this page. Click the button in the full-page preview to check it.</small>:
+         value.startsWith('/')&&!value.startsWith('//')?<small>This is a website page path. Test it after the page is published.</small>:
+         <small>Enter a full website URL, a section anchor (#enquiry), a phone number starting with tel:, or an email starting with mailto:.</small>}
+      </div>}
+      {field.kind!=='icon'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
       {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
-    </label>
+    </div>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
     const raw=editor?.page.values['__repeat__'+group.id]||'[]'
@@ -552,7 +677,7 @@ export default function App(){
               {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
             </select>
           </label>}
-          <span className="editor-repeat-count">{original+additions.length}</span>
+
         </div>
       </div>
       <div className="editor-repeat-items">
@@ -592,13 +717,22 @@ export default function App(){
               {fields.map((field,i)=>{
                 const title=repeaterFieldName(group,field,i+1)
                 const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
-                return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
-                  {(field.kind==='textarea'||value.length>110)
-                    ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
-                    :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
-                  {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
+                return <div className="editor-ordered-field" key={field.key}><label className="editor-ordered-label">{title}</label>
+                  {field.kind==='icon'&&field.attr==='icon_src'?iconChoiceControl(group.id+'-'+index+'-'+field.key,value,v=>updateRepeatEntry(group,index,field.key,v)):
+                    (field.kind==='textarea'||value.length>110)
+                      ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
+                      :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
+                  {field.kind==='image'&&<div className="editor-easy-image-upload"><label>Or upload a photo
+                    <input type="file" accept="image/png,image/jpeg,image/webp"
+                      aria-label={'Upload image for '+suffix+' '+(index+1)}
+                      onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>updateRepeatEntry(group,index,field.key,url))}/>
+                  </label></div>}
+                  {field.kind==='link'&&<div className="editor-link-check">{isTestableHref(value)
+                    ?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
+                    :<small>Use a URL, #anchor, tel: or mailto: destination.</small>}</div>}
+                  {(field.kind==='image'||field.kind==='icon'&&field.attr!=='icon_src')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
                   {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
-                </label>
+                </div>
               })}
               <div className="editor-repeat-actions">
                 <button type="button" className="outline compact" disabled={index===0}
@@ -624,7 +758,7 @@ export default function App(){
         <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
       </div>
       {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
-      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code></div>}
+      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code>{user?.role==='admin'&&<button type="button" className="outline compact" disabled={busy||dirty} onClick={enableLinksAndIconsOnThisPage}><LockKeyhole size={13}/> Make this page's links editable</button>}</div>}
       {icons.length>0&&<details className="editor-context-icon">
         <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
         <p>The original icon stays in place unless you choose a replacement image.</p>
@@ -734,7 +868,7 @@ export default function App(){
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button>{hasFixedLinkOrIcon&&user.role==='admin'&&<button className="outline" onClick={enableLinksAndIconsOnThisPage} disabled={busy||dirty}><LockKeyhole size={15}/> Enable links & icons</button>}<button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
@@ -768,11 +902,12 @@ export default function App(){
         <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
         <div className="editor-side-preview-window">
           {activeSectionId&&sectionPreviewHtml
-            ?<iframe title="Selected section preview" sandbox="" srcDoc={sectionPreviewHtml}/>
+            ?<iframe title="Selected section preview" sandbox="allow-same-origin" srcDoc={sectionPreviewHtml} onLoad={e=>attachPreviewLinks(e.currentTarget)}/>
             :<div className="editor-side-preview-empty">{sectionPreviewLoading?'Loading section…':activeSectionId?'Preparing section…':'Choose a section on the left.'}</div>}
           {sectionPreviewLoading&&sectionPreviewHtml&&<span className="editor-preview-refreshing">Updating…</span>}
         </div>
         {sectionPreviewError&&<p className="editor-side-preview-error" role="alert">{sectionPreviewError}</p>}
+        {!!linkFeedback&&<small className="editor-side-preview-feedback" role="status">{linkFeedback}</small>}
         <small className="editor-side-preview-foot">Preview only · Not published</small>
       </aside>
       </div>
@@ -1045,6 +1180,7 @@ export default function App(){
   </div>}
   {showPassword&&<div className="dialog-backdrop"><form className="dialog-card" onSubmit={e=>{e.preventDefault();rotatePassword()}}><h2>Change your password</h2><p>All existing sessions will be signed out after the change.</p><label>Current password<input type="password" value={oldPassword} required onChange={e=>setOldPassword(e.target.value)}/></label><label>New password (minimum 12 characters)<input type="password" value={newPassword} minLength={12} required onChange={e=>setNewPassword(e.target.value)}/></label><div className="button-group"><button type="button" className="outline" onClick={()=>setShowPassword(false)}>Cancel</button><button className="primary" disabled={busy}>Change password</button></div></form></div>}
   {preview!==null&&<div className={'preview-modal '+(canvasMode?'canvas-active':'')}>
+    {!!linkFeedback&&<div className="preview-link-feedback" role="status">{linkFeedback}<button type="button" aria-label="Dismiss link message" onClick={()=>setLinkFeedback('')}><X size={14}/></button></div>}
     <div className="preview-head">
       <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
       <div className="visual-head-actions">
@@ -1056,7 +1192,7 @@ export default function App(){
       </div>
     </div>
     <div className="visual-main">
-      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
+      <iframe key={canvasMode?'visual-editable':'readonly-preview'} ref={previewFrameRef} title="Website preview" sandbox="allow-same-origin"
         srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
@@ -1129,7 +1265,7 @@ export default function App(){
                   ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||selectedCanvasField.default
                   :editor?.page.values[selectedCanvasField.key]||selectedCanvasField.default}/>}
               {selectedCanvasField.kind==='image'
-                ?<input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
+                ?<><input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
                   value={extraIndex>=0&&selectedCanvasGroup
                     ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||''
                     :(editor?.page.values[selectedCanvasField.key]||'').startsWith('data:')?'':editor?.page.values[selectedCanvasField.key]||''}
@@ -1138,6 +1274,23 @@ export default function App(){
                     else if(!e.target.value)unsetField(selectedCanvasField.key)
                     else changeField(selectedCanvasField.key,e.target.value)
                   }}/>
+                  <div className="editor-easy-image-upload"><label>Or upload a replacement photo
+                    <input type="file" accept="image/png,image/jpeg,image/webp"
+                      aria-label="Upload selected image"
+                      onChange={e=>uploadPicture(e.target.files?.[0]||null,url=>{
+                        if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,url)
+                        else changeField(selectedCanvasField.key,url)
+                      })}/>
+                  </label></div></>
+                :selectedCanvasField.kind==='icon'&&selectedCanvasField.attr==='icon_src'
+                ?iconChoiceControl('visual-'+selectedCanvasField.key,
+                  extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
+                    :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default,
+                  v=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,v)
+                    else changeField(selectedCanvasField.key,v)
+                  })
                 :<textarea aria-label="Selected element content" rows={3}
                   value={extraIndex>=0&&selectedCanvasGroup
                     ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
@@ -1160,6 +1313,9 @@ export default function App(){
           {selectedCanvasLink?.mode==='page'&&<label>Button destination
             <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
               onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
+            {isTestableHref(editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default)
+              ?<a className="editor-inspector-test-link" href={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
+              :<small>For a section on this page, enter an anchor such as #enquiry.</small>}
           </label>}
         </div>}
         {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}

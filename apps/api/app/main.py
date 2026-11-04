@@ -22,7 +22,7 @@ from .db import get_db, SessionLocal
 from .models import User, Template, Page, Publication, SharedContent, Redirect, Media, AuditLog, utcnow
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
-from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, HEADINGS
+from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
 
@@ -385,7 +385,7 @@ def template_preview(template_id:int,focus_field:str|None=None,db:Session=Depend
                 for other in list(soup.find_all(attrs={'data-we-section': True})):
                     if other.get('data-we-section')!=section:other.decompose()
             output=str(soup)
-    return HTMLResponse(output,headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+    return HTMLResponse(output,headers={'X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 class NewPage(BaseModel):
@@ -428,6 +428,32 @@ def page_template_with_repeaters(db:Session,p:Page):
     source=ObjectStore().get(source_key).decode('utf-8')
     _,sections=overlay_metadata(source,stored['sections'],stored['fields'])
     return {**stored,'sections':sections}
+
+
+@app.post('/api/pages/{page_id}/enable-link-icon-editing')
+def enable_link_and_icon_editing(page_id:int,payload:dict,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Explicit page-only opt-in, protecting approved templates and publications."""
+    p=get_page(db,page_id)
+    if p.archived:fail(409,'Restore this page before changing editing permissions')
+    if payload.get('edit_version')!=p.edit_version:
+        fail(409,'Page has changed. Reload before enabling editing.')
+    snapshot=p.template_snapshot or {**template_json(get_template(db,p.template_id)),
+                                     'object_key':get_template(db,p.template_id).object_key}
+    updated=[]
+    count=0
+    for field in snapshot['fields']:
+        if field.get('mode')=='static' and field.get('kind') in ('link','icon'):
+            updated.append({**field,'mode':'page'})
+            count+=1
+        else:updated.append(field)
+    if count:
+        p.template_snapshot={**snapshot,'fields':updated}
+        p.edit_version+=1
+        p.updated_at=utcnow()
+        audit(db,user,'enable_page_links_icons',str(page_id),{'count':count})
+        db.commit();db.refresh(p)
+    return {'page':page_json(p),'template':page_template_with_repeaters(db,p),
+            'enabled_count':count}
 
 
 @app.get('/api/pages/{page_id}')
@@ -549,7 +575,7 @@ def validate_repeater_value(key,value,t):
             if f['kind']=='link' and v and not is_safe_link(v):fail(422,'Unsafe repeated link URL')
             if f['kind']=='image' and not SAFE_URL.match(v):fail(422,'Unsafe repeated image URL')
             if f['kind']=='icon':
-                if f.get('attr')=='icon_src' and v and not SAFE_URL.match(v):
+                if f.get('attr')=='icon_src' and not is_safe_icon_value(v):
                     fail(422,'Unsafe repeated icon URL')
                 if f.get('attr')=='class' and not SAFE_CLASS.fullmatch(v):
                     fail(422,'Unsafe repeated icon class')
@@ -591,7 +617,7 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
             if field['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
             if field['kind']=='link' and value and not is_safe_link(value):fail(422,'Unsafe link destination')
             if field['kind']=='icon':
-                if field.get('attr')=='icon_src' and value and not SAFE_URL.match(value):fail(422,'Icon URL is not allowed')
+                if field.get('attr')=='icon_src' and not is_safe_icon_value(value):fail(422,'Icon URL is not allowed')
                 if field.get('attr')=='class' and not SAFE_CLASS.fullmatch(value):fail(422,'Icon class is not allowed')
             newvals[key]=value
         changes['values']=newvals
@@ -650,7 +676,7 @@ def page_preview(page_id:int,section_id:str|None=None,db:Session=Depends(get_db)
     if section_id and section_id not in {x['id'] for x in (p.template_snapshot or template_json(get_template(db,p.template_id)))['sections']}:fail(404,'Unknown section')
     html=compiled(db,p,section_id)
     return HTMLResponse(html,headers={'X-Robots-Tag':'noindex, nofollow',
-      'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+      'Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 @app.post('/api/pages/{page_id}/preview',response_class=HTMLResponse)
@@ -671,7 +697,7 @@ def preview_unsaved(page_id:int,payload:PageUpdate,section_id:str|None=None,
             rendered=metadata_html(rendered,changes.get('title',p.title),changes.get('slug',p.slug),changes.get('seo',p.seo or {}),get_settings().public_site_url)
         except ValueError as exc:fail(422,str(exc))
     return HTMLResponse(rendered,headers={'X-Robots-Tag':'noindex, nofollow',
-      'Content-Security-Policy':"sandbox; default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https:; font-src https:"})
+      'Content-Security-Policy':"sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https:"})
 
 
 @app.post('/api/pages/{page_id}/publish')

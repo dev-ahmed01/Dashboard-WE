@@ -1,6 +1,9 @@
 name: Staging integration smoke
 on:
   pull_request:
+  push:
+    branches:
+      - 'feature/**'
   workflow_dispatch:
 jobs:
   staging:

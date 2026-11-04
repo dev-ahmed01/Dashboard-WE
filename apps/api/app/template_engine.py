@@ -23,6 +23,27 @@ SKIP_CONTAINERS = {'script', 'style', 'noscript', 'nav', 'head'}
 SAFE_URL = re.compile(r'^(?:https?://|/(?!/)|#|data:image/(?:png|jpeg|webp|gif);base64,)', re.I)
 SAFE_LINK = re.compile(r'^(?:https?://|/(?!/)|#|mailto:|tel:)', re.I)
 SAFE_CLASS = re.compile(r'^[a-zA-Z0-9 _-]{1,240}$')
+# Built-in, reviewed inline icons require no external image hosting.
+# Geometry is fixed by the application and never loaded from user markup.
+ICON_PATHS = {
+    'arrow-up-right': ['M7 17 17 7', 'M7 7h10v10'],
+    'arrow-right': ['M5 12h14', 'm12 5 7 7-7 7'],
+    'phone': ['M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.58 2.81.7A2 2 0 0 1 22 16.92z'],
+    'map-pin': ['M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 16 0Z', 'M12 10h.01'],
+    'check': ['M20 6 9 17l-5-5'],
+    'calendar': ['M8 2v4', 'M16 2v4', 'M3 10h18', 'M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'],
+    'chevron-right': ['m9 18 6-6-6-6'],
+    'layers': ['m12 2 8 5-8 5-8-5 8-5z', 'm4 12 8 5 8-5', 'm4 17 8 5 8-5'],
+}
+ICON_PREFIX='icon:'
+
+def is_safe_icon_value(value: str) -> bool:
+    return not value or bool(SAFE_URL.match(value)) or (
+        value.startswith(ICON_PREFIX) and value[len(ICON_PREFIX):] in ICON_PATHS
+    )
+
+
+
 BUTTON_LOCATION = re.compile(
     r"""(?:window\.)?location(?:\.href)?\s*=\s*["']([^"']+)["']""",
     re.I,
@@ -356,12 +377,36 @@ def change_rendered_field(soup, target: Tag, field: dict, value: str):
         else:
             target.attrs.pop('href',None)
     elif attr=='icon_src':
-        if value and SAFE_URL.match(value):
+        if not value:
+            return  # Keep the exact source icon when no change is selected.
+        if value.startswith(ICON_PREFIX) and value[len(ICON_PREFIX):] in ICON_PATHS:
+            replacement=soup.new_tag('svg')
+            replacement['viewBox']='0 0 24 24'
+            replacement['fill']='none'
+            replacement['stroke']='currentColor'
+            replacement['stroke-width']='2'
+            replacement['stroke-linecap']='round'
+            replacement['stroke-linejoin']='round'
+            replacement['aria-hidden']='true'
+            for d in ICON_PATHS[value[len(ICON_PREFIX):]]:
+                path=soup.new_tag('path')
+                path['d']=d
+                replacement.append(path)
+        elif SAFE_URL.match(value):
             replacement=soup.new_tag('img',src=value)
             replacement['alt']=target.get('aria-label') or ''
-            for retained in ('class','style','width','height'):
-                if target.get(retained):replacement[retained]=target[retained]
-            target.replace_with(replacement)
+            replacement['loading']='lazy'
+        else:
+            return
+        for retained in ('class','width','height'):
+            if target.get(retained):replacement[retained]=target[retained]
+        original_style=str(target.get('style') or '')
+        if replacement.name=='img':
+            replacement['style']=original_style+';display:inline-block;width:1.4em;height:1.4em;object-fit:contain;vertical-align:middle;'
+        elif original_style:
+            replacement['style']=original_style
+        replacement['data-we-field']=field['key']
+        target.replace_with(replacement)
     elif attr=='class':
         if SAFE_CLASS.fullmatch(value):target['class']=value.split()
     elif attr=='src':
