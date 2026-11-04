@@ -133,6 +133,18 @@ function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):stri
   }
   return f.kind==='textarea'?'Description':f.label.replace(/^(?:Text|Paragraph|H[1-6] heading):\s*/i,'').slice(0,70)||'Text'
 }
+function repeaterFieldName(group:Repeater,field:Field,number:number):string{
+  if(field.kind==='image')return group.kind==='solutions'?'Background image':group.kind==='benefits'?'Benefit image':'Card image'
+  if(field.kind==='icon')return 'Icon (optional)'
+  if(field.kind==='link')return 'Link to anchor / destination'
+  if(group.kind==='benefit_bullets')return 'Bullet point '+number
+  if(group.kind==='faqs')return field.tag==='summary'?'Question':'Answer'
+  if(group.kind==='solutions')return 'Solution name'
+  if(group.kind==='other_solutions')return 'Solution name'
+  if(group.kind==='benefits')return field.tag?.startsWith('h')?'Benefit heading':'Benefit description'
+  if(group.kind==='highlights')return field.label.startsWith('Card title:')?'Card heading':'Card description'
+  return fieldDisplayName(field,'card',number)
+}
 function hintForField(field:Field):string{
   if(field.kind==='link'){
     if(field.default.startsWith('tel:'))return 'Phone link: tel:+91…'
@@ -468,8 +480,8 @@ export default function App(){
       notify('Repeaters refreshed for this page: '+updated.repeaters+' groups and '+updated.new_fields+' newly detected fields.')
     })
   }
-  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
-    const title=fieldDisplayName(field,kind,position)
+  function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind'],customLabel?:string){
+    const title=customLabel||fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
     const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
@@ -531,7 +543,17 @@ export default function App(){
     return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
-        <span className="editor-repeat-count">{original+additions.length}</span>
+        <div className="editor-repeat-heading-controls">
+          {['highlights','solutions','other_solutions','cards'].includes(group.kind)&&<label className="editor-repeat-columns">
+            Cards per row
+            <select aria-label={'Columns for '+group.name} value={visualDesign.groups?.[group.id]?.columns||
+              (group.kind==='highlights'?4:group.kind==='other_solutions'?5:4)}
+              onChange={e=>designPatch('groups',group.id,{columns:Number(e.target.value)})}>
+              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>}
+          <span className="editor-repeat-count">{original+additions.length}</span>
+        </div>
       </div>
       <div className="editor-repeat-items">
         {group.items.map((item,index)=>{
@@ -547,7 +569,7 @@ export default function App(){
                 </div>
                 <small>Choose a layout above, then edit the image, name and link below.</small>
               </div>}
-              {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text'))}
+              {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text',repeaterFieldName(group,field,i+1)))}
               {subGroups.map(n=>renderRepeaterGroup(n,section,true))}
               {available.length===0&&subGroups.length===0&&<small>This template item is fixed.</small>}
             </div>
@@ -568,7 +590,7 @@ export default function App(){
                 <small>Choose a layout, then edit its image, name and destination below.</small>
               </div>}
               {fields.map((field,i)=>{
-                const title=fieldDisplayName(field,group.kind==='benefit_bullets'?'text':'card',i+1)
+                const title=repeaterFieldName(group,field,i+1)
                 const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
                 return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
                   {(field.kind==='textarea'||value.length>110)
@@ -578,7 +600,13 @@ export default function App(){
                   {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
                 </label>
               })}
-              <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove added {suffix}</button>
+              <div className="editor-repeat-actions">
+                <button type="button" className="outline compact" disabled={index===0}
+                  onClick={()=>{const next=[...additions];[next[index-1],next[index]]=[next[index],next[index-1]];putRepeatEntries(group,next)}}>Move up</button>
+                <button type="button" className="outline compact" disabled={index===additions.length-1}
+                  onClick={()=>{const next=[...additions];[next[index+1],next[index]]=[next[index],next[index+1]];putRepeatEntries(group,next)}}>Move down</button>
+                <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove {suffix}</button>
+              </div>
             </div>
           </details>
         })}
