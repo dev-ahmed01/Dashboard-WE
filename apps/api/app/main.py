@@ -8,6 +8,7 @@ from uuid import uuid4
 from xml.sax.saxutils import escape as xml_escape
 import json
 import re
+import json
 
 from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,7 @@ from .models import User, Template, Page, Publication, SharedContent, Redirect, 
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, HEADINGS
+from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS
 from .seo import metadata_html, safe_slug
 
 
@@ -317,7 +319,10 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     t.fields=updated
     if payload.sections is not None:
         if set(s.get('id') for s in payload.sections)!=set(x['id'] for x in t.sections):fail(422,'Section IDs cannot change')
-        t.sections=[{'id':s['id'],'name':str(s.get('name') or 'Section')[:120],'order':i+1} for i,s in enumerate(payload.sections)]
+        original_sections={sec['id']:sec for sec in t.sections}
+        t.sections=[{'id':s['id'],'name':str(s.get('name') or 'Section')[:120],'order':i+1,
+                     'repeaters':original_sections[s['id']].get('repeaters',[])}
+                    for i,s in enumerate(payload.sections)]
     t.approved=payload.approved
     t.version+=1
     audit(db,user,'mapping_update',str(t.id),{'approved':t.approved})
@@ -414,10 +419,21 @@ def list_pages(status:str|None=None,include_archived:bool=False,db:Session=Depen
     return [page_json(p) for p in db.scalars(query).all()]
 
 
+def page_template_with_repeaters(db:Session,p:Page):
+    """Expose repeaters on old page snapshots without modifying stored pages."""
+    stored=p.template_snapshot or template_json(get_template(db,p.template_id))
+    if any('repeaters' in sec for sec in stored['sections']):
+        return stored
+    source_key=stored.get('object_key') or get_template(db,p.template_id).object_key
+    source=ObjectStore().get(source_key).decode('utf-8')
+    _,sections=overlay_metadata(source,stored['sections'],stored['fields'])
+    return {**stored,'sections':sections}
+
+
 @app.get('/api/pages/{page_id}')
 def read_page(page_id:int,db:Session=Depends(get_db),_:User=Depends(current_user)):
     p=get_page(db,page_id)
-    return {'page':page_json(p),'template':p.template_snapshot or template_json(get_template(db,p.template_id))}
+    return {'page':page_json(p),'template':page_template_with_repeaters(db,p)}
 
 
 @app.post('/api/pages/{page_id}/archive')
@@ -447,9 +463,56 @@ class PageUpdate(BaseModel):
     seo:dict|None=None
 
 
+def validate_repeater_value(key,value,t):
+    if not isinstance(value,str) or len(value)>24000:
+        fail(422,'Repeater content must be text under 24,000 characters')
+    groups={g['id']:g for sec in t['sections'] for g in sec.get('repeaters',[])}
+    fields={f['key']:f for f in t['fields']}
+    if key.startswith(VARIANT_PREFIX):
+        for group in groups.values():
+            if group['kind']!='solutions':continue
+            if key in {VARIANT_PREFIX+group['id']+'__'+i['id'] for i in group['items']}:
+                if value not in VARIANTS:fail(422,'Unknown solution card style')
+                if not any(fields.get(fk,{}).get('mode')=='page'
+                           for item in group['items'] for fk in item['field_keys']):
+                    fail(422,'Static solution cards cannot be customised')
+                return
+        fail(422,'Unrecognized solution card style setting')
+    if not key.startswith(REPEAT_PREFIX):fail(422,'Unknown repeater')
+    group=groups.get(key[len(REPEAT_PREFIX):])
+    if not group or not group['items']:fail(422,'Unknown repeater group')
+    available={k:fields[k] for k in group['items'][-1]['field_keys']
+               if k in fields and fields[k].get('mode')=='page'}
+    if not available:fail(422,'This repeater is locked by its template mapping')
+    try:
+        entries=json.loads(value)
+    except (TypeError,ValueError):
+        fail(422,'Repeater entries must contain valid JSON')
+    if not isinstance(entries,list) or len(entries)>MAX_ADDITIONS:
+        fail(422,'Repeater supports up to 12 additional items')
+    for entry in entries:
+        if not isinstance(entry,dict):
+            fail(422,'Every repeater item must be an object')
+        if not set(entry).issubset(set(available)|({'__variant'} if group['kind']=='solutions' else set())):
+            fail(422,'Repeater contains a static or unrecognized field')
+        if '__variant' in entry and entry['__variant'] not in VARIANTS:
+            fail(422,'Invalid solution card style')
+        for fk,v in entry.items():
+            if fk=='__variant':continue
+            if not isinstance(v,str) or len(v)>3000:fail(422,'Repeater fields must be text under 3000 characters')
+            f=available[fk]
+            if f['kind']=='link' and v and not is_safe_link(v):fail(422,'Unsafe repeated link URL')
+            if f['kind']=='image' and not SAFE_URL.match(v):fail(422,'Unsafe repeated image URL')
+            if f['kind']=='icon':
+                if f.get('attr')=='icon_src' and v and not SAFE_URL.match(v):
+                    fail(422,'Unsafe repeated icon URL')
+                if f.get('attr')=='class' and not SAFE_CLASS.fullmatch(v):
+                    fail(422,'Unsafe repeated icon class')
+
+
 def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
     """Validate and construct a proposed page without modifying the stored record."""
-    t=p.template_snapshot or template_json(get_template(db,p.template_id))
+    t=page_template_with_repeaters(db,p)
     changes={}
     if payload.title is not None:changes['title']=payload.title.strip()[:200] or p.title
     if payload.slug is not None:
@@ -465,9 +528,16 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
         changes['slug']=slug
     if payload.values is not None:
         allowed={f['key']:f for f in t['fields'] if f['mode']=='page'}
-        if not set(payload.values).issubset(allowed):fail(422,'Attempted to change static or shared template fields')
+        extra_keys={k for k in payload.values if k.startswith(REPEAT_PREFIX) or k.startswith(VARIANT_PREFIX)}
+        if not (set(payload.values)-extra_keys).issubset(allowed):
+            fail(422,'Attempted to change static or shared template fields')
+        for key in extra_keys:
+            validate_repeater_value(key,payload.values[key],t)
         newvals=dict(p.values or {})
         for key,value in payload.values.items():
+            if key in extra_keys:
+                newvals[key]=value
+                continue
             if not isinstance(value,str) or len(value)>3000:fail(422,'Values must be text under 3000 characters')
             field=allowed[key]
             if field['kind']=='image' and not SAFE_URL.match(value):fail(422,'Image URL is not allowed')
