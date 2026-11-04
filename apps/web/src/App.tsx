@@ -577,7 +577,7 @@ export default function App(){
     const title=customLabel||fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
     const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
-    return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
+    return <div key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
       {field.kind==='image'&&field.default.startsWith('data:')&&<div className="editor-current-image"><img src={value.startsWith('data:')?value:field.default} alt="Current template image"/><small>Original image</small></div>}
       {field.kind==='icon'&&field.attr==='icon_src'
@@ -595,7 +595,7 @@ export default function App(){
       </div>}
       {field.kind!=='icon'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
       {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
-    </label>
+    </div>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
     const raw=editor?.page.values['__repeat__'+group.id]||'[]'
