@@ -379,7 +379,8 @@ export default function App(){
         ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
         :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
           placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the image or icon from the original {suffix}.</small>}
+                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
@@ -392,17 +393,23 @@ export default function App(){
   function addRepeatEntry(group:Repeater){
     const previous=repeatEntries(group)
     if(previous.length >= Math.min(group.max_additions||12,12))return
-    const last=group.items[group.items.length-1]
+    // New rows inherit the original card's layout and content from HTML.
+    // Do not serialize original images (often large embedded base64 data),
+    // which could exceed the page API's size cap before any field is edited.
     const entry:Record<string,string>={}
-    for(const key of last.field_keys){
-      const f=editor?.template.fields.find(f=>f.key===key)
-      if(f?.mode==='page')entry[key]=editor?.page.values[key]??f.default
-    }
     if(group.kind==='solutions')entry.__variant='regular'
     putRepeatEntries(group,[...previous,entry])
   }
   function updateRepeatEntry(group:Repeater,index:number,key:string,value:string){
-    const items=repeatEntries(group).map((item,i)=>i===index?{...item,[key]:value}:item)
+    const items=repeatEntries(group).map((item,i)=>{
+      if(i!==index)return item
+      const next={...item}
+      if(!value&&(editor?.template.fields.find(f=>f.key===key)?.kind==='image'||
+                  editor?.template.fields.find(f=>f.key===key)?.kind==='icon')){
+        delete next[key] // empty image/icon means preserve the original asset
+      }else next[key]=value
+      return next
+    })
     putRepeatEntries(group,items)
   }
   function deleteRepeatEntry(group:Repeater,index:number){
@@ -453,7 +460,7 @@ export default function App(){
               </select></label>}
               {fields.map((field,i)=>{
                 const title=fieldDisplayName(field,group.kind==='benefit_bullets'?'text':'card',i+1)
-                const value=item[field.key]??field.default
+                const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
                 return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
                   {(field.kind==='textarea'||value.length>110)
                     ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
