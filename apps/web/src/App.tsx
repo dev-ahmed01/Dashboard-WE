@@ -474,11 +474,14 @@ export default function App(){
     const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
+      {field.kind==='image'&&field.default.startsWith('data:')&&<div className="editor-current-image"><img src={value.startsWith('data:')?value:field.default} alt="Current template image"/><small>Original image</small></div>}
       {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+        ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+        :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
+          onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
+          placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
+      {field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
     </label>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
@@ -703,7 +706,7 @@ export default function App(){
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
