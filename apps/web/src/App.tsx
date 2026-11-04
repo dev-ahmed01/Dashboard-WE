@@ -1016,6 +1016,114 @@ export default function App(){
     </form>
   </div>}
   {showPassword&&<div className="dialog-backdrop"><form className="dialog-card" onSubmit={e=>{e.preventDefault();rotatePassword()}}><h2>Change your password</h2><p>All existing sessions will be signed out after the change.</p><label>Current password<input type="password" value={oldPassword} required onChange={e=>setOldPassword(e.target.value)}/></label><label>New password (minimum 12 characters)<input type="password" value={newPassword} minLength={12} required onChange={e=>setNewPassword(e.target.value)}/></label><div className="button-group"><button type="button" className="outline" onClick={()=>setShowPassword(false)}>Cancel</button><button className="primary" disabled={busy}>Change password</button></div></form></div>}
-  {preview!==null&&<div className="preview-modal"><div className="preview-head"><div><strong>Full-page preview</strong><span>Sandboxed · Draft · Not indexed</span></div><button onClick={()=>setPreview(null)} aria-label="Close preview"><X size={23}/></button></div><iframe title="Website preview" sandbox="" srcDoc={preview}/></div>}
+  {preview!==null&&<div className={'preview-modal '+(canvasMode?'canvas-active':'')}>
+    <div className="preview-head">
+      <div><strong>{canvasMode?'Visual Page Editor':'Full-page preview'}</strong><span>Draft only · Changes require Save draft · Live WordPress unaffected</span></div>
+      <div className="visual-head-actions">
+        <button type="button" className={canvasMode?'visual-mode-on':'visual-mode-off'} onClick={()=>{
+          setCanvasMode(mode=>!mode);setCanvasSelection(null);setCanvasGroupId('');previewScrollRef.current=0
+        }}><Eye size={16}/>{canvasMode?'Exit visual editing':'Edit design'}</button>
+        {canvasMode&&<button type="button" className="visual-save" disabled={!dirty||busy} onClick={savePage}><Save size={15}/> Save draft</button>}
+        <button type="button" onClick={()=>{setPreview(null);setCanvasMode(false);setCanvasSelection(null)}} aria-label="Close preview"><X size={23}/></button>
+      </div>
+    </div>
+    <div className="visual-main">
+      <iframe ref={previewFrameRef} title="Website preview" sandbox={canvasMode?'allow-same-origin':''}
+        srcDoc={preview} onLoad={e=>canvasLoaded(e.currentTarget)}/>
+      {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
+        <h2>Design controls</h2>
+        <p>Click a heading, picture, button or card in the page to select it. Edit the draft without changing the template.</p>
+        <div className="visual-inspector-group">
+          <label>Repeatable section
+            <select aria-label="Choose repeatable section" value={selectedCanvasGroup?.id||''} onChange={e=>{
+              const gid=e.target.value;setCanvasGroupId(gid);setCanvasSelection({fieldKey:'',linkKey:'',itemId:'',groupId:gid})
+            }}>
+              <option value="">Select section</option>
+              {allRepeaters.filter(g=>!g.parent_item_id).map(g=><option key={g.id} value={g.id}>{g.name} · {g.count} existing</option>)}
+            </select>
+          </label>
+        </div>
+        {selectedCanvasGroup&&<div className="visual-inspector-group">
+          <h3>{selectedCanvasGroup.name}</h3>
+          <label>Cards per desktop row
+            <select aria-label="Cards per row" value={visualDesign.groups?.[selectedCanvasGroup.id]?.columns||
+                (selectedCanvasGroup.kind==='highlights'?4:selectedCanvasGroup.kind==='solutions'?4:selectedCanvasGroup.kind==='other_solutions'?5:1)}
+              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{columns:Number(e.target.value)})}>
+              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n} per row</option>)}
+            </select>
+          </label>
+          <label>Space between cards: {visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}px
+            <input type="range" min="0" max="48" step="2" aria-label="Card spacing"
+              value={visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}
+              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{gap:Number(e.target.value)})}/>
+          </label>
+          <button type="button" className="visual-add" disabled={repeatEntries(selectedCanvasGroup).length>=selectedCanvasGroup.max_additions}
+            onClick={()=>addRepeatEntry(selectedCanvasGroup)}><Plus size={15}/> Add another {selectedCanvasGroup.kind==='faqs'?'FAQ':selectedCanvasGroup.kind==='solutions'?'solution':'card'}</button>
+        </div>}
+        {canvasSelection?.itemId&&selectedCanvasGroup&&<div className="visual-inspector-group">
+          <h3>{selectedCanvasItem?.title||'Added card'}</h3>
+          {selectedCanvasGroup.kind==='solutions'&&<div className="visual-variant-buttons">
+            <span>Card layout</span>
+            {(['regular','highlight','generic'] as const).map(variant=><button type="button" key={variant}
+              aria-pressed={(selectedCanvasItem?editor?.page.values['__variant__'+selectedCanvasGroup.id+'__'+selectedCanvasItem.id]
+                ||selectedCanvasItem.variant:repeatEntries(selectedCanvasGroup)[Number(canvasSelection.itemId.split('_added_')[1])-1]?.__variant||'regular')===variant}
+              onClick={()=>{
+                if(selectedCanvasItem)changeField('__variant__'+selectedCanvasGroup.id+'__'+selectedCanvasItem.id,variant)
+                else{const index=Number(canvasSelection.itemId.split('_added_')[1])-1
+                  if(index>=0)updateRepeatEntry(selectedCanvasGroup,index,'__variant',variant)}
+              }}>{variant[0].toUpperCase()+variant.slice(1)}</button>)}
+          </div>}
+          <label>Card width
+            <select aria-label="Selected card width" value={visualDesign.items?.[canvasSelection.itemId]?.span??(selectedCanvasItem?.variant==='highlight'?2:1)}
+              onChange={e=>designPatch('items',canvasSelection.itemId,{span:Number(e.target.value)})}>
+              <option value={1}>Regular · 1 column</option>
+              <option value={2}>Wide · 2 columns</option>
+              <option value={3}>Extra wide · 3 columns</option>
+              <option value={4}>Full width · 4 columns</option>
+            </select>
+          </label>
+          <label>Card height: {visualDesign.items?.[canvasSelection.itemId]?.height??300}px
+            <input type="range" aria-label="Selected card height" min="150" max="600" step="10"
+              value={visualDesign.items?.[canvasSelection.itemId]?.height??300}
+              onChange={e=>designPatch('items',canvasSelection.itemId,{height:Number(e.target.value)})}/>
+          </label>
+          <label className="visual-lock-row"><input type="checkbox" aria-label="Lock selected card"
+            checked={!!visualDesign.items?.[canvasSelection.itemId]?.locked}
+            onChange={e=>designPatch('items',canvasSelection.itemId,{locked:e.target.checked})}/>
+            <LockKeyhole size={14}/> Lock this card</label>
+        </div>}
+        {selectedCanvasField&&<div className="visual-inspector-group">
+          <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
+          {selectedCanvasField.mode==='page'&&!isFieldLocked(selectedCanvasField.key)
+            ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
+              <textarea aria-label="Selected element content" rows={3}
+                value={extraIndex>=0&&selectedCanvasGroup
+                  ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
+                  :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default}
+                onChange={e=>{
+                  if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
+                  else changeField(selectedCanvasField.key,e.target.value)
+                }}/>
+            </label>
+            :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
+          {selectedCanvasField.mode==='page'&&<label>Font size: {visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}px
+            <input aria-label="Selected font size" type="range" min="10" max="100" step="1"
+              value={visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}
+              onChange={e=>designPatch('fields',selectedCanvasField.key,{fontPx:Number(e.target.value)})}/>
+          </label>}
+          {selectedCanvasField.mode==='page'&&<label className="visual-lock-row">
+            <input type="checkbox" aria-label="Lock selected text" checked={isFieldLocked(selectedCanvasField.key)}
+              onChange={e=>designPatch('fields',selectedCanvasField.key,{locked:e.target.checked})}/>
+            <LockKeyhole size={14}/> Lock this element</label>}
+          {selectedCanvasLink?.mode==='page'&&<label>Button destination
+            <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
+              onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
+          </label>}
+        </div>}
+        {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}
+        <small className="visual-inspector-note">Page-specific changes · Desktop widths adapt to tablet and mobile · Preview is not published</small>
+      </aside>}
+    </div>
+  </div>}
   </div>
 }
