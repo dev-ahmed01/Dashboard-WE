@@ -81,6 +81,7 @@ function pageEditorBlocks(source:Field[]):EditorBlock[]{
       else if(editable)blocks.push({id:f.key,kind:'image',title:excerpt(f.label.replace(/^Image:\s*/,''),65)||'Image',fields:[f]})
       continue
     }
+    if(card && f.tag && /^h[1-6]$/.test(f.tag))card=null
     if(card){
       if(editable)card.fields.push(f)
       continue
@@ -336,7 +337,6 @@ export default function App(){
     setOldPassword('');setNewPassword('');setShowPassword(false);notify('Password changed. Sign in again with your new password.')
     accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null)
   })}
-  const changePage=(patch:Partial<Page>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,...patch}}:cur)
   const changeSEO=(patch:Partial<SEO>)=>setEditor(cur=>cur?{...cur,page:{...cur.page,seo:{...cur.page.seo,...patch}}}:cur)
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
   function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
