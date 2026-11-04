@@ -261,6 +261,7 @@ export default function App(){
   const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
+  const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
@@ -544,6 +545,20 @@ export default function App(){
     },true)
     if(previewScrollRef.current)frame.contentWindow?.scrollTo(0,previewScrollRef.current)
   }
+  async function enableLinksAndIconsOnThisPage(){
+    if(!editor||user?.role!=='admin')return
+    if(dirty){showError('Save this draft first, then enable editing for its links and icons.');return}
+    if(!window.confirm('Make fixed CTA links and icons editable on THIS page only? The approved template and published website will not change.'))return
+    await action(async()=>{
+      const latest=await api<{page:Page;template:Template;enabled_count:number}>(
+        '/api/pages/'+editor.page.id+'/enable-link-icon-editing',
+        {method:'POST',body:json({edit_version:editor.page.edit_version})})
+      setEditor({page:latest.page,template:latest.template})
+      setSavedPage(structuredClone(latest.page))
+      await refresh()
+      notify(latest.enabled_count+' button links and icons are now editable on this page.')
+    })
+  }
   async function enableRepeatersOnThisPage(){
     if(!editor)return
     if(dirty){showError('Save the current draft before refreshing repeater fields.');return}
@@ -714,7 +729,7 @@ export default function App(){
         <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
       </div>
       {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
-      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code></div>}
+      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code>{user.role==='admin'&&<button type="button" className="outline compact" disabled={busy||dirty} onClick={enableLinksAndIconsOnThisPage}><LockKeyhole size={13}/> Make this page's links editable</button>}</div>}
       {icons.length>0&&<details className="editor-context-icon">
         <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
         <p>The original icon stays in place unless you choose a replacement image.</p>
@@ -824,7 +839,7 @@ export default function App(){
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button>{hasFixedLinkOrIcon&&user.role==='admin'&&<button className="outline" onClick={enableLinksAndIconsOnThisPage} disabled={busy||dirty}><LockKeyhole size={15}/> Enable links & icons</button>}<button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
@@ -1230,6 +1245,15 @@ export default function App(){
                     else if(!e.target.value)unsetField(selectedCanvasField.key)
                     else changeField(selectedCanvasField.key,e.target.value)
                   }}/>
+                :selectedCanvasField.kind==='icon'&&selectedCanvasField.attr==='icon_src'
+                ?iconChoiceControl('visual-'+selectedCanvasField.key,
+                  extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
+                    :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default,
+                  v=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,v)
+                    else changeField(selectedCanvasField.key,v)
+                  })
                 :<textarea aria-label="Selected element content" rows={3}
                   value={extraIndex>=0&&selectedCanvasGroup
                     ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
@@ -1252,6 +1276,9 @@ export default function App(){
           {selectedCanvasLink?.mode==='page'&&<label>Button destination
             <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
               onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
+            {isTestableHref(editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default)
+              ?<a className="editor-inspector-test-link" href={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
+              :<small>For a section on this page, enter an anchor such as #enquiry.</small>}
           </label>}
         </div>}
         {!selectedCanvasGroup&&!selectedCanvasField&&<div className="visual-inspector-empty">Select an editable element in the page or choose a repeatable section above.</div>}
