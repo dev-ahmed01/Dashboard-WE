@@ -98,3 +98,22 @@ def test_visual_designer_rejects_unsafe_values_and_keeps_published_snapshot(clie
     assert r.status_code==200,r.text
     assert client.get(publication['url']).text==published_before
     assert 'data-we-design-element' in client.get(f"/api/pages/{p['id']}/preview",headers=auth).text
+
+
+def test_highlight_cards_reflow_automatically_without_columns_dropdown():
+    from app.template_engine import extract, render
+    source,sections,fields=extract(PAGE_HTML)
+    for f in fields:f['mode']='page'
+    highlights=next(g for sec in sections for g in sec.get('repeaters',[])
+                    if g['kind']=='highlights')
+    field=next(f for f in fields if f['key'] in highlights['items'][-1]['field_keys']
+               and f['attr']=='text')
+    values={'__repeat__'+highlights['id']:json.dumps([
+        {field['key']:'Fourth highlight'},{field['key']:'Fifth highlight'}
+    ])}
+    soup=BeautifulSoup(render(source,fields,values,{}),'html.parser')
+    assert len(soup.select('#hero .cards > article'))==5
+    style=soup.select_one('#we-editor-safe-layout').text
+    assert 'repeat(5,minmax(0,1fr))' in style
+    assert 'max-width:580px' in style
+    assert 'grid-template-columns:1fr!important' in style
