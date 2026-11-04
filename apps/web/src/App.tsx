@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
@@ -189,6 +189,12 @@ export default function App(){
   const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
   const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
+  const [canvasMode,setCanvasMode]=useState(false)
+  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string}|null>(null)
+  const [canvasGroupId,setCanvasGroupId]=useState('')
+  const [previewSection,setPreviewSection]=useState('')
+  const previewFrameRef=useRef<HTMLIFrameElement|null>(null)
+  const previewScrollRef=useRef(0)
   const [shared,setShared]=useState<Record<string,string>>({})
   const [sharedUsage,setSharedUsage]=useState<{key:string;pages:number;published_pages:number}[]>([])
   const [publicationInfo,setPublicationInfo]=useState<{published:{slug:string;seo:SEO;version:number}|null}|null>(null)
@@ -211,11 +217,38 @@ export default function App(){
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
+  const allRepeaters=editor?editor.template.sections.flatMap(sec=>sec.repeaters||[]):[]
+  const selectedCanvasGroup=allRepeaters.find(g=>g.id===(canvasSelection?.groupId||canvasGroupId))
+  const selectedCanvasItem=selectedCanvasGroup?.items.find(item=>item.id===canvasSelection?.itemId)
+  const selectedCanvasField=editor?.template.fields.find(field=>field.key===canvasSelection?.fieldKey)
+  const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
+  const visualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as {
+    groups?:Record<string,{columns?:number;gap?:number}>,
+    items?:Record<string,{span?:number;height?:number;locked?:boolean}>,
+    fields?:Record<string,{fontPx?:number;locked?:boolean}>
+  }}catch{return {}}})()
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
+  // Visual preview is a sandboxed copy of the *same draft*, not a second data
+  // store. User changes update the draft and refresh the preview without saving.
+  useEffect(()=>{
+    if(!canvasMode||preview===null||!editor)return
+    let cancelled=false
+    const timer=window.setTimeout(()=>{
+      const qs=previewSection?'?section_id='+encodeURIComponent(previewSection):''
+      html('/api/pages/'+editor.page.id+'/preview'+qs,JSON.parse(previewPayload))
+        .then(result=>{
+          if(cancelled)return
+          previewScrollRef.current=previewFrameRef.current?.contentWindow?.scrollY||0
+          setPreview(result)
+        }).catch(e=>{if(!cancelled)showError(e)})
+    },380)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
+  },[previewPayload,canvasMode,previewSection,previewRefresh])
+
   useEffect(()=>{
     if(!editor||!previewPayload||!activeSectionId){
       setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
@@ -262,7 +295,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('')})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('');setCanvasMode(false);setCanvasSelection(null);setCanvasGroupId('')})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
@@ -355,6 +388,7 @@ export default function App(){
     })
   }
   async function fullPreview(section?:string){if(!editor)return;await action(async()=>{
+    setPreviewSection(section||'')
     const qs=section?`?section_id=${encodeURIComponent(section)}`:''
     const p=editor.page
     setPreview(await html(`/api/pages/${p.id}/preview${qs}`,{edit_version:p.edit_version,title:p.title,slug:p.slug,values:p.values,seo:p.seo}))
