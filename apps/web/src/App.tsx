@@ -98,7 +98,6 @@ export default function App(){
   const [oldPassword,setOldPassword]=useState('')
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
-  const [collapsedSections,setCollapsedSections]=useState<string[]>([])
   const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
   const [focusedPreviewField,setFocusedPreviewField]=useState('')
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
@@ -201,7 +200,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([]);setActiveEditorSection(null);setFocusedPreviewField('')})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('')})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
