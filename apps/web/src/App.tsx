@@ -1124,14 +1124,28 @@ export default function App(){
           <h3>{fieldDisplayName(selectedCanvasField,'text',1)}</h3>
           {selectedCanvasField.mode==='page'&&!isFieldLocked(selectedCanvasField.key)
             ?<label>{selectedCanvasField.kind==='image'?'Replacement image URL':'Text'}
-              <textarea aria-label="Selected element content" rows={3}
-                value={extraIndex>=0&&selectedCanvasGroup
-                  ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
-                  :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default}
-                onChange={e=>{
-                  if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
-                  else changeField(selectedCanvasField.key,e.target.value)
-                }}/>
+              {selectedCanvasField.kind==='image'&&<img className="visual-inspector-image" alt="Selected page image"
+                src={extraIndex>=0&&selectedCanvasGroup
+                  ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||selectedCanvasField.default
+                  :editor?.page.values[selectedCanvasField.key]||selectedCanvasField.default}/>}
+              {selectedCanvasField.kind==='image'
+                ?<input aria-label="Selected image URL" placeholder="Paste an image URL; blank keeps original"
+                  value={extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]||''
+                    :(editor?.page.values[selectedCanvasField.key]||'').startsWith('data:')?'':editor?.page.values[selectedCanvasField.key]||''}
+                  onChange={e=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
+                    else if(!e.target.value)unsetField(selectedCanvasField.key)
+                    else changeField(selectedCanvasField.key,e.target.value)
+                  }}/>
+                :<textarea aria-label="Selected element content" rows={3}
+                  value={extraIndex>=0&&selectedCanvasGroup
+                    ?repeatEntries(selectedCanvasGroup)[extraIndex]?.[selectedCanvasField.key]??selectedCanvasField.default
+                    :editor?.page.values[selectedCanvasField.key]??selectedCanvasField.default}
+                  onChange={e=>{
+                    if(extraIndex>=0&&selectedCanvasGroup)updateRepeatEntry(selectedCanvasGroup,extraIndex,selectedCanvasField.key,e.target.value)
+                    else changeField(selectedCanvasField.key,e.target.value)
+                  }}/>}
             </label>
             :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
           {selectedCanvasField.mode==='page'&&<label>Font size: {visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}px
