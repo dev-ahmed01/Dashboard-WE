@@ -151,6 +151,13 @@ def set_variant(node: Tag, variant: str):
         classes.remove('office-special')
     classes.append('we-variant-'+variant)
     node['class'] = classes
+    if 'office-tile' in classes:
+        # Override positional template classes such as tile-3 (span 2).
+        # Explicit styles are constrained to presets and leave mobile layout
+        # responsive via a separate media rule in apply_design.
+        span=2 if variant=='highlight' else 1
+        height=345 if variant=='highlight' else 265 if variant=='generic' else 300
+        node['style']=node.get('style','')+f';grid-column:span {span}!important;height:{height}px!important;'
     node['data-we-variant'] = variant
 
 
@@ -262,6 +269,10 @@ def apply_design(soup,fields,values):
         size=options.get('fontPx')
         if isinstance(size,int) and 10<=size<=100:
             node['style']=(node.get('style','')+f';font-size:{size}px!important;')
+    # Layout variants remain one column on narrow viewports regardless of
+    # legacy tile-number class rules in the uploaded design.
+    if soup.find(attrs={'data-we-variant':True}):
+        stylesheet.append('@media(max-width:900px){[data-we-variant]{grid-column:auto!important;}}')
     if stylesheet:
         style=soup.new_tag('style')
         style['id']='we-editor-safe-layout'
