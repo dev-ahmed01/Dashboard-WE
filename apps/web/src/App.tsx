@@ -729,7 +729,7 @@ export default function App(){
         <div><small>{kindLabel}</small><strong>{block.title}</strong></div>
       </div>
       {regular.length>0&&<div className="editor-ordered-block-fields">{regular.map((field,i)=>editorFieldControl(field,i+1,block.kind))}</div>}
-      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code>{user.role==='admin'&&<button type="button" className="outline compact" disabled={busy||dirty} onClick={enableLinksAndIconsOnThisPage}><LockKeyhole size={13}/> Make this page's links editable</button>}</div>}
+      {block.kind==='cta'&&block.fixedDestination!==undefined&&<div className="editor-fixed-destination"><small>Button destination · Fixed by template</small><code>{block.fixedDestination}</code>{user?.role==='admin'&&<button type="button" className="outline compact" disabled={busy||dirty} onClick={enableLinksAndIconsOnThisPage}><LockKeyhole size={13}/> Make this page's links editable</button>}</div>}
       {icons.length>0&&<details className="editor-context-icon">
         <summary>Change {block.kind==='card'?'this card’s icon':block.kind==='cta'?'this button’s icon':'icon'} (optional) <ChevronRight size={15}/></summary>
         <p>The original icon stays in place unless you choose a replacement image.</p>
