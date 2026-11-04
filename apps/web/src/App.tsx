@@ -379,8 +379,7 @@ export default function App(){
         ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
         :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
           placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the image or icon from the original {suffix}.</small>}
-                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
   }
   function repeatEntries(group:Repeater):Record<string,string>[]{
@@ -473,7 +472,8 @@ export default function App(){
                   {(field.kind==='textarea'||value.length>110)
                     ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
                     :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
-                  {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+                  {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
+                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
                 </label>
               })}
               <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove added {suffix}</button>
