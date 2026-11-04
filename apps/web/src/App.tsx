@@ -474,45 +474,30 @@ export default function App(){
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
-        <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Only fields approved as page-variable can be changed. The original HTML layout stays intact.</p></div>
-        <span className="editor-field-total">{editor.template.fields.filter(f=>f.mode==='page').length} editable fields</span>
+        <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Edit each part in the same order it appears on the page. Choose a field to highlight it in the preview.</p></div>
+        <span className="editor-field-total">{editableSections.length} editable sections</span>
       </div>
       <div className="editor-content-workspace"><div className="editor-section-rows">
-        {editor.template.sections.map((section,i)=>{
-          const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
-          const groups=editorGroups(fields)
-          const collapsed=section.id!==activeSectionId
-          return <div className="editor-section-block" key={section.id}>
-            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>{setActiveEditorSection(collapsed?section.id:'');setFocusedPreviewField('')}}>
-              <span className="editor-section-no">{String(i+1).padStart(2,'0')}</span>
-              <span className="editor-section-name"><strong>{section.name}</strong><small>{fields.length?`${fields.length} editable field${fields.length===1?'':'s'}`:'Fixed content · reused from template'}</small></span>
-              {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
-              <ChevronRight size={17} className={`section-chevron ${collapsed?'':'expanded'}`}/>
-            </button>
-            {!collapsed&&fields.length>0&&<div className="editor-friendly-groups">
-              {groups.content.length>0&&<details className="editor-field-group" open>
-                <summary><span><strong>Headings & text</strong><small>Page headlines, descriptions and bullet points</small></span><span className="editor-group-count">{groups.content.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-fields-grid">{groups.content.map((f,i)=>editorFieldControl(f,i+1))}</div>
-              </details>}
-              {groups.actions.length>0&&<details className="editor-field-group editor-actions-group">
-                <summary><span><strong>Buttons & links</strong><small>Change button wording and where each button takes visitors</small></span><span className="editor-group-count">{groups.actions.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-action-collection">{groups.actions.map((item,i)=><div className="editor-action-card" key={item.id}>
-                  <div className="editor-action-card-head"><span className="editor-action-no">{String(i+1).padStart(2,'0')}</span><div><strong>{item.name}</strong><small>Button {i+1} · Edit text or destination below</small></div></div>
-                  <div className="editor-fields-grid">{item.fields.map((field,j)=>editorFieldControl(field,j+1))}</div>
-                </div>)}</div>
-              </details>}
-              {groups.media.length>0&&<details className="editor-field-group editor-media-group">
-                <summary><span><strong>Images & icons</strong><small>Replace visuals only when you need a different image or icon</small></span><span className="editor-group-count">{groups.media.length}</span><ChevronRight size={16}/></summary>
-                <div className="editor-fields-grid">{groups.media.map((f,i)=>editorFieldControl(f,i+1))}</div>
-              </details>}
-            </div>}
-          </div>
-        })}
-      </div>
-      <aside className="editor-side-preview" aria-label="Live section preview">
+         {editableSections.map(section=>{
+           const blocks=pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id))
+           const sectionOpen=section.id===activeSectionId
+           return <div className="editor-section-block" key={section.id}>
+             <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
+               <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{blocks.length} editable {blocks.length===1?'element':'elements'} · Page order</small></span>
+               <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
+             </button>
+             {sectionOpen&&<div className="editor-page-ordered-list">
+               {blocks.map((block,i)=>editorBlockControl(block,i))}
+             </div>}
+           </div>
+         })}
+         {editableSections.length===0&&<div className="editor-no-variable"><LockKeyhole size={20}/><strong>No editable sections</strong><p>Everything in this template is set to Static. Choose a template with Variable fields to edit page content.</p></div>}
+       </div>
+       <aside className="editor-side-preview" aria-label="Live section preview">
         <div className="editor-side-preview-head">
           <div><strong>Section preview</strong><small>{editor.template.sections.find(x=>x.id===activeSectionId)?.name||'Choose a section'}</small></div>
-          {activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}
+          <div className="editor-side-preview-actions"><button type="button" className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)}>Refresh</button>{activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}</div>
         </div>
         <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
         <div className="editor-side-preview-window">
@@ -532,7 +517,7 @@ export default function App(){
       <div className="form-stack seo-form-stack">
 
         {publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}
-        <div className="seo-primary-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label>URL slug<input value={editor.page.slug} onChange={e=>changePage({slug:e.target.value})}/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
+        <div className="seo-primary-fields seo-simple-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
         <div className="two-col seo-switches">
           <label className="seo-toggle-card">
             <span className="seo-toggle-copy"><strong>Allow indexing</strong><small>{editor.page.seo.noindex?'Off · Ask search engines not to show this page in results.':'On · Allow search engines to include this page in results.'}</small></span>
@@ -548,14 +533,7 @@ export default function App(){
       </div>
     </section>
 
-    <section className="edit-panel editor-preview-panel" id="page-preview" aria-labelledby="preview-heading">
-      <div className="panel-heading"><div><div className="small-label">03 / RESULT</div><h2 id="preview-heading">Page Preview</h2><p>See the full page below. Content and SEO edits appear here automatically without saving.</p></div><div className="button-group"><button className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)} disabled={inlinePreviewLoading}>Refresh preview</button><button className="outline compact" onClick={()=>fullPreview()} disabled={busy}>Expand preview <ArrowUpRight size={15}/></button></div></div>
-      <div className="inline-preview-bar"><span aria-live="polite">{inlinePreviewLoading?'Updating preview…':inlinePreviewError?'Preview unavailable':'Preview is up to date'}</span><span>Desktop · Full page · Draft only</span></div>
-      <div className="inline-preview-frame">{inlinePreview&&<iframe title="Inline page preview" sandbox="" srcDoc={inlinePreview}/>}{!inlinePreview&&<div className="inline-preview-empty">{inlinePreviewLoading?'Generating page preview…':inlinePreviewError||'Preparing preview…'}</div>}</div>
-      {inlinePreviewError&&<div className="inline-preview-error" role="alert">{inlinePreviewError} <button className="quiet-action" onClick={()=>setPreviewRefresh(n=>n+1)}>Try again</button></div>}
-      <div className="editor-preview-foot"><span>Preview changes are not published to WordPress.</span><div className="button-group"><button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
-    </section>
-  </div></>:
+    </div></>:
   <>
   {nav==='Category'&&<div className="category-page">
     <div className="category-heading">
