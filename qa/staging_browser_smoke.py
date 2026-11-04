@@ -200,7 +200,9 @@ def run():
         # Verify a real click in the preview opens the exact destination through
         # a parent-controlled link tester without navigating away from the CMS.
         page.evaluate("window.__testOpened=[];window.open=(url)=>{window.__testOpened.push(url);return null;}")
+        print("DEBUG link before",page.evaluate("({sandbox:document.querySelector('iframe[title=\\\"Selected section preview\\\"]')?.getAttribute('sandbox'),canRead:!!document.querySelector('iframe[title=\\\"Selected section preview\\\"]')?.contentDocument})"))
         side_frame.locator('a[href="'+recording+'"]').click()
+        print("DEBUG link after",page.evaluate("({opened:window.__testOpened,feedback:document.querySelector('.editor-side-preview-feedback')?.textContent,iframe:document.querySelector('iframe[title=\\\"Selected section preview\\\"]')?.contentWindow?.location?.href})"))
         assert page.evaluate("window.__testOpened") == [recording]
         expect(page.locator(".editor-side-preview-feedback")).to_contain_text("separate tab")
         expect(side_frame.locator('a[href="'+recording+'"]')).to_have_count(1)
