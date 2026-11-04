@@ -372,7 +372,7 @@ export default function App(){
   function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
     const title=fieldDisplayName(field,kind,position)
     const rawValue=editor?.page.values[field.key]??field.default
-    const value=isCtaText(field)?rawValue.replace(/\s*[↗↖↘↙→➜➔›]\s*$/,'').trim():rawValue
+    const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
       {field.kind==='textarea'
