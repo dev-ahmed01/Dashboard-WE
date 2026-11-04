@@ -378,8 +378,9 @@ def render(source: str, fields: list, values: dict, global_values: dict, section
         value=(values.get(field['key'],field['default']) if mode=='page' else
                global_values.get(field.get('global_key'),field['default']) if mode=='global' else field['default'])
         change_rendered_field(soup,target,field,str(value or ''))
-    from .repeaters import apply_extras
+    from .repeaters import apply_extras, apply_design
     apply_extras(soup,fields,values,change_rendered_field)
+    apply_design(soup,fields,values)
     if section_id:
         for section in list(soup.find_all(attrs={'data-we-section':True})):
             if section.get('data-we-section')!=section_id:
