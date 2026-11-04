@@ -1814,3 +1814,16 @@
 }
 .designer-existing-layer-list button.layer-selected{border-color:#ed2024;background:#fff2f2;color:#ce1820}
 .designer-existing-layer-list button span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+.designer-inspect-switch{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  border-radius:9px;padding:4px;border:1px solid #e8e1dc;background:#fff;
+}
+.designer-inspect-switch button{
+  padding:9px 6px;border:none;border-radius:7px;
+  background:transparent;color:#6a5b53;
+  font:700 11px Poppins,sans-serif;
+}
+.designer-inspect-switch button[aria-pressed='true']{
+  color:#ed2024;background:#ffeded;
+}
