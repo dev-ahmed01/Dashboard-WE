@@ -348,7 +348,6 @@ def _render_overlay(soup, entry):
 def apply_design(soup,fields,values):
     """Apply validated per-page visual styles and editable overlays."""
     design=read_design(values)
-    if not design:return
     groups=design.get('groups') or {}
     items=design.get('items') or {}
     field_styles=design.get('fields') or {}
@@ -390,6 +389,21 @@ def apply_design(soup,fields,values):
     for entry in design.get('elements',[]):
         if isinstance(entry,dict):
             _render_overlay(soup,entry)
+    # Highlights expand automatically when the admin adds a fifth or sixth
+    # card. No manual "Cards per row" selector is necessary.
+    for wrapper in soup.select('.cards[data-we-repeat-group]'):
+        original_and_new=[
+          el for el in wrapper.find_all(recursive=False)
+          if isinstance(el,Tag) and el.get('data-we-repeat-item')
+        ]
+        count=len(original_and_new)
+        if count>4:
+            columns=min(count,6)
+            gid=wrapper.get('data-we-repeat-group')
+            selector=f'[data-we-repeat-group="{gid}"]'
+            stylesheet.append(f'{selector}{{display:grid!important;grid-template-columns:repeat({columns},minmax(0,1fr))!important;}}')
+            stylesheet.append(f'@media(max-width:900px){{{selector}{{grid-template-columns:repeat(2,minmax(0,1fr))!important;}}}}')
+            stylesheet.append(f'@media(max-width:580px){{{selector}{{grid-template-columns:1fr!important;}}}}')
     if soup.find(attrs={'data-we-variant':True}):
         stylesheet.append('@media(max-width:900px){[data-we-variant]{grid-column:auto!important;}}')
     if stylesheet:
