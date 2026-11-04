@@ -870,8 +870,13 @@ export default function App(){
       }
     }
     window.addEventListener('keydown',handler)
-    return()=>window.removeEventListener('keydown',handler)
-  },[canvasMode,editor,canvasSelection,visualDesign])
+    const frameDocument=previewFrameRef.current?.contentDocument
+    frameDocument?.addEventListener('keydown',handler)
+    return()=>{
+      window.removeEventListener('keydown',handler)
+      frameDocument?.removeEventListener('keydown',handler)
+    }
+  },[canvasMode,editor,canvasSelection,visualDesign,preview])
   async function enableLinksAndIconsOnThisPage(){
     if(!editor||user?.role!=='admin')return
     if(dirty){showError('Save this draft first, then enable editing for its links and icons.');return}
@@ -1712,6 +1717,25 @@ export default function App(){
         {canvasLayersOpen&&<div className="visual-inspector-group designer-layers">
           <h3><Layers size={15}/> Layers</h3>
           {(visualDesign.elements||[]).length===0&&<small>No added elements yet. Use Text, Image, Shape or Button on the left.</small>}
+          <details className="designer-existing-layers">
+            <summary>Page cards & text</summary>
+            <div className="designer-existing-layer-list">
+              {allRepeaters.filter(g=>!g.parent_item_id).flatMap(group=>
+                group.items.map(item=><button type="button" key={item.id}
+                  className={canvasSelection?.itemId===item.id?'layer-selected':''}
+                  onClick={()=>{setCanvasSelection({fieldKey:'',linkKey:'',groupId:group.id,itemId:item.id});setCanvasGroupId(group.id)}}>
+                  <Layers size={13}/><span>{item.title||group.name}</span>
+                  {visualDesign.items?.[item.id]?.locked&&<LockKeyhole size={12}/>}
+                  {visualDesign.items?.[item.id]?.hidden&&<EyeOff size={12}/>}
+                </button>)) )}
+              {editor?.template.fields.filter(f=>f.mode==='page'&&(f.tag==='h1'||f.tag==='h2'||f.tag==='h3')).map(f=>
+                <button type="button" key={f.key} className={canvasSelection?.fieldKey===f.key?'layer-selected':''}
+                  onClick={()=>setCanvasSelection({fieldKey:f.key,linkKey:'',itemId:'',groupId:''})}>
+                  <Type size={13}/><span>{f.label.slice(0,50)}</span>
+                  {visualDesign.fields?.[f.key]?.hidden&&<EyeOff size={12}/>}
+                </button>)}
+            </div>
+          </details>
           {(visualDesign.elements||[]).slice().sort((a,b)=>b.zIndex-a.zIndex).map(el=>
             <button type="button" key={el.id} className={el.id===canvasSelection?.elementId?'layer-selected':''}
               aria-label={'Select '+el.type+' layer '+el.id}
