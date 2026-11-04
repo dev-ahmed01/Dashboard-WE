@@ -239,6 +239,20 @@ def extract(source: str):
                 add_field(tag, 'icon', 'icon_src', '', 'SVG icon')
             elif tag.name == 'i' and tag.get('class'):
                 add_field(tag, 'icon', 'class', ' '.join(tag.get('class')), 'Icon class')
+            elif tag.name in ('div', 'strong', 'b'):
+                # Real designs often style their highlight-card titles as
+                # <div class="card-title"> rather than h2/h3. Detect only leaf
+                # text nodes; never map layout wrappers containing other fields.
+                if tag.find(list(TEXT_TAGS | {'div', 'strong', 'b'})):
+                    continue
+                if tag.find_parent(list(HEADINGS | {'p', 'li', 'label', 'a', 'button'})):
+                    continue
+                value=' '.join(part.strip() for part in tag.contents
+                               if isinstance(part, NavigableString) and part.strip())
+                if 2 <= len(value) <= 1000:
+                    classes=' '.join(tag.get('class', []))
+                    prefix='Card title' if re.search(r'(?:^|[-_\\s])(card|tile|feature)[-_\\s]*title', classes, re.I) else 'Text'
+                    add_field(tag, 'textarea' if len(value)>110 else 'text','text',value,prefix)
             elif tag.name in TEXT_TAGS:
                 # Parent headings/paragraphs/buttons own their text even when styled
                 # spans or inline icons occur inside. Never double-count nested spans.

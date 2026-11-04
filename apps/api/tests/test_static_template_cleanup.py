@@ -40,70 +40,68 @@ def test_delete_all_templates_requires_confirmation_and_admin(client):
     second=imported(client,auth,name='Previous Template B')
     keys=set(FakeStore.files)
     assert len(keys)==2
-    invalid=client.request('DELETE','/api/templates',headers=auth,json={'confirmation':'delete'})
+    invalid=client.request('DELETE','/api/templates',headers=auth,json={'confirm':False})
     assert invalid.status_code==422
     assert len(client.get('/api/templates',headers=auth).json())==2
-    missing=client.request('DELETE','/api/templates',json={'confirmation':'DELETE ALL TEMPLATES'})
+    missing=client.request('DELETE','/api/templates',json={'confirm':True})
     assert missing.status_code in (401,403)
-    confirm=client.request('DELETE','/api/templates',headers=auth,
-                           json={'confirmation':'DELETE ALL TEMPLATES'})
+    confirm=client.request('DELETE','/api/templates',headers=auth,json={'confirm':True})
     assert confirm.status_code==200,confirm.text
-    assert confirm.json()=={'deleted':2,'storage_cleanup_failed':0}
+    assert confirm.json()=={'removed':2,'retained_for_pages':0,'storage_cleanup_failed':0}
     assert client.get('/api/templates',headers=auth).json()==[]
     assert not keys.intersection(FakeStore.files)
 
 
-def test_delete_all_refuses_templates_used_by_any_page_including_archived(client):
+def test_delete_all_hides_linked_templates_and_preserves_archived_pages(client):
     auth=login(client)
     first=imported(client,auth,name='Old Linked Template')
     template=approve(client,auth,first)
     draft=page(client,auth,template,name='Archived Draft For Protection')
     assert client.post(f"/api/pages/{draft['id']}/archive",headers=auth).status_code==200
-    assert client.get('/api/pages',headers=auth).json()==[]
-    deletion=client.request('DELETE','/api/templates',headers=auth,
-                            json={'confirmation':'DELETE ALL TEMPLATES'})
-    assert deletion.status_code==409
-    assert 'archived or published' in deletion.text
-    assert len(client.get('/api/templates',headers=auth).json())==1
+    keys_before=set(FakeStore.files)
+    deleted=client.request('DELETE','/api/templates',headers=auth,json={'confirm':True})
+    assert deleted.status_code==200,deleted.text
+    assert deleted.json()['retained_for_pages']==1
+    assert client.get('/api/templates',headers=auth).json()==[]
     assert client.get(f"/api/pages/{draft['id']}",headers=auth).status_code==200
+    assert client.get(f"/api/pages/{draft['id']}/preview",headers=auth).status_code==200
+    assert keys_before==set(FakeStore.files)
+    blocked=client.post('/api/pages',headers=auth,json={'name':'Forbidden new page','template_id':template['id']})
+    assert blocked.status_code==409
 
 
-def test_delete_one_template_requires_exact_name_and_preserves_other_templates(client):
+def test_delete_one_template_needs_confirm_and_keeps_other_templates(client):
     auth=login(client)
     first=imported(client,auth,name='Managed Offices Layout')
     second=imported(client,auth,name='One Person Office Layout')
-    all_keys=set(FakeStore.files)
-    assert len(all_keys)==2
     url=f"/api/templates/{first['id']}"
-    invalid=client.request('DELETE',url,headers=auth,
-                           json={'confirmation':'DELETE Managed Offices'})
-    assert invalid.status_code==422
-    assert len(client.get('/api/templates',headers=auth).json())==2
-    missing=client.request('DELETE',url,json={'confirmation':'DELETE Managed Offices Layout'})
-    assert missing.status_code in (401,403)
-    result=client.request('DELETE',url,headers=auth,
-                          json={'confirmation':'DELETE Managed Offices Layout'})
+    assert client.request('DELETE',url,headers=auth,json={'confirm':False}).status_code==422
+    assert client.request('DELETE',url,json={'confirm':True}).status_code in (401,403)
+    result=client.request('DELETE',url,headers=auth,json={'confirm':True})
     assert result.status_code==200,result.text
-    assert result.json()['deleted']==1
+    assert result.json()['removed']==1
+    assert result.json()['retained_for_pages']==0
     remaining=client.get('/api/templates',headers=auth).json()
     assert [t['id'] for t in remaining]==[second['id']]
     assert len(FakeStore.files)==1
-    assert set(FakeStore.files).issubset(all_keys)
-    assert client.request('DELETE',url,headers=auth,
-                          json={'confirmation':'DELETE Managed Offices Layout'}).status_code==404
+    assert client.request('DELETE',url,headers=auth,json={'confirm':True}).status_code==404
 
 
-def test_delete_one_refuses_template_with_archived_page(client):
+def test_delete_one_used_template_keeps_page_edit_and_publication(client):
     auth=login(client)
     first=imported(client,auth,name='Protected Office Template')
-    approved=approve(client,auth,first)
-    linked_page=page(client,auth,approved,name='Office Draft To Keep')
-    archive=client.post(f"/api/pages/{linked_page['id']}/archive",headers=auth)
-    assert archive.status_code==200,archive.text
-    result=client.request('DELETE',f"/api/templates/{first['id']}",headers=auth,
-                          json={'confirmation':'DELETE Protected Office Template'})
-    assert result.status_code==409
-    assert 'page(s)' in result.text
-    assert len(client.get('/api/templates',headers=auth).json())==1
-    assert client.get(f"/api/pages/{linked_page['id']}",headers=auth).status_code==200
-    assert len(FakeStore.files)==1
+    approved=approve(client,auth,first,{'Private workspace':'page'})
+    linked_page=page(client,auth,approved,name='Existing Office Draft')
+    saved_keys=set(FakeStore.files)
+    removal=client.request('DELETE',f"/api/templates/{first['id']}",headers=auth,json={'confirm':True})
+    assert removal.status_code==200,removal.text
+    assert removal.json()['retained_for_pages']==1
+    assert client.get('/api/templates',headers=auth).json()==[]
+    assert set(FakeStore.files)==saved_keys
+    assert client.get(f"/api/pages/{linked_page['id']}",headers=auth).json()['template']['approved'] is True
+    changed=put_page(client,linked_page['id'],auth,{'values':{next(f['key'] for f in approved['fields'] if f['default']=='Private workspace'):'New office headline'}})
+    assert changed.status_code==200,changed.text
+    preview=client.get(f"/api/pages/{linked_page['id']}/preview",headers=auth)
+    assert preview.status_code==200 and 'New office headline' in preview.text
+    blocked=client.post('/api/pages',headers=auth,json={'name':'Not allowed now','template_id':first['id']})
+    assert blocked.status_code==409

@@ -6,7 +6,7 @@ type Field={key:string;section_id:string;label:string;kind:string;attr:string;de
 type Section={id:string;name:string;order:number}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;canonical_override:string;og_title?:string;og_description?:string}
-type Page={id:number;template_id:number;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
+type Page={id:number;template_id:number;template_name?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
 type Nav='Category'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
 type Tab='All Pages'|'Add Page'|'Upload Template'
 
@@ -62,6 +62,7 @@ function friendlyEditorLabel(field:Field,position:number):string{
   if(field.kind==='icon')return field.attr==='icon_src'?'Replacement icon image URL':'Icon style'
   if(field.kind==='image')return 'Image URL'
   if(field.attr==='text'&&(field.tag==='a'||field.tag==='button'))return 'Button text'
+  if(field.label.startsWith('Card title:'))return 'Highlight card title — '+field.default.slice(0,42)
   if(field.tag==='h1')return 'Main headline (H1)'
   if(field.tag&&/^h[2-6]$/.test(field.tag))return 'Heading ('+field.tag.toUpperCase()+')'
   if(field.tag==='p')return 'Paragraph '+position
@@ -97,7 +98,11 @@ export default function App(){
   const [oldPassword,setOldPassword]=useState('')
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
-  const [collapsedSections,setCollapsedSections]=useState<string[]>([])
+  const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
+  const [focusedPreviewField,setFocusedPreviewField]=useState('')
+  const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
+  const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
+  const [sectionPreviewError,setSectionPreviewError]=useState('')
   const [inlinePreview,setInlinePreview]=useState('')
   const [inlinePreviewError,setInlinePreviewError]=useState('')
   const [inlinePreviewLoading,setInlinePreviewLoading]=useState(false)
@@ -130,11 +135,11 @@ export default function App(){
   const [selectedTemplatePreview,setSelectedTemplatePreview]=useState('')
   const [templateDragActive,setTemplateDragActive]=useState(false)
   const [deletingTemplate,setDeletingTemplate]=useState<Template|'all'|null>(null)
-  const [deletePhrase,setDeletePhrase]=useState('')
   const [deleteError,setDeleteError]=useState('')
   const draftState=(p:Page)=>JSON.stringify({title:p.title,slug:p.slug,values:p.values,seo:p.seo})
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
+  const activeSectionId=editor?(activeEditorSection===null?editor.template.sections[0]?.id:activeEditorSection):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
   useEffect(()=>{
@@ -149,6 +154,26 @@ export default function App(){
     },450)
     return()=>{cancelled=true;window.clearTimeout(timer)}
   },[editor?.page.id,previewPayload,previewRefresh])
+  useEffect(()=>{
+    if(!editor||!previewPayload||!activeSectionId){
+      setSectionPreviewHtml('');setSectionPreviewLoading(false);setSectionPreviewError('');return
+    }
+    let cancelled=false
+    setSectionPreviewLoading(true)
+    const timer=window.setTimeout(()=>{
+      html('/api/pages/'+editor.page.id+'/preview?section_id='+encodeURIComponent(activeSectionId),JSON.parse(previewPayload))
+        .then(content=>{
+          if(cancelled)return
+          const key=/^[a-z0-9_-]+$/i.test(focusedPreviewField)?focusedPreviewField:''
+          const css=key?'<style>[data-we-field="'+key+'"],[data-we-link-field="'+key+'"]{outline:3px solid #ed2024!important;outline-offset:3px!important;background:rgba(255,185,0,.22)!important;scroll-margin-top:90px!important}</style>':''
+          setSectionPreviewHtml(css?content.replace('</head>',css+'</head>'):content)
+          setSectionPreviewError('')
+        })
+        .catch(e=>{if(!cancelled)setSectionPreviewError(e instanceof Error?e.message:String(e))})
+        .finally(()=>{if(!cancelled)setSectionPreviewLoading(false)})
+    },320)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
+  },[editor?.page.id,activeSectionId,previewPayload,previewRefresh,focusedPreviewField])
   useEffect(()=>{
     let active=true
     if(!selectedTemplate){setSelectedTemplatePreview('');return}
@@ -175,7 +200,7 @@ export default function App(){
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
   })}
-  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setCollapsedSections([])})}
+  async function openPage(p:Page){if(!mayLeave())return;await action(async()=>{const data=await api<{page:Page;template:Template}>(`/api/pages/${p.id}`);setEditor(data);setSavedPage(structuredClone(data.page));api<typeof publicationInfo>(`/api/pages/${p.id}/publication-status`).then(setPublicationInfo).catch(showError);setActiveEditorSection(null);setFocusedPreviewField('')})}
   async function createPage(){await action(async()=>{
     if(!newName.trim()||!selectedTemplate)throw new Error('Enter a page name and select a template')
     const p=await api<Page>('/api/pages',{method:'POST',body:json({name:newName.trim(),template_id:selectedTemplate})})
@@ -200,26 +225,24 @@ export default function App(){
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
   function openDeleteDialog(target:Template|'all'){
-    setDeletingTemplate(target);setDeletePhrase('');setDeleteError('')
+    setDeletingTemplate(target);setDeleteError('')
   }
-  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeletePhrase('');setDeleteError('')}
+  function closeDeleteDialog(){if(busy)return;setDeletingTemplate(null);setDeleteError('')}
   async function confirmTemplateDeletion(){
     if(!deletingTemplate||busy)return
     const target=deletingTemplate
-    const phrase=target==='all'?'DELETE ALL TEMPLATES':'DELETE '+target.name
-    if(deletePhrase!==phrase)return
     setBusy(true);setDeleteError('');setError('')
     try{
       const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
-      const result=await api<{deleted:number;storage_cleanup_failed:number}>(endpoint,{
-        method:'DELETE',body:json({confirmation:deletePhrase})
+      const result=await api<{removed:number;retained_for_pages:number;storage_cleanup_failed:number}>(endpoint,{
+        method:'DELETE',body:json({confirm:true})
       })
       if(target==='all'||mappingId===target.id){setMappingId(null);setUploaded(null);setOpenMappingSection(null);setSectionModeBackups({})}
       if(target==='all'||selectedTemplate===target.id)setSelectedTemplate(null)
       await refresh()
-      setDeletingTemplate(null);setDeletePhrase('')
-      notify(result.deleted+' template'+(result.deleted===1?'':'s')+' deleted.'+
-        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' storage object(s) could not be removed.':''))
+      setDeletingTemplate(null)
+      notify(result.removed+' template'+(result.removed===1?'':'s')+' removed from your library. Existing pages are preserved.'+
+        (result.storage_cleanup_failed?' '+result.storage_cleanup_failed+' unused storage object(s) could not be removed.':''))
     }catch(e){
       setDeleteError(e instanceof Error?e.message:String(e))
     }finally{setBusy(false)}
@@ -291,8 +314,8 @@ export default function App(){
     return <label key={field.key} className={'editor-human-field '+(field.kind==='textarea'||field.kind==='image'||field.kind==='link'?'wide-field':'')}>
       <span className="editor-human-field-name">{title}</span>
       {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} value={value} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={value} onChange={e=>changeField(field.key,e.target.value)} type="text"
+        ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+        :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
           placeholder={field.kind==='link'?'e.g. /contact/ or #enquiry':field.kind==='icon'?'Optional icon image URL':undefined}/>}
       {editorHelp(field)&&<small className="editor-human-help">{editorHelp(field)}</small>}
     </label>
@@ -406,13 +429,13 @@ export default function App(){
         <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Only fields approved as page-variable can be changed. The original HTML layout stays intact.</p></div>
         <span className="editor-field-total">{editor.template.fields.filter(f=>f.mode==='page').length} editable fields</span>
       </div>
-      <div className="editor-section-rows">
+      <div className="editor-content-workspace"><div className="editor-section-rows">
         {editor.template.sections.map((section,i)=>{
           const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
           const groups=editorGroups(fields)
-          const collapsed=collapsedSections.includes(section.id)
+          const collapsed=section.id!==activeSectionId
           return <div className="editor-section-block" key={section.id}>
-            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>setCollapsedSections(prev=>prev.includes(section.id)?prev.filter(id=>id!==section.id):[...prev,section.id])}>
+            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>{setActiveEditorSection(collapsed?section.id:'');setFocusedPreviewField('')}}>
               <span className="editor-section-no">{String(i+1).padStart(2,'0')}</span>
               <span className="editor-section-name"><strong>{section.name}</strong><small>{fields.length?`${fields.length} editable field${fields.length===1?'':'s'}`:'Fixed content · reused from template'}</small></span>
               {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
@@ -437,6 +460,22 @@ export default function App(){
             </div>}
           </div>
         })}
+      </div>
+      <aside className="editor-side-preview" aria-label="Live section preview">
+        <div className="editor-side-preview-head">
+          <div><strong>Section preview</strong><small>{editor.template.sections.find(x=>x.id===activeSectionId)?.name||'Choose a section'}</small></div>
+          {activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}
+        </div>
+        <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
+        <div className="editor-side-preview-window">
+          {activeSectionId&&sectionPreviewHtml
+            ?<iframe title="Selected section preview" sandbox="" srcDoc={sectionPreviewHtml}/>
+            :<div className="editor-side-preview-empty">{sectionPreviewLoading?'Loading section…':activeSectionId?'Preparing section…':'Choose a section on the left.'}</div>}
+          {sectionPreviewLoading&&sectionPreviewHtml&&<span className="editor-preview-refreshing">Updating…</span>}
+        </div>
+        {sectionPreviewError&&<p className="editor-side-preview-error" role="alert">{sectionPreviewError}</p>}
+        <small className="editor-side-preview-foot">Preview only · Not published</small>
+      </aside>
       </div>
     </section>
 
@@ -508,7 +547,7 @@ export default function App(){
         {categoryPages.map(p=><div className="category-table-row" key={p.id}>
           <input type="checkbox" aria-label={'Select '+p.title} checked={selectedPageIds.includes(p.id)} onChange={e=>setSelectedPageIds(ids=>e.target.checked?[...ids,p.id]:ids.filter(id=>id!==p.id))}/>
           <div className="category-page-name"><strong>{p.title}</strong><span>{'/'+p.slug+'/'}</span></div>
-          <div className="category-template-name">{templates.find(t=>t.id===p.template_id)?.name||'Unavailable template'}</div>
+          <div className="category-template-name">{templates.find(t=>t.id===p.template_id)?.name||p.template_name||'Previously removed template'}</div>
           <div><span className={'category-status '+(p.status==='published'?'category-published':'category-draft')}>{p.status==='published'?'Published':'Draft'}</span>{p.has_unpublished_changes&&<small className="category-draft-indicator">Unpublished changes</small>}</div>
           <time dateTime={p.updated_at}>{new Date(p.updated_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</time>
           <details className="category-actions"><summary aria-label={'Actions for '+p.title}><MoreHorizontal size={20}/></summary><div className="category-action-menu">
@@ -704,14 +743,11 @@ export default function App(){
     <form className="dialog-card template-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="template-delete-title" onSubmit={e=>{e.preventDefault();confirmTemplateDeletion()}}>
       <div className="template-delete-icon"><Trash2 size={23}/></div>
       <h2 id="template-delete-title">{deletingTemplate==='all'?'Delete all templates?':'Delete this template?'}</h2>
-      <p>{deletingTemplate==='all'?'This permanently deletes the uploaded template library.':'This permanently deletes "'+deletingTemplate.name+'".'}</p>
-      <p className="template-delete-warning">Templates already used by any page—including archived or published pages—are protected. If a page depends on a selected template, the deletion is blocked and nothing is removed.</p>
-      <label>To confirm, type <strong>{deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name}</strong>
-        <input autoFocus type="text" placeholder="Type the confirmation phrase" autoComplete="off" spellCheck={false} value={deletePhrase} onChange={e=>setDeletePhrase(e.target.value)}/>
-      </label>
+      <p>{deletingTemplate==='all'?'Remove all templates from the active library?':'Remove "'+deletingTemplate.name+'" from the active library?'}</p>
+      <p className="template-delete-warning">Are you sure? This removes the template from your active library. Pages already created from it, including published pages, keep their original content and can still be edited.</p>
       {deleteError&&<div className="template-delete-error" role="alert">{deleteError}</div>}
       <div className="button-group"><button type="button" className="outline" onClick={closeDeleteDialog} disabled={busy}>Cancel</button>
-        <button type="submit" className="primary template-confirm-delete" disabled={busy||deletePhrase!==(deletingTemplate==='all'?'DELETE ALL TEMPLATES':'DELETE '+deletingTemplate.name)}><Trash2 size={15}/> {busy?'Deleting…':'Delete permanently'}</button>
+        <button type="submit" className="primary template-confirm-delete" disabled={busy}><Trash2 size={15}/> {busy?'Removing…':deletingTemplate==='all'?'Remove all templates':'Remove template'}</button>
       </div>
     </form>
   </div>}

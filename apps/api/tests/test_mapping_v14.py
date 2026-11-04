@@ -170,3 +170,34 @@ def test_new_hero_does_not_steal_legacy_section_ids():
     assert sections[0]['id'] not in {'section_1','section_2','section_3','section_4','section_5','section_6'}
     assert [s['id'] for s in sections[1:]] == [f'section_{i}' for i in range(1,7)]
     assert all(any(f['key']==f'section_{i}_field_1' and f['section_id']==f'section_{i}' for f in fields) for i in range(1,7))
+
+
+def test_yellow_highlight_card_div_titles_are_detected_and_renderable():
+    html='''<!doctype html><html><body><main><section class="hero">
+      <h1>Managed offices for growing companies</h1>
+      <div class="cards">
+       <article class="card"><div class="card-title">Offices in prime locations</div>
+         <svg viewBox="0 0 20 20"><path d="M0 0L10 10"/></svg>
+         <p>Move-in ready offices</p></article>
+       <article class="card"><div class="card-title">Multiple pricing plans</div>
+         <p>Four flexible plans</p></article>
+       <article class="card"><div class="card-title">Flexible commitments</div>
+         <p>Scale without friction</p></article>
+       <article class="card"><div class="card-title">Move-in immediately</div>
+         <p>Fully furnished offices</p></article>
+      </div></section></main></body></html>'''
+    imported_html, sections, fields=extract(html)
+    expected=['Offices in prime locations','Multiple pricing plans','Flexible commitments','Move-in immediately']
+    titles=[f for f in fields if f['label'].startswith('Card title:')]
+    assert len(sections)==1
+    assert [f['default'] for f in titles]==expected
+    assert len({f['key'] for f in fields})==len(fields)
+    # Ensure layout wrappers are not treated as one giant editable field.
+    assert not any(f['default'].startswith('Offices in prime locations Move-in ready offices') for f in fields)
+    for f in titles:f['mode']='page'
+    new_values={titles[0]['key']:'Prime business locations'}
+    result=render(imported_html,fields,new_values,{})
+    soup=BeautifulSoup(result,'html.parser')
+    assert soup.find('div',class_='card-title').get_text(' ',strip=True)=='Prime business locations'
+    assert len(soup.select('article.card'))==4
+    assert [e.get_text(' ',strip=True) for e in soup.select('.card-title')][1:]==expected[1:]
