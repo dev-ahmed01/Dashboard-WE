@@ -62,6 +62,7 @@ function friendlyEditorLabel(field:Field,position:number):string{
   if(field.kind==='icon')return field.attr==='icon_src'?'Replacement icon image URL':'Icon style'
   if(field.kind==='image')return 'Image URL'
   if(field.attr==='text'&&(field.tag==='a'||field.tag==='button'))return 'Button text'
+  if(field.label.startsWith('Card title:'))return 'Highlight card title — '+field.default.slice(0,42)
   if(field.tag==='h1')return 'Main headline (H1)'
   if(field.tag&&/^h[2-6]$/.test(field.tag))return 'Heading ('+field.tag.toUpperCase()+')'
   if(field.tag==='p')return 'Paragraph '+position
@@ -314,8 +315,8 @@ export default function App(){
     return <label key={field.key} className={'editor-human-field '+(field.kind==='textarea'||field.kind==='image'||field.kind==='link'?'wide-field':'')}>
       <span className="editor-human-field-name">{title}</span>
       {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} value={value} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={value} onChange={e=>changeField(field.key,e.target.value)} type="text"
+        ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+        :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
           placeholder={field.kind==='link'?'e.g. /contact/ or #enquiry':field.kind==='icon'?'Optional icon image URL':undefined}/>}
       {editorHelp(field)&&<small className="editor-human-help">{editorHelp(field)}</small>}
     </label>
@@ -429,13 +430,13 @@ export default function App(){
         <div><div className="small-label">01 / CONTENT</div><h2 id="editing-heading">Section Editing</h2><p>Only fields approved as page-variable can be changed. The original HTML layout stays intact.</p></div>
         <span className="editor-field-total">{editor.template.fields.filter(f=>f.mode==='page').length} editable fields</span>
       </div>
-      <div className="editor-section-rows">
+      <div className="editor-content-workspace"><div className="editor-section-rows">
         {editor.template.sections.map((section,i)=>{
           const fields=editor.template.fields.filter(f=>f.section_id===section.id&&f.mode==='page')
           const groups=editorGroups(fields)
-          const collapsed=collapsedSections.includes(section.id)
+          const collapsed=section.id!==activeSectionId
           return <div className="editor-section-block" key={section.id}>
-            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>setCollapsedSections(prev=>prev.includes(section.id)?prev.filter(id=>id!==section.id):[...prev,section.id])}>
+            <button className="editor-section-toggle" type="button" aria-expanded={!collapsed} onClick={()=>{setActiveEditorSection(collapsed?section.id:'');setFocusedPreviewField('')}}>
               <span className="editor-section-no">{String(i+1).padStart(2,'0')}</span>
               <span className="editor-section-name"><strong>{section.name}</strong><small>{fields.length?`${fields.length} editable field${fields.length===1?'':'s'}`:'Fixed content · reused from template'}</small></span>
               {fields.length===0&&<LockKeyhole size={15} className="fixed-icon"/>}
@@ -460,6 +461,22 @@ export default function App(){
             </div>}
           </div>
         })}
+      </div>
+      <aside className="editor-side-preview" aria-label="Live section preview">
+        <div className="editor-side-preview-head">
+          <div><strong>Section preview</strong><small>{editor.template.sections.find(x=>x.id===activeSectionId)?.name||'Choose a section'}</small></div>
+          {activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}
+        </div>
+        <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
+        <div className="editor-side-preview-window">
+          {activeSectionId&&sectionPreviewHtml
+            ?<iframe title="Selected section preview" sandbox="" srcDoc={sectionPreviewHtml}/>
+            :<div className="editor-side-preview-empty">{sectionPreviewLoading?'Loading section…':activeSectionId?'Preparing section…':'Choose a section on the left.'}</div>}
+          {sectionPreviewLoading&&sectionPreviewHtml&&<span className="editor-preview-refreshing">Updating…</span>}
+        </div>
+        {sectionPreviewError&&<p className="editor-side-preview-error" role="alert">{sectionPreviewError}</p>}
+        <small className="editor-side-preview-foot">Preview only · Not published</small>
+      </aside>
       </div>
     </section>
 
