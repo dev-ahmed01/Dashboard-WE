@@ -97,7 +97,7 @@ function pageEditorBlocks(source:Field[]):EditorBlock[]{
 }
 function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):string{
   if(f.kind==='link')return 'Button destination'
-  if(f.kind==='icon')return 'Replacement icon image URL'
+  if(f.kind==='icon')return f.attr==='class'?'Icon class (advanced)':'Replacement icon image URL'
   if(f.kind==='image')return kind==='card'?'Card image':'Image'
   if(isCtaText(f))return 'Button text'
   if(/^Card title:/i.test(f.label))return 'Card heading'
@@ -118,7 +118,7 @@ function hintForField(field:Field):string{
     return 'Enter a page path (/contact/), section (#enquiry), phone (tel:+91…), or full https:// URL.'
   }
   if(field.kind==='image')return 'Use the URL of your uploaded image.'
-  if(field.kind==='icon')return 'Leave blank to keep the original icon. To replace it, enter a PNG, JPEG or WebP image URL.'
+  if(field.kind==='icon')return field.attr==='class'?'Keep the original value unless you know the CSS icon class used by this template.':'Leave blank to keep the original icon. To replace it, enter a PNG, JPEG or WebP image URL.'
   return ''
 }
 
@@ -347,7 +347,7 @@ export default function App(){
       {field.kind==='textarea'
         ?<textarea aria-label={title} rows={3} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
         :<input aria-label={title} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'?'https://.../icon.png':undefined}/>}
+          placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
       {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
   }
