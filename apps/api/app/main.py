@@ -23,7 +23,7 @@ from .models import User, Template, Page, Publication, SharedContent, Redirect, 
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, HEADINGS
-from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS
+from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
 
 
@@ -573,11 +573,14 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
         changes['slug']=slug
     if payload.values is not None:
         allowed={f['key']:f for f in t['fields'] if f['mode']=='page'}
-        extra_keys={k for k in payload.values if k.startswith(REPEAT_PREFIX) or k.startswith(VARIANT_PREFIX)}
+        extra_keys={k for k in payload.values if k.startswith(REPEAT_PREFIX) or k.startswith(VARIANT_PREFIX) or k==DESIGN_KEY}
         if not (set(payload.values)-extra_keys).issubset(allowed):
             fail(422,'Attempted to change static or shared template fields')
         for key in extra_keys:
-            validate_repeater_value(key,payload.values[key],t)
+            if key==DESIGN_KEY:
+                try: validate_design(payload.values[key],t['sections'],t['fields'])
+                except ValueError as exc:fail(422,str(exc))
+            else:validate_repeater_value(key,payload.values[key],t)
         newvals=dict(p.values or {})
         for key,value in payload.values.items():
             if key in extra_keys:
