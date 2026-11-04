@@ -27,54 +27,98 @@ async function html(path:string,payload?:unknown):Promise<string>{
 const json=(o:unknown)=>JSON.stringify(o)
 const label=(k:string)=>k.replaceAll('_',' ')
 
-type EditorAction={id:string;name:string;fields:Field[]}
-type EditorGroups={content:Field[];actions:EditorAction[];media:Field[]}
 
-/** Keep a CTA's text and destination next to each other, based on the
- * importer's stable extraction order (text immediately precedes its link).
- * This works on saved V14+ templates without changing database records. */
-function editorGroups(fields:Field[]):EditorGroups{
-  const used=new Set<string>()
-  const actions:EditorAction[]=[]
-  const cta=(f:Field)=>f.kind==='link'||((f.tag==='a'||f.tag==='button')&&f.attr==='text')
-  fields.forEach((f,i)=>{
-    if(!cta(f)||used.has(f.key))return
-    const pair:Field[]=[f];used.add(f.key)
-    const prev=fields[i-1],next=fields[i+1]
-    if(f.kind==='link'&&prev&&!used.has(prev.key)&&prev.attr==='text'&&cta(prev)){
-      pair.unshift(prev);used.add(prev.key)
-    }else if(f.attr==='text'&&next&&!used.has(next.key)&&next.kind==='link'){
-      pair.push(next);used.add(next.key)
+type EditorBlock={id:string;kind:'text'|'cta'|'card'|'image';title:string;fields:Field[]}
+const isCtaText=(f:Field)=>f.attr==='text'&&(f.tag==='a'||f.tag==='button')
+const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replace(/\s+/g,' ').trim().length>n?'…':'')
+
+/** Order the editor as the real HTML is ordered: headline, calls-to-action,
+ * then repeated highlight cards, descriptions and images. Static content is
+ * used only to identify a block. It never produces an editable input. */
+function pageEditorBlocks(source:Field[]):EditorBlock[]{
+  const blocks:EditorBlock[]=[]
+  let card:EditorBlock|null=null
+  let lastCTA:EditorBlock|null=null
+  for(const f of source){
+    const editable=f.mode==='page'
+    const isCardTitle=/^Card title:/i.test(f.label)
+    if(isCardTitle){
+      card={id:f.key,kind:'card',title:excerpt(f.default,65)||'Highlight card',fields:[]}
+      blocks.push(card);lastCTA=null
+      if(editable)card.fields.push(f)
+      continue
     }
-    const textField=pair.find(x=>x.attr==='text')
-    const raw=(textField?.default||f.label.replace(/^(?:Link destination|Button link|Button text|Link text):\s*/i,'')).replace(/\s+/g,' ').trim()
-    const name=raw.length>55?raw.slice(0,55).trim()+'…':raw||'Untitled button'
-    actions.push({id:pair[0].key,name,fields:pair})
-  })
-  return {
-    content:fields.filter(f=>!used.has(f.key)&&f.kind!=='image'&&f.kind!=='icon'),
-    actions,
-    media:fields.filter(f=>!used.has(f.key)&&(f.kind==='image'||f.kind==='icon'))
+    if(isCtaText(f)){
+      card=null
+      lastCTA={id:f.key,kind:'cta',title:excerpt(f.default,60)||'Button',fields:[]}
+      blocks.push(lastCTA)
+      if(editable)lastCTA.fields.push(f)
+      continue
+    }
+    if(f.kind==='link'){
+      // Importer emits a button's text immediately before its destination.
+      // Even if the text is static, pair its editable link with the named CTA.
+      if(!lastCTA||lastCTA.fields.some(x=>x.kind==='link')){
+        lastCTA={id:f.key,kind:'cta',title:excerpt(f.label.replace(/^.*?:\s*/,''),60)||'Button',fields:[]}
+        blocks.push(lastCTA)
+      }
+      card=null
+      if(editable)lastCTA.fields.push(f)
+      continue
+    }
+    if(f.kind==='icon'){
+      // SVGs are usually decorative. Do not produce five anonymous URL
+      // inputs; attach configurable icons to their actual card or CTA instead.
+      if(editable){
+        if(card)card.fields.push(f)
+        else if(lastCTA)lastCTA.fields.push(f)
+      }
+      continue
+    }
+    lastCTA=null
+    if(f.kind==='image'){
+      if(card){if(editable)card.fields.push(f)}
+      else if(editable)blocks.push({id:f.key,kind:'image',title:excerpt(f.label.replace(/^Image:\s*/,''),65)||'Image',fields:[f]})
+      continue
+    }
+    if(card){
+      if(editable)card.fields.push(f)
+      continue
+    }
+    if(editable){
+      const title=/^Card title:/i.test(f.label)?excerpt(f.default,60)
+        :f.tag==='h1'?'Main headline':f.tag&&/^h[2-6]$/.test(f.tag)?'Section heading'
+        :excerpt(f.default,64)||'Text'
+      blocks.push({id:f.key,kind:'text',title,fields:[f]})
+    }
   }
+  return blocks.filter(b=>b.fields.length>0)
 }
-function friendlyEditorLabel(field:Field,position:number):string{
-  if(field.kind==='link')return 'Where this button goes'
-  if(field.kind==='icon')return field.attr==='icon_src'?'Replacement icon image URL':'Icon style'
-  if(field.kind==='image')return 'Image URL'
-  if(field.attr==='text'&&(field.tag==='a'||field.tag==='button'))return 'Button text'
-  if(field.label.startsWith('Card title:'))return 'Highlight card title — '+field.default.slice(0,42)
-  if(field.tag==='h1')return 'Main headline (H1)'
-  if(field.tag&&/^h[2-6]$/.test(field.tag))return 'Heading ('+field.tag.toUpperCase()+')'
-  if(field.tag==='p')return 'Paragraph '+position
-  if(field.tag==='li')return 'Bullet point '+position
-  if(field.tag==='label')return 'Form label '+position
-  return field.kind==='textarea'?'Long description '+position:'Text '+position
+function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):string{
+  if(f.kind==='link')return 'Button destination'
+  if(f.kind==='icon')return 'Replacement icon image URL'
+  if(f.kind==='image')return kind==='card'?'Card image':'Image'
+  if(isCtaText(f))return 'Button text'
+  if(/^Card title:/i.test(f.label))return 'Card heading'
+  if(kind==='card'&&f.tag==='p')return 'Card description'
+  if(f.tag==='h1')return 'Main headline'
+  if(f.tag&&/^h[2-6]$/.test(f.tag))return 'Section heading ('+f.tag.toUpperCase()+')'
+  if(f.tag==='li')return 'List item '+position
+  if(f.tag==='p'){
+    const val=excerpt(f.default,42)
+    return val?'Text: '+val:'Paragraph'
+  }
+  return f.kind==='textarea'?'Description':f.label.replace(/^(?:Text|Paragraph|H[1-6] heading):\s*/i,'').slice(0,70)||'Text'
 }
-function editorHelp(field:Field):string{
-  if(field.kind==='link')return 'Use #enquiry for a section, /contact/ for a page, or a full https:// address.'
-  if(field.kind==='icon')return field.attr==='icon_src'?'Leave blank to keep the existing icon. To replace it, paste an image URL.':'Enter icon CSS class names only.'
-  if(field.kind==='image')return 'Paste the URL of an uploaded or approved image.'
-  return field.default?'Currently: '+(field.default.length>105?field.default.slice(0,105).trim()+'…':field.default):''
+function hintForField(field:Field):string{
+  if(field.kind==='link'){
+    if(field.default.startsWith('tel:'))return 'Phone link: tel:+91…'
+    if(field.default.startsWith('#'))return 'Section link: #enquiry'
+    return 'Enter a page path (/contact/), section (#enquiry), phone (tel:+91…), or full https:// URL.'
+  }
+  if(field.kind==='image')return 'Use the URL of your uploaded image.'
+  if(field.kind==='icon')return 'Leave blank to keep the original icon. To replace it, enter a PNG, JPEG or WebP image URL.'
+  return ''
 }
 
 export default function App(){
