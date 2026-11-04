@@ -439,9 +439,13 @@ export default function App(){
           return <details className="editor-repeat-item" key={item.id}>
             <summary><span className="editor-repeat-item-num">{String(index+1).padStart(2,'0')}</span><span>{item.title||suffix+' '+(index+1)}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
-              {group.kind==='solutions'&&<label className="editor-repeat-variant">Card style<select aria-label={'Style for '+item.title} value={editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular'} onChange={e=>changeField('__variant__'+group.id+'__'+item.id,e.target.value)}>
-                <option value="regular">Regular</option><option value="highlight">Highlight</option><option value="generic">Generic</option>
-              </select></label>}
+              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+                <span>Solution card layout</span>
+                <div className="editor-solution-tabs" role="tablist" aria-label={'Style for '+item.title}>
+                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>changeField('__variant__'+group.id+'__'+item.id,v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                </div>
+                <small>Choose a layout above, then edit the image, name and link below.</small>
+              </div>}
               {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text'))}
               {subGroups.map(n=>renderRepeaterGroup(n,section,true))}
               {available.length===0&&subGroups.length===0&&<small>This template item is fixed.</small>}
@@ -455,9 +459,13 @@ export default function App(){
           return <details className="editor-repeat-item added" key={'extra-'+index} open={undefined}>
             <summary><span className="editor-repeat-item-num">{String(original+index+1).padStart(2,'0')}</span><span>New {suffix} {index+1}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
-              {group.kind==='solutions'&&<label className="editor-repeat-variant">Card style<select value={item.__variant||'regular'} onChange={e=>updateRepeatEntry(group,index,'__variant',e.target.value)}>
-                <option value="regular">Regular</option><option value="highlight">Highlight</option><option value="generic">Generic</option>
-              </select></label>}
+              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+                <span>Solution card layout</span>
+                <div className="editor-solution-tabs" role="tablist" aria-label={'Style for new '+suffix+' '+(index+1)}>
+                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>updateRepeatEntry(group,index,'__variant',v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                </div>
+                <small>Choose a layout, then edit its image, name and destination below.</small>
+              </div>}
               {fields.map((field,i)=>{
                 const title=fieldDisplayName(field,group.kind==='benefit_bullets'?'text':'card',i+1)
                 const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
