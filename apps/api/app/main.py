@@ -422,8 +422,8 @@ def list_pages(status:str|None=None,include_archived:bool=False,db:Session=Depen
 def page_template_with_repeaters(db:Session,p:Page):
     """Expose repeaters on old page snapshots without modifying stored pages."""
     stored=p.template_snapshot or template_json(get_template(db,p.template_id))
-    if any('repeaters' in sec for sec in stored['sections']):
-        return stored
+    # Recompute on every read: older saved pages contain empty/stale repeater
+    # metadata even though their HTML has legitimate card and FAQ groups.
     source_key=stored.get('object_key') or get_template(db,p.template_id).object_key
     source=ObjectStore().get(source_key).decode('utf-8')
     _,sections=overlay_metadata(source,stored['sections'],stored['fields'])
@@ -434,6 +434,51 @@ def page_template_with_repeaters(db:Session,p:Page):
 def read_page(page_id:int,db:Session=Depends(get_db),_:User=Depends(current_user)):
     p=get_page(db,page_id)
     return {'page':page_json(p),'template':page_template_with_repeaters(db,p)}
+
+
+@app.post('/api/pages/{page_id}/upgrade-repeaters')
+def upgrade_page_repeaters(page_id:int,payload:dict,db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Explicit opt-in upgrade for an existing page's old approved snapshot.
+
+    Write new immutable source HTML: no other pages/templates or publications
+    are changed. Preserve all old field mapping decisions and values, and
+    expose omitted repeated items and FAQ answers as new page variables.
+    """
+    p=get_page(db,page_id)
+    if p.archived:fail(409,'Restore the page before updating repeaters')
+    if payload.get('edit_version')!=p.edit_version:
+        fail(409,'Page has changed. Reload before upgrading repeaters.')
+    original=p.template_snapshot or template_json(get_template(db,p.template_id))
+    source=ObjectStore().get(original['object_key']).decode('utf-8')
+    try:
+        upgraded,sections,fresh=extract(source)
+    except ValueError as e:fail(422,str(e))
+    old={f['key']:f for f in original['fields']}
+    old_sec={x['id']:x for x in original['sections']}
+    for sec in sections:
+        if sec['id'] in old_sec:sec['name']=old_sec[sec['id']]['name']
+    repeated={key for sec in sections for group in sec.get('repeaters',[])
+              for item in group['items'] for key in item['field_keys']}
+    for field in fresh:
+        previous=old.get(field['key'])
+        if previous and previous.get('kind')==field.get('kind') and previous.get('attr')==field.get('attr'):
+            for key in ('label','mode','global_key','heading_tag'):
+                if key in previous:field[key]=previous[key]
+            if field.get('kind') in ('link','icon') and 'default' in previous:
+                field['default']=previous['default']
+        elif field['key'] in repeated:
+            field['mode']='page'
+    # Existing locked/static choices remain locked. The upgrade enables only
+    # fields that were not previously detected and are in repeatable groups.
+    key=f'pages/{p.id}/repeater-upgrade-{uuid4().hex}.html'
+    ObjectStore().put(key,upgraded.encode('utf-8'),'text/html')
+    p.template_snapshot={**original,'object_key':key,'sections':sections,'fields':fresh,'approved':True}
+    p.edit_version+=1;p.updated_at=utcnow()
+    audit(db,user,'page_repeaters_upgrade',str(p.id),{'repeaters':sum(len(x.get('repeaters',[])) for x in sections),'new_fields':len(fresh)-len(old)})
+    db.commit();db.refresh(p)
+    return {'page':page_json(p),'template':page_template_with_repeaters(db,p),
+            'new_fields':len([field for field in fresh if field['key'] not in old]),
+            'repeaters':sum(len(x.get('repeaters',[])) for x in sections)}
 
 
 @app.post('/api/pages/{page_id}/archive')
