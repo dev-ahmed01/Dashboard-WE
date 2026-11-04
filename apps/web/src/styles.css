@@ -1642,3 +1642,22 @@
 @media(max-width:680px){
   .preview-link-feedback{top:115px;max-width:92vw}
 }
+
+.editor-easy-image-upload{display:grid;gap:7px}
+.editor-easy-image-upload label{
+  display:grid;gap:8px;
+  font-size:11px;color:#5b4f47;font-weight:650;
+}
+.editor-easy-image-upload input[type=file],
+.editor-simple-icon-choice input[type=file]{
+  width:100%;max-width:100%;box-sizing:border-box;
+  padding:8px 10px;min-height:42px;
+  border:1px dashed #d8c7b6;border-radius:9px;
+  background:#fffdf8;color:#4e4540;font-size:11px;
+}
+.editor-easy-image-upload input[type=file]::file-selector-button,
+.editor-simple-icon-choice input[type=file]::file-selector-button{
+  border:1px solid #e7c6c6;background:#fff0f0;
+  border-radius:7px;margin-right:10px;
+  padding:7px 9px;color:#c81f26;font-weight:700;
+}
