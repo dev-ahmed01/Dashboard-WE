@@ -3,6 +3,7 @@ import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTe
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
+type VisualDesign={groups?:Record<string,{columns?:number;gap?:number}>,items?:Record<string,{span?:number;height?:number;locked?:boolean}>,fields?:Record<string,{fontPx?:number;locked?:boolean}>}
 type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
 type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
@@ -221,13 +222,12 @@ export default function App(){
   const allRepeaters=editor?editor.template.sections.flatMap(sec=>sec.repeaters||[]):[]
   const selectedCanvasGroup=allRepeaters.find(g=>g.id===(canvasSelection?.groupId||canvasGroupId))
   const selectedCanvasItem=selectedCanvasGroup?.items.find(item=>item.id===canvasSelection?.itemId)
-  const selectedCanvasField=editor?.template.fields.find(field=>field.key===canvasSelection?.fieldKey)
+  const extraSelection=selectedCanvasGroup&&canvasSelection?.fieldKey?.startsWith(selectedCanvasGroup.id+'_added_')?
+    canvasSelection.fieldKey.slice((selectedCanvasGroup.id+'_added_').length).match(/^(\d+)_(.+)$/):null
+  const extraIndex=extraSelection?Number(extraSelection[1])-1:-1
+  const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
-  const visualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as {
-    groups?:Record<string,{columns?:number;gap?:number}>,
-    items?:Record<string,{span?:number;height?:number;locked?:boolean}>,
-    fields?:Record<string,{fontPx?:number;locked?:boolean}>
-  }}catch{return {}}})()
+  const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
   const editableSections=editor?editor.template.sections.filter(section=>
     sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
