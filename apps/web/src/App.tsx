@@ -1727,7 +1727,7 @@ export default function App(){
                   <Layers size={13}/><span>{item.title||group.name}</span>
                   {visualDesign.items?.[item.id]?.locked&&<LockKeyhole size={12}/>}
                   {visualDesign.items?.[item.id]?.hidden&&<EyeOff size={12}/>}
-                </button>)) )}
+                </button>))}
               {editor?.template.fields.filter(f=>f.mode==='page'&&(f.tag==='h1'||f.tag==='h2'||f.tag==='h3')).map(f=>
                 <button type="button" key={f.key} className={canvasSelection?.fieldKey===f.key?'layer-selected':''}
                   onClick={()=>setCanvasSelection({fieldKey:f.key,linkKey:'',itemId:'',groupId:''})}>
