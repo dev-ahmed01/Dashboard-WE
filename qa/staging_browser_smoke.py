@@ -246,16 +246,12 @@ def run():
         inspector=page.locator(".visual-inspector")
         expect(inspector.get_by_label("Selected element content")).to_be_visible()
         inspector.get_by_label("Selected element content").fill("Visual editor headline")
-        inspector.get_by_label("Selected font size").evaluate("""(el) => {
-          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(el,'44');el.dispatchEvent(new Event('input',{bubbles:true}));
-          el.dispatchEvent(new Event('change',{bubbles:true}));
-        }""")
+        inspector.get_by_label("Font size", exact=True).fill("44")
         expect(frame.get_by_text("Visual editor headline")).to_be_visible(timeout=15000)
         expect(frame.locator('h1')).to_have_attribute("style", __import__('re').compile(r'font-size:44px'))
-        inspector.get_by_label("Lock selected text").check()
+        inspector.get_by_label("Lock selected element").check()
         expect(inspector.get_by_text("This element is locked", exact=False)).to_be_visible()
-        inspector.get_by_label("Lock selected text").uncheck()
+        inspector.get_by_label("Lock selected element").uncheck()
         # Never expose the Cards per row selector: page editors resize actual
         # cards in the design canvas without needing layout jargon.
         assert page.get_by_text("Cards per row").count()==0
@@ -266,11 +262,7 @@ def run():
         frame.locator('.cards > article').first.click(position={'x':15,'y':15})
         expect(inspector.get_by_label("Selected card width")).to_be_visible()
         inspector.get_by_label("Selected card width").select_option("2")
-        inspector.get_by_label("Selected card height").evaluate("""(el) => {
-          const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(el,'400');el.dispatchEvent(new Event('input',{bubbles:true}));
-          el.dispatchEvent(new Event('change',{bubbles:true}));
-        }""")
+        inspector.get_by_label("Height",exact=True).fill("400")
         expect(frame.locator('.cards > article').first).to_have_attribute("style", __import__('re').compile(r'grid-column:span 2.*height:400px'))
         # V23: Canva-style tools work on the SAME draft and render live.
         page.get_by_role("button", name="Add text", exact=True).click()
