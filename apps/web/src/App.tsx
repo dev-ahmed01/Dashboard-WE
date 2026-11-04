@@ -1,9 +1,26 @@
 import {useEffect, useRef, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3} from 'lucide-react'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
-type VisualDesign={groups?:Record<string,{columns?:number;gap?:number}>,items?:Record<string,{span?:number;height?:number;locked?:boolean}>,fields?:Record<string,{fontPx?:number;locked?:boolean}>}
+type DesignStyle={
+  span?:number;height?:number;locked?:boolean;order?:number;widthPx?:number;heightPx?:number;
+  x?:number;y?:number;rotate?:number;opacity?:number;zIndex?:number;
+  radius?:number;padding?:number;fontPx?:number;fontWeight?:number;letterSpacing?:number;
+  lineHeight?:number;color?:string;background?:string;fontFamily?:string;textAlign?:string;hidden?:boolean
+}
+type CanvasElement={
+  id:string;type:'text'|'image'|'shape'|'button';sectionId:string;
+  text?:string;url?:string;x:number;y:number;width:number;height:number;
+  fontSize:number;fontFamily:string;fontWeight:number;color:string;background:string;
+  opacity:number;rotate:number;radius:number;textAlign:string;zIndex:number;
+  locked?:boolean;hidden?:boolean
+}
+type VisualDesign={
+  groups?:Record<string,{columns?:number;gap?:number}>,
+  items?:Record<string,DesignStyle>,fields?:Record<string,DesignStyle>,
+  page?:{background?:string},elements?:CanvasElement[]
+}
 type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
 type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
@@ -224,9 +241,18 @@ export default function App(){
   const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
   const [canvasMode,setCanvasMode]=useState(false)
-  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string}|null>(null)
+  const [canvasSelection,setCanvasSelection]=useState<{fieldKey:string;linkKey:string;groupId:string;itemId:string;elementId?:string}|null>(null)
   const [canvasGroupId,setCanvasGroupId]=useState('')
   const [canvasFontBaseline,setCanvasFontBaseline]=useState(20)
+  const [canvasZoom,setCanvasZoom]=useState(100)
+  const [canvasDevice,setCanvasDevice]=useState<'desktop'|'tablet'|'mobile'>('desktop')
+  const [canvasGrid,setCanvasGrid]=useState(false)
+  const [canvasLayersOpen,setCanvasLayersOpen]=useState(false)
+  const [canvasUndoCounter,setCanvasUndoCounter]=useState(0)
+  const canvasUndoRef=useRef<Record<string,string>[]>([])
+  const canvasRedoRef=useRef<Record<string,string>[]>([])
+  const canvasLastHistoryRef=useRef<{key:string;time:number}>({key:'',time:0})
+
   const [previewSection,setPreviewSection]=useState('')
   const previewFrameRef=useRef<HTMLIFrameElement|null>(null)
   const previewScrollRef=useRef(0)
@@ -260,6 +286,7 @@ export default function App(){
   const extraIndex=extraSelection?Number(extraSelection[1])-1:-1
   const selectedCanvasField=editor?.template.fields.find(field=>field.key===(extraSelection?extraSelection[2]:canvasSelection?.fieldKey))
   const selectedCanvasLink=editor?.template.fields.find(field=>field.key===canvasSelection?.linkKey)
+  const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
   const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
   const editableSections=editor?editor.template.sections.filter(section=>
@@ -669,14 +696,7 @@ export default function App(){
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
         <div className="editor-repeat-heading-controls">
-          {['highlights','solutions','other_solutions','cards'].includes(group.kind)&&<label className="editor-repeat-columns">
-            Cards per row
-            <select aria-label={'Columns for '+group.name} value={visualDesign.groups?.[group.id]?.columns||
-              (group.kind==='highlights'?4:group.kind==='other_solutions'?5:4)}
-              onChange={e=>designPatch('groups',group.id,{columns:Number(e.target.value)})}>
-              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>}
+
 
         </div>
       </div>
@@ -1209,13 +1229,7 @@ export default function App(){
         </div>
         {selectedCanvasGroup&&<div className="visual-inspector-group">
           <h3>{selectedCanvasGroup.name}</h3>
-          <label>Cards per desktop row
-            <select aria-label="Cards per row" value={visualDesign.groups?.[selectedCanvasGroup.id]?.columns||
-                (selectedCanvasGroup.kind==='highlights'?4:selectedCanvasGroup.kind==='solutions'?4:selectedCanvasGroup.kind==='other_solutions'?5:1)}
-              onChange={e=>designPatch('groups',selectedCanvasGroup.id,{columns:Number(e.target.value)})}>
-              {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n} per row</option>)}
-            </select>
-          </label>
+
           <label>Space between cards: {visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}px
             <input type="range" min="0" max="48" step="2" aria-label="Card spacing"
               value={visualDesign.groups?.[selectedCanvasGroup.id]?.gap??16}
