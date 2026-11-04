@@ -565,12 +565,20 @@ export default function App(){
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
       {field.kind==='image'&&field.default.startsWith('data:')&&<div className="editor-current-image"><img src={value.startsWith('data:')?value:field.default} alt="Current template image"/><small>Original image</small></div>}
-      {field.kind==='textarea'
-        ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
-        :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
-          onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
-          placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
-      {field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+      {field.kind==='icon'&&field.attr==='icon_src'
+        ?iconChoiceControl(field.key,value,v=>changeField(field.key,v))
+        :field.kind==='textarea'
+          ?<textarea aria-label={title} rows={3} disabled={isFieldLocked(field.key)} value={value} onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>changeField(field.key,e.target.value)}/>
+          :<input aria-label={title} value={field.kind==='image'&&value.startsWith('data:')?'':value} disabled={isFieldLocked(field.key)}
+            onFocus={()=>setFocusedPreviewField(field.key)} onChange={e=>field.kind==='image'&&!e.target.value?unsetField(field.key):changeField(field.key,e.target.value)} type="text"
+            placeholder={field.kind==='image'?'Paste replacement image URL (optional)':field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':undefined}/>}
+      {field.kind==='link'&&<div className="editor-link-check">
+        {isTestableHref(value)?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>:
+         value.startsWith('#')?<small>Goes to the {value} section on this page. Click the button in the full-page preview to check it.</small>:
+         value.startsWith('/')&&!value.startsWith('//')?<small>This is a website page path. Test it after the page is published.</small>:
+         <small>Enter a full website URL, a section anchor (#enquiry), a phone number starting with tel:, or an email starting with mailto:.</small>}
+      </div>}
+      {field.kind!=='icon'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
       {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
     </label>
   }
@@ -670,13 +678,17 @@ export default function App(){
               {fields.map((field,i)=>{
                 const title=repeaterFieldName(group,field,i+1)
                 const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
-                return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
-                  {(field.kind==='textarea'||value.length>110)
-                    ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
-                    :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
-                  {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
+                return <div className="editor-ordered-field" key={field.key}><label className="editor-ordered-label">{title}</label>
+                  {field.kind==='icon'&&field.attr==='icon_src'?iconChoiceControl(group.id+'-'+index+'-'+field.key,value,v=>updateRepeatEntry(group,index,field.key,v)):
+                    (field.kind==='textarea'||value.length>110)
+                      ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
+                      :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
+                  {field.kind==='link'&&<div className="editor-link-check">{isTestableHref(value)
+                    ?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
+                    :<small>Use a URL, #anchor, tel: or mailto: destination.</small>}</div>}
+                  {(field.kind==='image'||field.kind==='icon'&&field.attr!=='icon_src')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
                   {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
-                </label>
+                </div>
               })}
               <div className="editor-repeat-actions">
                 <button type="button" className="outline compact" disabled={index===0}
