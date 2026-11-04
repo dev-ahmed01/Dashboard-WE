@@ -67,6 +67,7 @@ def run():
         <section class="hero" data-we-section="hero" data-we-name="Hero">
         <h1 data-we-field="hero_heading" data-we-label="Main headline">Original office headline</h1>
         <p>Locked original supporting content</p>
+         <div class="cards"><article><div class="card-title">Offices in prime locations</div><p>Move-in ready locations</p></article><article><div class="card-title">Multiple pricing plans</div><p>Flexible pricing</p></article></div>
          <a href="#enquiry">Request a callback</a></section>
         <section data-we-section="benefits" data-we-name="Benefits">
         <h2>Flexible benefits</h2><p>Static benefit description</p></section>
@@ -128,16 +129,12 @@ def run():
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
         page.get_by_role("button", name="Save template configuration").click()
         expect(page.get_by_text("Template mapping saved", exact=False)).to_be_visible()
-        # Destructive actions require an actual dialog and an exact typed phrase.
+        # Deletion is a straightforward yes/no confirmation, no typing.
         page.get_by_role("button", name="Delete template Staging Template").click()
         delete_dialog=page.get_by_role("dialog", name="Delete this template?")
         expect(delete_dialog).to_be_visible()
-        delete_button=delete_dialog.get_by_role("button", name="Delete permanently")
-        expect(delete_button).to_be_disabled()
-        delete_dialog.get_by_placeholder("Type the confirmation phrase").fill("DELETE wrong template")
-        expect(delete_button).to_be_disabled()
-        delete_dialog.get_by_placeholder("Type the confirmation phrase").fill("DELETE Staging Template")
-        expect(delete_button).to_be_enabled()
+        expect(delete_dialog.get_by_placeholder("Type the confirmation phrase")).to_have_count(0)
+        expect(delete_dialog.get_by_role("button", name="Remove template")).to_be_enabled()
         delete_dialog.get_by_role("button", name="Cancel").click()
         expect(delete_dialog).to_have_count(0)
         expect(page.locator(".category-uploaded-row")).to_have_count(1)
@@ -161,6 +158,19 @@ def run():
         expect(page.locator("#seo-settings")).to_be_visible()
         expect(page.locator(".editor-field-group").first.get_by_text("Headings & text")).to_be_visible()
         expect(page.locator(".editor-actions-group summary")).to_be_visible()
+        expect(page.get_by_text("Highlight card title — Offices in prime locations")).to_be_visible()
+        expect(page.get_by_text("Highlight card title — Multiple pricing plans")).to_be_visible()
+        expect(page.locator(".editor-side-preview")).to_be_visible()
+        side_bounds=page.locator(".editor-side-preview").bounding_box()
+        fields_bounds=page.locator(".editor-section-rows").bounding_box()
+        assert side_bounds["x"]>=fields_bounds["x"]+fields_bounds["width"]-2, "Side preview must appear to the right"
+        side_frame=page.frame_locator('iframe[title="Selected section preview"]')
+        expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
+        # Selecting another card switches preview to that section and closes Hero.
+        page.locator(".editor-section-toggle").nth(1).click()
+        expect(side_frame.get_by_text("Flexible benefits")).to_be_visible(timeout=15000)
+        page.locator(".editor-section-toggle").first.click()
+        expect(side_frame.get_by_text("Offices in prime locations")).to_be_visible(timeout=15000)
         page.locator(".editor-actions-group summary").click()
         expect(page.locator(".editor-action-card")).to_have_count(1)
         expect(page.locator(".editor-action-card-head strong")).to_have_text("Request a callback")
@@ -200,6 +210,18 @@ def run():
         page.screenshot(path=str(OUT/"05_published.png"))
         page.get_by_role("switch", name="Allow indexing").uncheck()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()
+        assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
+
+        # Remove a referenced template without losing its published page or edit form.
+        page.locator(".page-top .backlink").click()
+        page.locator(".tabs").get_by_role("tab", name="Upload Template").click()
+        page.get_by_role("button", name="Delete template Staging Template").click()
+        page.get_by_role("dialog", name="Delete this template?").get_by_role("button", name="Remove template").click()
+        expect(page.get_by_text("removed from your library", exact=False)).to_be_visible()
+        expect(page.locator(".category-uploaded-row")).to_have_count(0)
+        page.locator(".tabs").get_by_role("tab", name="All Pages").click()
+        expect(page.locator(".category-table-row")).to_have_count(1)
+        expect(page.locator(".category-table-row").get_by_text("Staging Template")).to_be_visible()
         assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
 
         # Editor: existing role restrictions unchanged (no uploading or publishing).
