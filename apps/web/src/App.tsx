@@ -681,7 +681,7 @@ export default function App(){
       canvasGrid?'body{background-image:linear-gradient(#cccccc32 1px,transparent 1px),linear-gradient(90deg,#cccccc32 1px,transparent 1px)!important;background-size:24px 24px!important;}':''
     ].join('\n')
     ;(doc.head||doc.body).appendChild(style)
-    let handle:HTMLElement|null=null
+    let handle:HTMLButtonElement|null=null
     let currentNode:HTMLElement|null=null
     function drawHandle(node:HTMLElement|null){
       handle?.remove()
@@ -694,8 +694,8 @@ export default function App(){
       handle.type='button'
       handle.setAttribute('data-we-resize-handle','true')
       handle.setAttribute('aria-label','Drag to resize selected element')
-      handle.style.left=(rect.right+win.scrollX-9)+'px'
-      handle.style.top=(rect.bottom+win.scrollY-9)+'px'
+      handle.style.left=(rect.right+(win?.scrollX||0)-9)+'px'
+      handle.style.top=(rect.bottom+(win?.scrollY||0)-9)+'px'
       doc.body.appendChild(handle)
     }
     function selectedTarget(){
@@ -1692,7 +1692,7 @@ export default function App(){
       {canvasMode&&<aside className="visual-inspector" aria-label="Visual editing inspector">
         <h2>Design controls</h2>
         <p>Click any editable element. Drag to move, drag the red corner to resize, or use the controls below. Changes stay in your draft.</p>
-        <div className="designer-info-bar">
+        <div className="designer-info-bar" title={'Draft design revision '+canvasUndoCounter}>
           <span>Editor ready</span><small>Ctrl+Z undo · Ctrl+D duplicate · Delete remove</small>
         </div>
         <div className="visual-inspector-group">
