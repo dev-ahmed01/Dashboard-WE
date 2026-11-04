@@ -18,7 +18,7 @@ SECTION_NAMES = {
     'process': 'Process', 'cta': 'Call to Action', 'banner': 'Banner',
 }
 HEADINGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
-TEXT_TAGS = HEADINGS | {'p', 'li', 'button', 'a', 'label', 'span'}
+TEXT_TAGS = HEADINGS | {'p', 'li', 'button', 'a', 'label', 'span', 'summary'}
 SKIP_CONTAINERS = {'script', 'style', 'noscript', 'nav', 'head'}
 SAFE_URL = re.compile(r'^(?:https?://|/(?!/)|#|data:image/(?:png|jpeg|webp|gif);base64,)', re.I)
 SAFE_LINK = re.compile(r'^(?:https?://|/(?!/)|#|mailto:|tel:)', re.I)
@@ -278,68 +278,110 @@ def extract(source: str):
                         'p':'Paragraph','li':'List item','span':'Text','label':'Label'
                     }.get(tag.name, 'Text')
                     add_field(tag, 'textarea' if len(value) > 110 else 'text', 'text', value, prefix)
-    return str(soup), sections, fields
+    from .repeaters import overlay_metadata
+    annotated_html, enriched_sections = overlay_metadata(str(soup), sections, fields)
+    return annotated_html, enriched_sections, fields
+
+
+ARROW_SUFFIX = re.compile(r'\s*([↗↖↘↙→➜➔›])\s*$')
+ICON_CLASS_HINT = re.compile(r'(?:icon|arrow|arr|chevron|toggle|symbol|glyph)', re.I)
+
+
+def _decorative_node(node: NavigableString, root: Tag) -> bool:
+    """Protect CSS arrow/icon glyphs and aria-hidden spans during CTA edits."""
+    parent=node.parent
+    while parent is not None and parent is not root:
+        if parent.name in ('svg', 'style', 'script') or str(parent.get('aria-hidden', '')).lower() == 'true':
+            return True
+        if ICON_CLASS_HINT.search(' '.join(parent.get('class', []))):
+            return True
+        parent=parent.parent
+    return bool(re.fullmatch(r'\s*[↗↖↘↙→➜➔›+]\s*',str(node)))
+
+
+def change_rendered_field(soup, target: Tag, field: dict, value: str):
+    """Apply one value while preserving icons, arrows and legal URL schemes."""
+    attr=field['attr']
+    if attr=='text':
+        requested_heading=field.get('heading_tag')
+        if requested_heading in HEADINGS and target.name in HEADINGS:
+            target.name=requested_heading
+        if value==str(field.get('default','')):
+            return
+        if target.name in ('a','button','summary'):
+            # Legacy snapshots may include an arrow as plain trailing text.
+            # Move it into its own noneditable icon only when none exists yet.
+            icon_match=ARROW_SUFFIX.search(str(field.get('default','')))
+            descendants=[x for x in target.descendants if isinstance(x,NavigableString) and x.strip()]
+            protected=[x for x in descendants if _decorative_node(x,target)]
+            raw_main=[x for x in descendants if x not in protected]
+            if icon_match and not protected:
+                last=raw_main[-1] if raw_main else None
+                if last is not None and ARROW_SUFFIX.search(str(last)):
+                    current=str(last)
+                    last.replace_with(ARROW_SUFFIX.sub('',current))
+                    preserved=soup.new_tag('span')
+                    preserved['aria-hidden']='true'
+                    preserved['class']='we-preserved-cta-icon'
+                    preserved.string=icon_match.group(1)
+                    target.append(preserved)
+            texts=[x for x in target.descendants if isinstance(x,NavigableString)
+                   and x.strip() and not _decorative_node(x,target)]
+            # If the user typed an arrow into the button label, keep just
+            # the real text so it never duplicates the protected arrow.
+            if any(_decorative_node(x,target) for x in target.descendants if isinstance(x,NavigableString)):
+                value=ARROW_SUFFIX.sub('',value).strip()
+        else:
+            texts=[x for x in target.descendants if isinstance(x,NavigableString)
+                   and x.strip() and x.parent.name not in ('svg','style','script')]
+        if texts:
+            texts[0].replace_with(value)
+            for extra in texts[1:]:extra.replace_with('')
+        else:
+            target.insert(0,value)
+    elif attr in ('href','data-we-link'):
+        if value and not is_safe_link(value):return
+        if attr=='data-we-link':
+            if value:
+                if target.name=='button':
+                    target.name='a'
+                    target.attrs.pop('type',None)
+                    target.attrs.pop('disabled',None)
+                target['href']=value
+                target['rel']='noopener noreferrer'
+            elif target.name=='a':
+                target.attrs.pop('href',None)
+        elif value:
+            target['href']=value
+        else:
+            target.attrs.pop('href',None)
+    elif attr=='icon_src':
+        if value and SAFE_URL.match(value):
+            replacement=soup.new_tag('img',src=value)
+            replacement['alt']=target.get('aria-label') or ''
+            for retained in ('class','style','width','height'):
+                if target.get(retained):replacement[retained]=target[retained]
+            target.replace_with(replacement)
+    elif attr=='class':
+        if SAFE_CLASS.fullmatch(value):target['class']=value.split()
+    elif attr=='src':
+        if SAFE_URL.match(value):target['src']=value
 
 
 def render(source: str, fields: list, values: dict, global_values: dict, section_id: str | None = None):
-    soup = sanitize(source)
+    soup=sanitize(source)
     for field in fields:
-        marker = field.get('marker') or 'data-we-field'
-        target = soup.find(attrs={marker: field['key']})
-        if not target:
-            continue
-        mode = field.get('mode', 'static')
-        value = (values.get(field['key'], field['default']) if mode == 'page' else
-                 global_values.get(field.get('global_key'), field['default']) if mode == 'global' else field['default'])
-        value = str(value or '')
-        attr = field['attr']
-        if attr == 'text':
-            requested_heading = field.get('heading_tag')
-            if requested_heading in HEADINGS and target.name in HEADINGS:
-                target.name = requested_heading
-            # Preserve original nested spans, coloured words and inline SVGs if unchanged.
-            if value != str(field.get('default', '')):
-                texts = [x for x in target.descendants if isinstance(x, NavigableString)
-                         and x.strip() and x.parent.name not in ('svg', 'style', 'script')]
-                if texts:
-                    texts[0].replace_with(value)
-                    for extra in texts[1:]:
-                        extra.replace_with('')
-                else:
-                    target.append(value)
-        elif attr in ('href', 'data-we-link'):
-            if value and not is_safe_link(value):
-                continue
-            if attr == 'data-we-link':
-                if value:
-                    if target.name == 'button':
-                        target.name = 'a'
-                        target.attrs.pop('type', None)
-                        target.attrs.pop('disabled', None)
-                    target['href'] = value
-                    target['rel'] = 'noopener noreferrer'
-                elif target.name == 'a':
-                    target.attrs.pop('href', None)
-            elif value:
-                target['href'] = value
-            else:
-                target.attrs.pop('href', None)
-        elif attr == 'icon_src':
-            if value and SAFE_URL.match(value):
-                replacement = soup.new_tag('img', src=value)
-                replacement['alt'] = target.get('aria-label') or 'Icon'
-                for retained in ('class', 'style', 'width', 'height'):
-                    if target.get(retained):
-                        replacement[retained] = target[retained]
-                target.replace_with(replacement)
-        elif attr == 'class':
-            if SAFE_CLASS.fullmatch(value):
-                target['class'] = value.split()
-        elif attr == 'src':
-            if SAFE_URL.match(value):
-                target[attr] = value
+        marker=field.get('marker') or 'data-we-field'
+        target=soup.find(attrs={marker:field['key']})
+        if not target:continue
+        mode=field.get('mode','static')
+        value=(values.get(field['key'],field['default']) if mode=='page' else
+               global_values.get(field.get('global_key'),field['default']) if mode=='global' else field['default'])
+        change_rendered_field(soup,target,field,str(value or ''))
+    from .repeaters import apply_extras
+    apply_extras(soup,fields,values,change_rendered_field)
     if section_id:
-        for section in list(soup.find_all(attrs={'data-we-section': True})):
-            if section.get('data-we-section') != section_id:
+        for section in list(soup.find_all(attrs={'data-we-section':True})):
+            if section.get('data-we-section')!=section_id:
                 section.decompose()
     return str(soup)

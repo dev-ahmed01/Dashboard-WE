@@ -3,7 +3,9 @@ import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTe
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
-type Section={id:string;name:string;order:number}
+type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
+type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
+type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;canonical_override:string;og_title?:string;og_description?:string}
 type Page={id:number;template_id:number;template_name?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
@@ -35,6 +37,24 @@ const excerpt=(v:string,n=60)=>v.replace(/\s+/g,' ').trim().slice(0,n)+(v.replac
 /** Order the editor as the real HTML is ordered: headline, calls-to-action,
  * then repeated highlight cards, descriptions and images. Static content is
  * used only to identify a block. It never produces an editable input. */
+function variableRepeaterGroups(section:Section,fields:Field[]):Repeater[]{
+  const variable=new Set(fields.filter(f=>f.mode==='page').map(f=>f.key))
+  return (section.repeaters||[]).filter(group=>
+    group.items.some(item=>item.field_keys.some(key=>variable.has(key))))
+}
+function sourceOrderedEditor(section:Section,all:Field[]){
+  const repeaters=variableRepeaterGroups(section,all)
+  const repeated=new Set(repeaters.flatMap(group=>group.items.flatMap(item=>item.field_keys)))
+  const blocks=pageEditorBlocks(all.filter(f=>!repeated.has(f.key)))
+  const sourceIndex=new Map(all.map((f,i)=>[f.key,i]))
+  const items=[
+    ...blocks.map(block=>({id:block.id,kind:'block' as const,block,group:null as Repeater|null,
+      order:sourceIndex.get(block.fields[0].key)??9999})),
+    ...repeaters.filter(g=>!g.parent_item_id).map(group=>({id:group.id,kind:'group' as const,
+      block:null as EditorBlock|null,group,order:Math.min(...group.items.flatMap(it=>it.field_keys.map(f=>sourceIndex.get(f)??9999)))}))
+  ].sort((a,b)=>a.order-b.order)
+  return {items,repeaters}
+}
 function pageEditorBlocks(source:Field[]):EditorBlock[]{
   const blocks:EditorBlock[]=[]
   let card:EditorBlock|null=null
@@ -145,6 +165,15 @@ export default function App(){
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
   const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
+  useEffect(()=>{
+    if(!activeEditorSection)return
+    const id=activeEditorSection
+    const frame=window.requestAnimationFrame(()=>{
+      document.getElementById('edit-section-'+id)?.scrollIntoView({behavior:'smooth',block:'start'})
+    })
+    return()=>window.cancelAnimationFrame(frame)
+  },[activeEditorSection])
+
   const [focusedPreviewField,setFocusedPreviewField]=useState('')
   const [sectionPreviewHtml,setSectionPreviewHtml]=useState('')
   const [sectionPreviewLoading,setSectionPreviewLoading]=useState(false)
@@ -183,7 +212,7 @@ export default function App(){
   const dirty=!!editor&&!!savedPage&&draftState(editor.page)!==draftState(savedPage)
   const previewPayload=editor?json({edit_version:editor.page.edit_version,title:editor.page.title,slug:editor.page.slug,values:editor.page.values,seo:editor.page.seo}):''
   const editableSections=editor?editor.template.sections.filter(section=>
-    pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id)).length>0):[]
+    sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
@@ -342,7 +371,8 @@ export default function App(){
   const changeField=(key:string,val:string)=>setEditor(cur=>cur?{...cur,page:{...cur.page,values:{...cur.page.values,[key]:val}}}:cur)
   function editorFieldControl(field:Field,position:number,kind:EditorBlock['kind']){
     const title=fieldDisplayName(field,kind,position)
-    const value=editor?.page.values[field.key]??field.default
+    const rawValue=editor?.page.values[field.key]??field.default
+    const value=(isCtaText(field)||field.tag==='summary')?rawValue.replace(/\s*[↗↖↘↙→➜➔›+]\s*$/,'').trim():rawValue
     return <label key={field.key} className={'editor-ordered-field '+(field.kind==='link'?'editor-destination-field':'')}>
       <span className="editor-ordered-label">{title}</span>
       {field.kind==='textarea'
@@ -351,6 +381,108 @@ export default function App(){
           placeholder={field.kind==='link'?'e.g. #enquiry, /contact/, tel:+91...':field.kind==='icon'&&field.attr!=='class'?'https://.../icon.png':undefined}/>}
       {hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
     </label>
+  }
+  function repeatEntries(group:Repeater):Record<string,string>[]{
+    const raw=editor?.page.values['__repeat__'+group.id]||'[]'
+    try{const items=JSON.parse(raw);return Array.isArray(items)?items:[]}catch{return []}
+  }
+  function putRepeatEntries(group:Repeater,entries:Record<string,string>[]){
+    changeField('__repeat__'+group.id,JSON.stringify(entries))
+  }
+  function addRepeatEntry(group:Repeater){
+    const previous=repeatEntries(group)
+    if(previous.length >= Math.min(group.max_additions||12,12))return
+    // New rows inherit the original card's layout and content from HTML.
+    // Do not serialize original images (often large embedded base64 data),
+    // which could exceed the page API's size cap before any field is edited.
+    const entry:Record<string,string>={}
+    if(group.kind==='solutions')entry.__variant='regular'
+    putRepeatEntries(group,[...previous,entry])
+  }
+  function updateRepeatEntry(group:Repeater,index:number,key:string,value:string){
+    const items=repeatEntries(group).map((item,i)=>{
+      if(i!==index)return item
+      const next={...item}
+      if(!value&&(editor?.template.fields.find(f=>f.key===key)?.kind==='image'||
+                  editor?.template.fields.find(f=>f.key===key)?.kind==='icon')){
+        delete next[key] // empty image/icon means preserve the original asset
+      }else next[key]=value
+      return next
+    })
+    putRepeatEntries(group,items)
+  }
+  function deleteRepeatEntry(group:Repeater,index:number){
+    putRepeatEntries(group,repeatEntries(group).filter((_,i)=>i!==index))
+  }
+  function existingItemFields(item:RepeaterItem,section:Section){
+    const nested=variableRepeaterGroups(section,editor?.template.fields||[])
+      .filter(x=>x.parent_item_id===item.id)
+    const nestedKeys=new Set(nested.flatMap(g=>g.items.flatMap(it=>it.field_keys)))
+    return item.field_keys.map(key=>editor?.template.fields.find(f=>f.key===key))
+      .filter((field):field is Field=>!!field&&field.mode==='page'&&!nestedKeys.has(field.key))
+  }
+  function renderRepeaterGroup(group:Repeater,section:Section,nested=false){
+    const additions=repeatEntries(group)
+    const suffix=group.kind==='benefit_bullets'?'bullet point':group.kind==='faqs'?'FAQ':group.kind==='solutions'?'solution':group.kind==='other_solutions'?'solution link':group.kind==='benefits'?'benefit':'card'
+    const title=group.kind==='highlights'?'Highlights cards':group.kind==='benefits'?'Benefits':group.kind==='faqs'?'Frequently asked questions':group.kind==='benefit_bullets'?'Bullet points':group.name
+    const original=group.items.length
+    return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
+      <div className="editor-repeat-heading">
+        <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
+        <span className="editor-repeat-count">{original+additions.length}</span>
+      </div>
+      <div className="editor-repeat-items">
+        {group.items.map((item,index)=>{
+          const available=existingItemFields(item,section)
+          const subGroups=(section.repeaters||[]).filter(g=>g.parent_item_id===item.id&&variableRepeaterGroups(section,editor?.template.fields||[]).includes(g))
+          return <details className="editor-repeat-item" key={item.id}>
+            <summary><span className="editor-repeat-item-num">{String(index+1).padStart(2,'0')}</span><span>{item.title||suffix+' '+(index+1)}</span><ChevronRight size={15}/></summary>
+            <div className="editor-repeat-fields">
+              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+                <span>Solution card layout</span>
+                <div className="editor-solution-tabs" role="tablist" aria-label={'Style for '+item.title}>
+                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>changeField('__variant__'+group.id+'__'+item.id,v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                </div>
+                <small>Choose a layout above, then edit the image, name and link below.</small>
+              </div>}
+              {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text'))}
+              {subGroups.map(n=>renderRepeaterGroup(n,section,true))}
+              {available.length===0&&subGroups.length===0&&<small>This template item is fixed.</small>}
+            </div>
+          </details>
+        })}
+        {additions.map((item,index)=>{
+          const sample=group.items[group.items.length-1]
+          const fields=sample.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k))
+            .filter((field):field is Field=>!!field&&field.mode==='page')
+          return <details className="editor-repeat-item added" key={'extra-'+index} open={undefined}>
+            <summary><span className="editor-repeat-item-num">{String(original+index+1).padStart(2,'0')}</span><span>New {suffix} {index+1}</span><ChevronRight size={15}/></summary>
+            <div className="editor-repeat-fields">
+              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+                <span>Solution card layout</span>
+                <div className="editor-solution-tabs" role="tablist" aria-label={'Style for new '+suffix+' '+(index+1)}>
+                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>updateRepeatEntry(group,index,'__variant',v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                </div>
+                <small>Choose a layout, then edit its image, name and destination below.</small>
+              </div>}
+              {fields.map((field,i)=>{
+                const title=fieldDisplayName(field,group.kind==='benefit_bullets'?'text':'card',i+1)
+                const value=item[field.key]??(field.kind==='image'||field.kind==='icon'?'':field.default)
+                return <label className="editor-ordered-field" key={field.key}><span className="editor-ordered-label">{title}</span>
+                  {(field.kind==='textarea'||value.length>110)
+                    ?<textarea rows={3} value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>
+                    :<input value={value} onChange={e=>updateRepeatEntry(group,index,field.key,e.target.value)} aria-label={title}/>}
+                  {(field.kind==='image'||field.kind==='icon')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
+                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+                </label>
+              })}
+              <button type="button" className="editor-repeat-remove" onClick={()=>deleteRepeatEntry(group,index)}><Trash2 size={14}/> Remove added {suffix}</button>
+            </div>
+          </details>
+        })}
+      </div>
+      <button type="button" className="editor-repeat-add" disabled={additions.length>=Math.min(group.max_additions||12,12)} onClick={()=>addRepeatEntry(group)}><Plus size={16}/> Add another {suffix}</button>
+    </div>
   }
   function editorBlockControl(block:EditorBlock,index:number){
     const regular=block.fields.filter(f=>f.kind!=='icon')
@@ -481,16 +613,18 @@ export default function App(){
       </div>
       <div className="editor-content-workspace"><div className="editor-section-rows">
          {editableSections.map(section=>{
-           const blocks=pageEditorBlocks(editor.template.fields.filter(f=>f.section_id===section.id))
+           const ordered=sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id))
            const sectionOpen=section.id===activeSectionId
-           return <div className="editor-section-block" key={section.id}>
+           return <div className="editor-section-block" key={section.id} id={'edit-section-'+section.id}>
              <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
                <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
-               <span className="editor-section-name"><strong>{section.name}</strong><small>{blocks.length} editable {blocks.length===1?'element':'elements'} · Page order</small></span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length} content {ordered.items.length===1?'group':'groups'} · Original page order</small></span>
                <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
              </button>
              {sectionOpen&&<div className="editor-page-ordered-list">
-               {blocks.map((block,i)=>editorBlockControl(block,i))}
+               {ordered.items.map((part,i)=>part.kind==='group'&&part.group
+                 ?renderRepeaterGroup(part.group,section)
+                 :part.block?editorBlockControl(part.block,i):null)}
              </div>}
            </div>
          })}

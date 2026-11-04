@@ -1349,3 +1349,122 @@
 }
 .editor-fixed-destination small{font-size:11px;color:#8c817a;font-weight:650}
 .editor-fixed-destination code{font-size:12px;color:#4c413b;overflow-wrap:anywhere;line-height:1.5}
+
+/* V20: section-specific repeaters and stable page scroll. */
+.editor-section-block{scroll-margin-top:26px}
+.editor-repeat-group{
+  overflow:hidden;
+  border:1px solid #e4ddd7;
+  border-radius:13px;
+  background:#fff;
+}
+.editor-repeat-group.nested{
+  border-color:#eadbd2;
+  background:#fffcfa;
+  margin-top:8px;
+}
+.editor-repeat-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:15px 15px 14px;
+  background:#f8f6f4;
+  border-bottom:1px solid #eae5e1;
+}
+.editor-repeat-heading>div{min-width:0;display:grid;gap:5px}
+.editor-repeat-heading strong{font-size:13px;font-weight:750;color:#2d2722}
+.editor-repeat-heading small{font-size:10px;color:#8f837c;line-height:1.4}
+.editor-repeat-count{
+  min-width:31px;height:31px;
+  display:grid;place-items:center;
+  padding:0 6px;
+  border-radius:9px;background:#fff;
+  font-size:12px;font-weight:700;color:#574b43;
+}
+.editor-repeat-items{
+  display:flex;flex-direction:column;gap:9px;
+  padding:11px;
+}
+.editor-repeat-item{
+  background:#fff;
+  border:1px solid #e8e1dd;
+  border-radius:10px;
+  overflow:hidden;
+}
+.editor-repeat-item>summary{
+  display:flex;align-items:center;gap:11px;
+  font-size:12px;font-weight:700;
+  line-height:1.5;color:#2d2623;
+  padding:11px 12px;
+  cursor:pointer;list-style:none;
+}
+.editor-repeat-item>summary::-webkit-details-marker{display:none}
+.editor-repeat-item>summary>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}
+.editor-repeat-item>summary svg{flex:none;color:#a1938a;transition:transform .16s}
+.editor-repeat-item[open]>summary svg{transform:rotate(90deg)}
+.editor-repeat-item[open]>summary{background:#faf8f6;border-bottom:1px solid #eae4df}
+.editor-repeat-item-num{
+  min-width:29px;height:29px;
+  display:grid;place-items:center;
+  background:#f2efed;color:#79706b;
+  border-radius:7px;font-size:10px;
+}
+.editor-repeat-item.added{border-color:#efcfd0}
+.editor-repeat-item.added .editor-repeat-item-num{background:#fff0f0;color:#d82930}
+.editor-repeat-fields{padding:12px;display:grid;gap:11px}
+.editor-repeat-fields .editor-ordered-field{min-width:0}
+.editor-repeat-fields .editor-ordered-field input,
+.editor-repeat-fields .editor-ordered-field textarea{width:100%}
+.editor-repeat-variant{display:grid;gap:7px;font-size:11px;font-weight:700;color:#51453d}
+.editor-repeat-variant select{
+  height:42px;border:1px solid #e0d6ce;border-radius:9px;
+  padding:0 9px;background:#fff;color:#29231e;
+  font-size:12px;font-weight:550;
+}
+.editor-repeat-add{
+  display:flex;justify-content:center;align-items:center;gap:8px;
+  margin:3px 11px 13px;width:calc(100% - 22px);
+  background:#fff7e5;
+  border:1px dashed #ecbd65;
+  border-radius:10px;
+  padding:12px 10px;
+  color:#7c5410;
+  font-size:12px;font-weight:750;
+}
+.editor-repeat-add:hover:not(:disabled){background:#ffefc9;border-color:#df9c29}
+.editor-repeat-add:disabled{opacity:.45;cursor:not-allowed}
+.editor-repeat-remove{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid #efc9c9;color:#c12a30;background:#fff7f7;
+  font-size:11px;font-weight:700;
+  border-radius:9px;padding:10px 12px;
+}
+.editor-repeat-remove:hover{background:#ffeded}
+.editor-repeat-group.nested .editor-repeat-heading{background:#fff9f3;padding:11px}
+.editor-repeat-group.nested .editor-repeat-items{padding:9px}
+@media(min-width:1280px){
+  .editor-repeat-item>summary{padding:12px 13px}
+}
+@media(max-width:680px){
+  .editor-repeat-heading{padding:12px}
+  .editor-repeat-items{padding:9px}
+  .editor-repeat-fields{padding:10px}
+}
+
+.editor-solution-tabs{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:4px;padding:4px;
+  background:#f4f1ee;border:1px solid #ece4dc;border-radius:10px;
+}
+.editor-solution-tabs button{
+  min-width:0;padding:9px 5px;
+  background:transparent;border:1px solid transparent;
+  border-radius:7px;
+  color:#73675f;font-size:11px;font-weight:700;
+}
+.editor-solution-tabs button[aria-selected="true"]{
+  background:#fff;
+  border-color:#eadfda;
+  color:#e11e24;
+  box-shadow:0 1px 5px #17110d10;
+}
+.editor-repeat-variant>span{font-size:11px;font-weight:700}
+.editor-repeat-variant small{font-size:10px;color:#85766a;font-weight:400;line-height:1.5}
