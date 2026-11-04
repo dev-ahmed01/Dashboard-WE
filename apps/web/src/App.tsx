@@ -1087,6 +1087,15 @@ export default function App(){
     return <div className="designer-property-stack">
       <div className="designer-property-section">
         <h3><Move size={15}/> Position & size</h3>
+        {category==='items'&&<label>Card grid width
+          <select aria-label="Selected card width" value={options.span??1}
+            onChange={e=>patch({span:Number(e.target.value)})}>
+            <option value={1}>Regular (1 column)</option>
+            <option value={2}>Wide (2 columns)</option>
+            <option value={3}>Extra wide (3 columns)</option>
+            <option value={4}>Full width (4 columns)</option>
+          </select>
+        </label>}
         <div className="designer-property-grid">
           {numberInput('Move horizontally','x',-600,600,0)}
           {numberInput('Move vertically','y',-600,600,0)}
@@ -1113,6 +1122,7 @@ export default function App(){
           </select>
         </label>
         <div className="designer-property-grid">
+          {numberInput('Font size','fontPx',8,120,canvasFontBaseline)}
           {numberInput('Font weight','fontWeight',400,800,600,'')}
           {numberInput('Letter spacing','letterSpacing',-5,20,0)}
           {numberInput('Line height','lineHeight',80,250,130,'%')}
@@ -1781,24 +1791,6 @@ export default function App(){
                   if(index>=0)updateRepeatEntry(selectedCanvasGroup,index,'__variant',variant)}
               }}>{variant[0].toUpperCase()+variant.slice(1)}</button>)}
           </div>}
-          <label>Card width
-            <select aria-label="Selected card width" value={visualDesign.items?.[canvasSelection.itemId]?.span??(selectedCanvasItem?.variant==='highlight'?2:1)}
-              onChange={e=>designPatch('items',canvasSelection.itemId,{span:Number(e.target.value)})}>
-              <option value={1}>Regular · 1 column</option>
-              <option value={2}>Wide · 2 columns</option>
-              <option value={3}>Extra wide · 3 columns</option>
-              <option value={4}>Full width · 4 columns</option>
-            </select>
-          </label>
-          <label>Card height: {visualDesign.items?.[canvasSelection.itemId]?.height??300}px
-            <input type="range" aria-label="Selected card height" min="150" max="600" step="10"
-              value={visualDesign.items?.[canvasSelection.itemId]?.height??300}
-              onChange={e=>designPatch('items',canvasSelection.itemId,{height:Number(e.target.value)})}/>
-          </label>
-          <label className="visual-lock-row"><input type="checkbox" aria-label="Lock selected card"
-            checked={!!visualDesign.items?.[canvasSelection.itemId]?.locked}
-            onChange={e=>designPatch('items',canvasSelection.itemId,{locked:e.target.checked})}/>
-            <LockKeyhole size={14}/> Lock this card</label>
           <button type="button" className="designer-neutral-action" onClick={duplicateSelectedCard}><Copy size={14}/> Duplicate card</button>
           {canvasSelection?.itemId&&canvasStyleControls('items',canvasSelection.itemId)}
         </div>}
@@ -1847,15 +1839,6 @@ export default function App(){
                   }}/>}
             </label>
             :<p>{isFieldLocked(selectedCanvasField.key)?'This element is locked. Unlock it to edit.':'This text is Static in the approved template.'}</p>}
-          {selectedCanvasField.mode==='page'&&<label>Font size: {visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}px
-            <input aria-label="Selected font size" type="range" min="10" max="100" step="1"
-              value={visualDesign.fields?.[selectedCanvasField.key]?.fontPx??canvasFontBaseline}
-              onChange={e=>designPatch('fields',selectedCanvasField.key,{fontPx:Number(e.target.value)})}/>
-          </label>}
-          {selectedCanvasField.mode==='page'&&<label className="visual-lock-row">
-            <input type="checkbox" aria-label="Lock selected text" checked={isFieldLocked(selectedCanvasField.key)}
-              onChange={e=>designPatch('fields',selectedCanvasField.key,{locked:e.target.checked})}/>
-            <LockKeyhole size={14}/> Lock this element</label>}
           {selectedCanvasLink?.mode==='page'&&<label>Button destination
             <input aria-label="Selected CTA destination" value={editor?.page.values[selectedCanvasLink.key]??selectedCanvasLink.default}
               onChange={e=>changeField(selectedCanvasLink.key,e.target.value)}/>
