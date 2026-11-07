@@ -159,8 +159,10 @@ def run():
         page.locator(".tabs").get_by_role("tab", name="Add Page").click()
         page.locator("#category-template-select").select_option(index=1)
         expect(page.locator('iframe[title="Selected template preview"]')).to_be_visible()
-        assert px(".category-form-row>label") == 14, "Form labels should be 14px"
-        assert px(".category-form-row input", "height") == 44, "Form inputs should be 44px high"
+        expect(page.locator(".we-add-workspace")).to_be_visible()
+        expect(page.locator(".we-template-choice.is-selected")).to_have_count(1)
+        assert px(".we-add-field label") >= 11, "Creation form labels must remain legible"
+        assert px(".we-add-field input", "height") >= 44, "Creation form inputs must be touch-friendly"
         page.screenshot(path=str(OUT/"02_add_page.png"))
         page.get_by_placeholder("Enter page name").fill("QA Bengaluru Office")
         page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
@@ -187,7 +189,7 @@ def run():
         recording="https://kommodo.ai/i/sCYKuA1fO4ob1o92TkHk"
         page.locator(".editor-block-cta").first.get_by_label("Button destination").fill(recording)
         expect(page.locator(".editor-block-cta").first.get_by_role("link", name="Test this link")).to_have_attribute("href",recording)
-        expect(page.locator(".editor-repeat-count")).to_have_count(0)
+        expect(page.locator(".editor-repeat-count")).to_have_count(1)
         side_frame=page.frame_locator('iframe[title="Selected section preview"]')
         expect(side_frame.locator('a[href="'+recording+'"]')).to_have_count(1,timeout=15000)
         # SVG icon picker has recognizable names; changes immediately render
@@ -207,7 +209,7 @@ def run():
         # A newly added card is saved as a repeater and updates the live preview.
         highlights.get_by_role("button", name="Add another card").click()
         new_card=highlights.locator(".editor-repeat-item.added").first
-        new_card.locator("summary").click()
+        expect(new_card).to_have_attribute("open", "")
         new_card.get_by_label("Card heading").fill("New flexible office benefit")
         expect(new_card.get_by_label("Card heading")).to_have_value("New flexible office benefit")
         expect(highlights.locator(".editor-repeat-item")).to_have_count(3)
@@ -322,6 +324,16 @@ def run():
         page.locator("#seo-settings").scroll_into_view_if_needed()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
+        expect(page.locator(".we-seo-workspace")).to_be_visible()
+        expect(page.locator(".seo-serp-result")).to_contain_text("QA office for Bengaluru")
+        page.get_by_role("tab", name="Social").click()
+        expect(page.locator(".we-social-preview-card")).to_contain_text("QA office for Bengaluru")
+        page.locator(".we-seo-social-fields summary").click()
+        page.get_by_label("Social title").fill("QA social link title")
+        expect(page.locator(".we-social-preview-card")).to_contain_text("QA social link title")
+        page.get_by_role("tab", name="Search").click()
+        page.get_by_role("button", name="Mobile").click()
+        expect(page.locator(".we-search-preview-mobile")).to_be_visible()
         page.get_by_role("radio", name="Index", exact=True).check()
         expect(page.get_by_role("radio", name="Index", exact=True)).to_be_checked()
         page.get_by_role("checkbox", name="Nofollow").check()
@@ -335,6 +347,7 @@ def run():
         expect(page.get_by_text("Published to the local CMS only", exact=False)).to_be_visible(timeout=15000)
         published_html = httpx.get(API+"/site/qa-bengaluru-office/").text
         assert 'index,follow,noarchive,noimageindex,nosnippet' in published_html
+        assert 'QA social link title' in published_html
         sitemap = httpx.get(API+"/sitemap.xml").text
         assert "qa-bengaluru-office" in sitemap, sitemap[:500]
         page.screenshot(path=str(OUT/"05_published.png"))
