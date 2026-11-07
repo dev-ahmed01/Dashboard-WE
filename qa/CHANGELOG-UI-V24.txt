@@ -1,0 +1,1 @@
+Reference-based Dashboard-WE UI: Category list styling, two-column Add Page with template picker and preview, editor header with Content/SEO jump links, repeater auto-expand, two-column SEO with Search desktop/mobile and Social preview. Publish and preview remain local. Backend unchanged.
