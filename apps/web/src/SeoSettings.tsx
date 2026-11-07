@@ -55,11 +55,11 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
   const sourceDescription=(descriptive.find(s=>s.length>=55)||descriptive[0]||'').slice(0,160)
   const fallbackTitle=sourceHeading.toLowerCase().includes('workspace by emlen')?
     sourceHeading.slice(0,110):(sourceHeading+' | Workspace by Emlen').slice(0,110)
-  const displayTitle=seo.seo_title.trim()||fallbackTitle
-  const displayDescription=seo.description.trim()||sourceDescription
+  const displayTitle=(seo.seo_title||'').trim()||fallbackTitle
+  const displayDescription=(seo.description||'').trim()||sourceDescription
   const displayUrl='https://workspacebyemlen.co.in/'+page.slug.replace(/^\/+|\/+$/g,'')+'/'
-  const autoFillAvailable=(!seo.seo_title.trim()&&!!fallbackTitle)||
-    (!seo.description.trim()&&!!sourceDescription)
+  const autoFillAvailable=(!(seo.seo_title||'').trim()&&!!fallbackTitle)||
+    (!(seo.description||'').trim()&&!!sourceDescription)
 
   const directives=[
     {key:'index',title:'Index',detail:'Allow this page to appear in search results.',checked:!seo.noindex,exclusive:true,choose:()=>onChange({noindex:false})},
@@ -72,8 +72,8 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
 
   function fillFromPage(){
     const patch:Partial<SEO>={}
-    if(!seo.seo_title.trim())patch.seo_title=fallbackTitle
-    if(!seo.description.trim()&&sourceDescription)patch.description=sourceDescription
+    if(!(seo.seo_title||'').trim())patch.seo_title=fallbackTitle
+    if(!(seo.description||'').trim()&&sourceDescription)patch.description=sourceDescription
     if(Object.keys(patch).length)onChange(patch)
   }
 
@@ -161,7 +161,7 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
         </div>
         <div className="seo-preview-note">
           Preview is illustrative. Search engines may change the title or description they display.
-          {!seo.seo_title.trim()||!seo.description.trim()?' Empty SEO fields use existing page content for this preview only.':''}
+          {!(seo.seo_title||'').trim()||!(seo.description||'').trim()?' Empty SEO fields use existing page content for this preview only.':''}
         </div>
       </div>
     </div>
