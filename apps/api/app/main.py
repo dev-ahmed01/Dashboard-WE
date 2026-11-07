@@ -404,7 +404,7 @@ def create_page(payload:NewPage,db:Session=Depends(get_db),user:User=Depends(cur
            or db.scalar(select(Publication.id).where(Publication.slug==slug))):
         slug=f'{base}-{i}';i+=1
     p=Page(template_id=t.id,title=payload.name.strip(),slug=slug,values={},template_snapshot={**template_json(t),'object_key':t.object_key},
-           seo={'seo_title':'','description':'','noindex':True,'nofollow':False,'canonical_override':''},status='draft')
+           seo={'seo_title':'','description':'','noindex':True,'nofollow':False,'noarchive':False,'noimageindex':False,'nosnippet':False,'canonical_override':''},status='draft')
     db.add(p);db.flush()
     audit(db,user,'page_create',str(p.id),{'template_id':t.id})
     db.commit();db.refresh(p)
@@ -622,12 +622,12 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
             newvals[key]=value
         changes['values']=newvals
     if payload.seo is not None:
-        allowed={'seo_title','description','noindex','nofollow','canonical_override','og_title','og_description'}
+        allowed={'seo_title','description','noindex','nofollow','noarchive','noimageindex','nosnippet','canonical_override','og_title','og_description'}
         if not set(payload.seo).issubset(allowed):fail(422,'Unexpected SEO field')
         seo=dict(p.seo or {})
         for k,v in payload.seo.items():
-            if k in ('noindex','nofollow') and not isinstance(v,bool):fail(422,'Robots settings must be booleans')
-            if k not in ('noindex','nofollow') and (not isinstance(v,str) or len(v)>500):fail(422,'SEO text is too long')
+            if k in ('noindex','nofollow','noarchive','noimageindex','nosnippet') and not isinstance(v,bool):fail(422,'Robots settings must be booleans')
+            if k not in ('noindex','nofollow','noarchive','noimageindex','nosnippet') and (not isinstance(v,str) or len(v)>500):fail(422,'SEO text is too long')
             seo[k]=v
         changes['seo']=seo
     return changes
