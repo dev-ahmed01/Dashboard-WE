@@ -128,8 +128,6 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
             {option.key==='noarchive'&&<CircleHelp size={15} className="seo-robot-help" aria-label="Google no longer uses noarchive" />}
           </label>)}
         </div>
-        <div className="seo-robots-footer"><span>Generated robots meta:</span>
-          <code>{enabledRobots(seo).join(', ')}</code></div>
       </div>
 
       <label>Canonical override (optional)
