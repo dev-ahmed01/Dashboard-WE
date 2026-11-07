@@ -37,7 +37,7 @@ export default function AddPageWorkspace({
         <label htmlFor="category-new-page-name">Page name</label>
         <input id="category-new-page-name" value={name} maxLength={200}
           onChange={e=>onNameChange(e.target.value)}
-          placeholder="e.g. Managed Offices in Jayanagar"/>
+          placeholder="Enter page name"/>
         <small>This name identifies the page in your dashboard.</small>
       </div>
 
