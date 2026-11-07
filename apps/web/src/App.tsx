@@ -1018,7 +1018,8 @@ export default function App(){
           const fields=sample.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k))
             .filter((field):field is Field=>!!field&&field.mode==='page')
           return <details className="editor-repeat-item added" key={'extra-'+index}
-            id={'repeater-'+group.id+'-added-'+index} defaultOpen={lastAddedRepeater===group.id+'-added-'+index}>
+            id={'repeater-'+group.id+'-added-'+index}
+            ref={node=>{if(node&&lastAddedRepeater===group.id+'-added-'+index&&!node.dataset.initialized){node.open=true;node.dataset.initialized='yes'}}}>
             <summary><span className="editor-repeat-item-num">{String(original+index+1).padStart(2,'0')}</span><span>New {suffix} {index+1}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
               {group.kind==='solutions'&&<div className="editor-repeat-variant">
