@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3} from 'lucide-react'
 import SeoSettings from './SeoSettings'
+import AddPageWorkspace from './AddPageWorkspace'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
@@ -232,6 +233,7 @@ export default function App(){
   const [sectionPreviewError,setSectionPreviewError]=useState('')
   const [previewRefresh,setPreviewRefresh]=useState(0)
   const [newName,setNewName]=useState('')
+  const [lastAddedRepeater,setLastAddedRepeater]=useState('')
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
   const [uploaded,setUploaded]=useState<Template|null>(null)
   const [uploadName,setUploadName]=useState('')
@@ -953,7 +955,10 @@ export default function App(){
     // which could exceed the page API's size cap before any field is edited.
     const entry:Record<string,string>={}
     if(group.kind==='solutions')entry.__variant='regular'
+    const newKey=group.id+'-added-'+previous.length
+    setLastAddedRepeater(newKey)
     putRepeatEntries(group,[...previous,entry])
+    window.requestAnimationFrame(()=>document.getElementById('repeater-'+newKey)?.scrollIntoView({behavior:'smooth',block:'nearest'}))
   }
   function updateRepeatEntry(group:Repeater,index:number,key:string,value:string){
     const items=repeatEntries(group).map((item,i)=>{
@@ -982,13 +987,11 @@ export default function App(){
     const suffix=group.kind==='benefit_bullets'?'bullet point':group.kind==='faqs'?'FAQ':group.kind==='solutions'?'solution':group.kind==='other_solutions'?'solution link':group.kind==='benefits'?'benefit':'card'
     const title=group.kind==='highlights'?'Highlights cards':group.kind==='benefits'?'Benefits':group.kind==='faqs'?'Frequently asked questions':group.kind==='benefit_bullets'?'Bullet points':group.name
     const original=group.items.length
+    const maxAdditions=Math.min(group.max_additions||12,12)
     return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
       <div className="editor-repeat-heading">
-        <div><strong>{title}</strong><small>{original} from template · {additions.length} added · Add more below</small></div>
-        <div className="editor-repeat-heading-controls">
-
-
-        </div>
+        <div><strong>{title}</strong><small>{original} in template · {additions.length} added</small></div>
+        <span className="editor-repeat-count">{original+additions.length} items</span>
       </div>
       <div className="editor-repeat-items">
         {group.items.map((item,index)=>{
@@ -1014,7 +1017,9 @@ export default function App(){
           const sample=group.items[group.items.length-1]
           const fields=sample.field_keys.map(k=>editor?.template.fields.find(f=>f.key===k))
             .filter((field):field is Field=>!!field&&field.mode==='page')
-          return <details className="editor-repeat-item added" key={'extra-'+index} open={undefined}>
+          return <details className="editor-repeat-item added" key={'extra-'+index}
+            id={'repeater-'+group.id+'-added-'+index}
+            ref={node=>{if(node&&lastAddedRepeater===group.id+'-added-'+index&&!node.dataset.initialized){node.open=true;node.dataset.initialized='yes'}}}>
             <summary><span className="editor-repeat-item-num">{String(original+index+1).padStart(2,'0')}</span><span>New {suffix} {index+1}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
               {group.kind==='solutions'&&<div className="editor-repeat-variant">
@@ -1055,7 +1060,7 @@ export default function App(){
           </details>
         })}
       </div>
-      <button type="button" className="editor-repeat-add" disabled={additions.length>=Math.min(group.max_additions||12,12)} onClick={()=>addRepeatEntry(group)}><Plus size={16}/> Add another {suffix}</button>
+      <button type="button" className="editor-repeat-add" disabled={additions.length>=maxAdditions} onClick={()=>addRepeatEntry(group)}><Plus size={16}/> {additions.length>=maxAdditions?'Maximum added':'Add another '+suffix}</button>
     </div>
   }
   function editorBlockControl(block:EditorBlock,index:number){
@@ -1351,7 +1356,33 @@ export default function App(){
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
 
-  {editor?<><div className="page-top"><div><button className="backlink" onClick={closeEditor}>← All Pages</button><h1>{editor.page.title}</h1><p>Edit content only where the approved template permits changes.</p><div className="editor-signals">{dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}{editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}{!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}</div></div><div className="button-group"><button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button><button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button>{hasFixedLinkOrIcon&&user.role==='admin'&&<button className="outline" onClick={enableLinksAndIconsOnThisPage} disabled={busy||dirty}><LockKeyhole size={15}/> Enable links & icons</button>}<button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>{user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}</div></div>
+  {editor?<><div className="page-top we-editor-header">
+    <div className="we-editor-heading">
+      <button className="backlink" onClick={closeEditor}>← All Pages</button>
+      <h1>{editor.page.title}</h1>
+      <p>Edit the page content and SEO settings. Your published version stays unchanged until you publish.</p>
+      <div className="editor-signals">
+        {dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}
+        {editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}
+        {!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}
+      </div>
+      <div className="we-editor-jump-links" role="navigation" aria-label="Editor sections">
+        <button type="button" onClick={()=>document.getElementById('section-editing')?.scrollIntoView({behavior:'smooth',block:'start'})}>Content <ChevronRight size={13}/></button>
+        <button type="button" onClick={()=>document.getElementById('seo-settings')?.scrollIntoView({behavior:'smooth',block:'start'})}>SEO <ChevronRight size={13}/></button>
+      </div>
+    </div>
+    <div className="we-editor-actions">
+      <div className="we-editor-secondary-actions">
+        <button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button>
+        <button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button>
+        {hasFixedLinkOrIcon&&user.role==='admin'&&<button className="outline" onClick={enableLinksAndIconsOnThisPage} disabled={busy||dirty}><LockKeyhole size={15}/> Enable links & icons</button>}
+      </div>
+      <div className="we-editor-main-actions">
+        <button className="outline" onClick={savePage} disabled={busy||!dirty}><Save size={15}/> Save draft</button>
+        {user.role==='admin'&&<button className="primary" onClick={publishPage} disabled={busy}>Publish locally <ArrowUpRight size={16}/></button>}
+      </div>
+    </div>
+  </div>
   <div className="editor-layout editor-flow">
     <section className="edit-panel editor-section-panel" id="section-editing" aria-labelledby="editing-heading">
       <div className="panel-heading">
@@ -1382,7 +1413,7 @@ export default function App(){
           <div><strong>Section preview</strong><small>{editor.template.sections.find(x=>x.id===activeSectionId)?.name||'Choose a section'}</small></div>
           <div className="editor-side-preview-actions"><button type="button" className="outline compact" onClick={()=>setPreviewRefresh(n=>n+1)}>Refresh</button>{activeSectionId&&<button type="button" className="outline compact" onClick={()=>fullPreview(activeSectionId)}>Expand <ArrowUpRight size={14}/></button>}</div>
         </div>
-        <div className="editor-side-preview-tip">Select any field to highlight it. Changes appear here as you type.</div>
+        <div className="editor-side-preview-tip">Your changes appear here as you type. Select a field to highlight it.</div>
         <div className="editor-side-preview-window">
           {activeSectionId&&sectionPreviewHtml
             ?<iframe title="Selected section preview" sandbox="allow-same-origin" srcDoc={sectionPreviewHtml} onLoad={e=>attachPreviewLinks(e.currentTarget)}/>
@@ -1455,35 +1486,12 @@ export default function App(){
       </div>
     </div>}
 
-    {tab==='Add Page'&&<div className="category-create-screen" role="tabpanel">
-      <div className="category-form-card">
-        <div className="category-form-row">
-          <label htmlFor="category-template-select">Choose template</label>
-          <select id="category-template-select" value={selectedTemplate??''} onChange={e=>setSelectedTemplate(e.target.value?Number(e.target.value):null)}>
-            <option value="">Select approved template</option>
-            {approvedTemplates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-        <div className="category-form-row">
-          <label htmlFor="category-new-page-name">Page name</label>
-          <input id="category-new-page-name" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Enter page name" maxLength={200}/>
-        </div>
-        <div className="category-form-actions">
-          <button type="button" className="outline" onClick={()=>{setNewName('');setSelectedTemplate(null);setTab('All Pages')}}>Cancel</button>
-          <button type="button" className="primary" onClick={createPage} disabled={busy||!selectedTemplate||!newName.trim()}>Add Page <ArrowUpRight size={17}/></button>
-        </div>
-      </div>
-      <div className="category-template-summary">
-        {selectedApprovedTemplate?<>
-          <div className="category-template-thumb"><iframe title="Selected template preview" sandbox="" srcDoc={selectedTemplatePreview}/></div>
-          <div className="category-template-summary-text"><h2>{selectedApprovedTemplate.name}</h2><p>{selectedApprovedTemplate.category} · {selectedApprovedTemplate.sections.length} sections</p><span className="category-status category-approved">Approved template</span></div>
-        </>:<div className="category-no-template">
-          <LayoutTemplate size={27}/><h2>No template selected</h2>
-          <p>{approvedTemplates.length?'Choose a template above to preview it.':'There are no approved templates yet.'}</p>
-          {user.role==='admin'&&!approvedTemplates.length&&<button className="outline" type="button" onClick={()=>setTab('Upload Template')}>Upload template <ArrowUpRight size={16}/></button>}
-        </div>}
-      </div>
-    </div>}
+    {tab==='Add Page'&&<AddPageWorkspace name={newName} selectedId={selectedTemplate}
+      templates={approvedTemplates} selected={selectedApprovedTemplate||null} previewHtml={selectedTemplatePreview}
+      busy={busy} isAdmin={user.role==='admin'} onNameChange={setNewName}
+      onSelect={setSelectedTemplate} onSubmit={createPage}
+      onCancel={()=>{setNewName('');setSelectedTemplate(null);setTab('All Pages')}}
+      onUpload={()=>setTab('Upload Template')}/>}
 
     {tab==='Upload Template'&&user.role==='admin'&&<div className="category-upload-screen" role="tabpanel">
       <div className={'category-upload-dropzone '+(templateDragActive?'drag-active':'')} onDragOver={e=>{e.preventDefault();setTemplateDragActive(true)}} onDragLeave={e=>{e.preventDefault();setTemplateDragActive(false)}} onDrop={e=>{e.preventDefault();setTemplateDragActive(false);chooseTemplateFile(e.dataTransfer.files?.[0]||null)}}>
