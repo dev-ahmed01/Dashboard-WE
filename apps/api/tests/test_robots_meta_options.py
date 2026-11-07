@@ -33,7 +33,8 @@ def test_extended_robots_save_preview_publish_and_sitemap(client):
     saved = put_page(client,draft['id'],auth,{'seo':settings})
     assert saved.status_code == 200,saved.text
     assert all(saved.json()['seo'][key] == value for key,value in settings.items())
-    preview = client.get(f"/api/pages/{draft['id']}/preview",headers=auth)
+    preview = client.post(f"/api/pages/{draft['id']}/preview",headers=auth,
+                          json={"edit_version":saved.json()["edit_version"]})
     assert preview.status_code == 200
     assert 'index,nofollow,noarchive,noimageindex,nosnippet' in preview.text
     assert preview.headers['x-robots-tag']=='noindex, nofollow'
