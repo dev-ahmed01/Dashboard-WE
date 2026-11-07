@@ -170,7 +170,7 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
             <button type="button" role="tab" aria-selected={previewKind==='social'}
               onClick={()=>setPreviewKind('social')}><LayoutTemplate size={14}/> Social</button>
           </div>
-          {previewKind==='search'&&<div role="group" aria-label="Search preview device" className="we-seo-device-buttons">
+          {previewKind==='search'&&<div role="group" aria-label="Search result viewport" className="we-seo-device-buttons">
             <button type="button" aria-pressed={previewSize==='desktop'}
               onClick={()=>setPreviewSize('desktop')}>Desktop</button>
             <button type="button" aria-pressed={previewSize==='mobile'}
