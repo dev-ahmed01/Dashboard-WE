@@ -322,17 +322,23 @@ def run():
         page.locator("#seo-settings").scroll_into_view_if_needed()
         page.get_by_label("SEO title").fill("QA office for Bengaluru")
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
-        page.get_by_role("switch", name="Allow indexing").check()
-        expect(page.get_by_role("switch", name="Allow indexing")).to_be_checked()
-        page.get_by_role("switch", name="Follow links").uncheck()
-        expect(page.get_by_role("switch", name="Follow links")).not_to_be_checked()
-        page.get_by_role("switch", name="Follow links").check()
+        page.get_by_role("radio", name="Index", exact=True).check()
+        expect(page.get_by_role("radio", name="Index", exact=True)).to_be_checked()
+        page.get_by_role("checkbox", name="Nofollow").check()
+        expect(page.get_by_role("checkbox", name="Nofollow")).to_be_checked()
+        page.get_by_role("checkbox", name="Nofollow").uncheck()
+        page.get_by_role("checkbox", name="No Archive").check()
+        page.get_by_role("checkbox", name="No Image Index").check()
+        page.get_by_role("checkbox", name="No Snippet").check()
+        expect(page.locator(".seo-serp-muted")).to_contain_text("No Snippet")
         page.locator(".page-top").get_by_role("button", name="Publish locally").click()
         expect(page.get_by_text("Published to the local CMS only", exact=False)).to_be_visible(timeout=15000)
+        published_html = httpx.get(API+"/site/qa-bengaluru-office/").text
+        assert 'index,follow,noarchive,noimageindex,nosnippet' in published_html
         sitemap = httpx.get(API+"/sitemap.xml").text
         assert "qa-bengaluru-office" in sitemap, sitemap[:500]
         page.screenshot(path=str(OUT/"05_published.png"))
-        page.get_by_role("switch", name="Allow indexing").uncheck()
+        page.get_by_role("radio", name="No Index", exact=True).check()
         page.locator(".page-top").get_by_role("button", name="Save draft").click()
         assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
 

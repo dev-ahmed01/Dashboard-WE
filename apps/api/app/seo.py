@@ -25,7 +25,16 @@ def metadata_html(html: str, title: str, slug: str, seo: dict, origin: str):
         raise ValueError('Canonical URL must be HTTPS')
     tag = soup.new_tag('title'); tag.string = title_text; soup.head.append(tag)
     desc = soup.new_tag('meta'); desc.attrs = {'name':'description','content':description}; soup.head.append(desc)
-    robots = soup.new_tag('meta'); robots.attrs={'name':'robots','content':('noindex' if seo.get('noindex',True) else 'index')+','+('nofollow' if seo.get('nofollow',False) else 'follow')}; soup.head.append(robots)
+    directives = [
+        'noindex' if seo.get('noindex', True) else 'index',
+        'nofollow' if seo.get('nofollow', False) else 'follow',
+    ]
+    for setting in ('noarchive', 'noimageindex', 'nosnippet'):
+        if seo.get(setting, False):
+            directives.append(setting)
+    robots = soup.new_tag('meta')
+    robots.attrs = {'name': 'robots', 'content': ','.join(directives)}
+    soup.head.append(robots)
     link = soup.new_tag('link');link.attrs={'rel':'canonical','href':canonical};soup.head.append(link)
     for key, content in [('og:title',seo.get('og_title') or title_text),('og:description',seo.get('og_description') or description),('og:url',canonical)]:
         meta = soup.new_tag('meta');meta.attrs={'property':key,'content':content};soup.head.append(meta)
