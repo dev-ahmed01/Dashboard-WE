@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3} from 'lucide-react'
+import SeoSettings from './SeoSettings'
 
 type Mode='static'|'global'|'page'
 type Field={key:string;section_id:string;label:string;kind:string;attr:string;default:string;mode:Mode;global_key:string|null;tag?:string;heading_tag?:string|null;marker?:string}
@@ -25,7 +26,7 @@ type RepeaterItem={id:string;title:string;field_keys:string[];variant?:string}
 type Repeater={id:string;section_id:string;kind:string;name:string;items:RepeaterItem[];parent_item_id?:string|null;count:number;max_additions:number}
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
-type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;canonical_override:string;og_title?:string;og_description?:string}
+type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;noarchive?:boolean;noimageindex?:boolean;nosnippet?:boolean;canonical_override:string;og_title?:string;og_description?:string}
 type Page={id:number;template_id:number;template_name?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
 type Nav='Category'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
 type Tab='All Pages'|'Add Page'|'Upload Template'
@@ -1395,26 +1396,7 @@ export default function App(){
       </div>
     </section>
 
-    <section className="edit-panel editor-seo-panel" id="seo-settings" aria-labelledby="seo-heading">
-      <div className="panel-heading"><div><div className="small-label">02 / SEARCH</div><h2 id="seo-heading">SEO Settings</h2><p>Set the information search engines use for this page.</p></div></div>
-      <div className="form-stack seo-form-stack">
-
-        {publicationInfo?.published&&<div className="publication-diff"><strong>Currently published SEO · Version {publicationInfo.published.version}</strong><p>These are the values in the last local publication. Your draft fields below can differ until republishing.</p><dl><dt>Title</dt><dd>{publicationInfo.published.seo.seo_title||'Not set'}</dd><dt>Meta description</dt><dd>{publicationInfo.published.seo.description||'Not set'}</dd><dt>Robots</dt><dd>{publicationInfo.published.seo.noindex?'Noindex':'Index'} / {publicationInfo.published.seo.nofollow?'Nofollow':'Follow'}</dd><dt>URL</dt><dd>/{publicationInfo.published.slug}/</dd></dl></div>}
-        <div className="seo-primary-fields seo-simple-fields"><label>SEO title<input value={editor.page.seo.seo_title||''} onChange={e=>changeSEO({seo_title:e.target.value})} placeholder="Your unique search title"/></label><label className="wide-field">Meta description<textarea rows={3} value={editor.page.seo.description||''} onChange={e=>changeSEO({description:e.target.value})} placeholder="Brief, useful page description"/></label></div>
-        <div className="two-col seo-switches">
-          <label className="seo-toggle-card">
-            <span className="seo-toggle-copy"><strong>Allow indexing</strong><small>{editor.page.seo.noindex?'Off · Ask search engines not to show this page in results.':'On · Allow search engines to include this page in results.'}</small></span>
-            <span className="seo-toggle-control"><input role="switch" aria-label="Allow indexing" type="checkbox" checked={!editor.page.seo.noindex} onChange={e=>changeSEO({noindex:!e.target.checked})}/><span className="seo-toggle-track" aria-hidden="true"/></span>
-          </label>
-          <label className="seo-toggle-card">
-            <span className="seo-toggle-copy"><strong>Follow links</strong><small>{editor.page.seo.nofollow?'Off · Ask search engines not to follow links on this page.':'On · Allow search engines to follow links on this page.'}</small></span>
-            <span className="seo-toggle-control"><input role="switch" aria-label="Follow links" type="checkbox" checked={!editor.page.seo.nofollow} onChange={e=>changeSEO({nofollow:!e.target.checked})}/><span className="seo-toggle-track" aria-hidden="true"/></span>
-          </label>
-        </div>
-        <label>Canonical override (optional)<input value={editor.page.seo.canonical_override||''} onChange={e=>changeSEO({canonical_override:e.target.value})} placeholder="Automatic self-canonical"/></label>
-        <div className="search-preview"><span>Search result preview</span><small>workspacebyemlen.co.in › {editor.page.slug}</small><h3>{editor.page.seo.seo_title||editor.page.title}</h3><p>{editor.page.seo.description||'Add a meta description to preview the search snippet.'}</p></div>
-      </div>
-    </section>
+    <SeoSettings page={editor.page} fields={editor.template.fields} shared={shared} published={publicationInfo?.published} onChange={changeSEO}/>
 
     </div></>:
   <>
