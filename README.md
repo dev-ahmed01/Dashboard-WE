@@ -90,3 +90,11 @@ The client can self-host on a VPS with one Compose stack initially. Scale the AP
 ### Verification and remaining limits
 
 Backend automated tests: `cd apps/api && python -m pytest -q`. The suite includes the formerly failing cases and standalone V11 regression scenarios. Frontend CI builds through GitHub Actions (`npm run build`). Real multiuser browser/UAT, PostgreSQL+MinIO deployment, restore drills, and live WordPress integration still require staging verification before production.
+
+## Contabo production migration package
+
+The production deployment is now prepared at [ops/contabo/DEPLOY.md](ops/contabo/DEPLOY.md). It uses an independent Docker Compose project with private PostgreSQL and S3-compatible media, one shared SaS/Caddy HTTPS ingress, first-run private secret generation, schema migrations as explicit release operations, and guarded encrypted **paired SQL+S3** backup and isolated restore tools.
+
+The frontend build uses committed `apps/web/package-lock.json` and `npm ci`; API container/CI uses the fully pinned `apps/api/requirements.lock.txt`. The separate `Contabo production recovery rehearsal` GitHub workflow tests a synthetic database and object, encrypts archives and restores them into a fresh project. This is **not** an off-host disaster recovery acceptance or live VPS validation.
+
+**Do not expose the admin hostname until HTTPS, approved admin access controls (SSO/MFA or an identity-aware gateway), real backup custody and deployment checks are operational.** Source CI does not approve real student/customer records, working outgoing email, or an existing public website cutover.
