@@ -5,7 +5,7 @@ on:
     branches: [main, 'feature/**']
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,7 +17,7 @@ jobs:
         working-directory: apps/api
         run: python -m pytest -q
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +28,30 @@ jobs:
       - name: Build frontend
         working-directory: apps/web
         run: npm run build
+      - name: Validate WE shared-host Compose has no published DB, storage or app ports
+        run: |
+          cp .env.example .env
+          WE_STAGING_HOST=we-staging.example.org docker compose --env-file .env \
+            -f compose.shared-ingress.yaml config --quiet
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          env = dict(os.environ, WE_STAGING_HOST="we-staging.example.org")
+          out = subprocess.check_output(
+              ["docker", "compose", "--env-file", ".env",
+               "-f", "compose.shared-ingress.yaml", "config", "--format", "json"],
+              text=True, env=env,
+          )
+          config = json.loads(out)["services"]
+          assert set(config) == {"db", "minio", "api", "web"}
+          assert all(not service.get("ports") for service in config.values())
+          for name in ("db", "minio", "api"):
+              assert set(config[name]["networks"]) == {"private"}
+          assert set(config["web"]["networks"]) == {"ingress", "private"}
+          print("WE shared-host topology validated; no host ports or storage exposure.")
+          PY
       - name: Smoke test production nginx container and SPA fallback
         run: |
           docker build -t workspace-emlen-web-smoke -f apps/web/Dockerfile .
