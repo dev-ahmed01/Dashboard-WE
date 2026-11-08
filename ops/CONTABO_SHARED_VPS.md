@@ -65,6 +65,6 @@ For the legacy `compose.yaml` development stack, the API also no longer migrates
 - Inventory both original data sources and the exact Alembic revision before proposing any real data transfer. No automatic overwrite of existing Docker volumes, production DB or MinIO object stores.
 - Apply migrations once per release from a verified image/commit, after a tested backup. Keep a rollback candidate for API/web. Do not attempt uncontrolled schema downgrades.
 - Monitor storage space, DB and bucket health, API 5xx, TLS, login failures, backups, and access-control logs. Keep S3 credentials, JWTs, personal data and full backup dumps out of public GitHub/CI logs.
-- Use independent code review, a protected `main` branch, dependency audit, a dependency lockfile, and a real staging UAT before production. The current frontend has no committed npm lockfile, so deterministic builds remain an explicit follow-up blocker.
+- Use independent code review, a protected `main` branch, dependency audit, a dependency lockfile, and a real staging UAT before production. The frontend and Python API now have committed lockfiles and reproducible CI/container installs. Staging still requires independent UAT, TLS/DNS and off-host backup signoff.
 
 **Release status:** A source-level staging blueprint only. HTTPS proxy setup, actual VPS validation, complete SQL+object-storage restore, independent stakeholder acceptance and final release controls remain open.
