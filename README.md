@@ -16,11 +16,13 @@ Production-oriented, self-hostable **template CMS + SEO manager**. Frontend and 
 
 1. Copy `.env.example` to `.env` and replace all secrets. Use long, unique passwords. **The previous `workspace` / `workspace*123` login is intentionally not present.**
 2. Install current Docker Engine and Docker Compose.
-3. Run `docker compose up --build -d` from the repository root.
+3. Run `docker compose up -d db minio`, then `docker compose run --rm api alembic upgrade head`, then `docker compose up --build -d` from the repository root. Migrations are explicit one-off release actions; they no longer run every time the API container starts.
 4. Open `http://localhost:8080`. The first administrator uses `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
 5. Keep the service bound to `127.0.0.1` until you configure HTTPS and restricted admin access through a trusted reverse proxy or Cloudflare Access.
 
 Do not publish ports 5432 or 9000 to the internet. Configure off-host backups for both the PostgreSQL volume and MinIO bucket.
+
+For an isolated WE staging instance on the **shared Contabo VPS** with SaS and AE, use [the shared-ingress runbook](ops/CONTABO_SHARED_VPS.md) instead of publishing a second proxy. That topology keeps PostgreSQL and media storage private and requires one host-wide HTTPS entry point.
 
 ## Business workflow
 
