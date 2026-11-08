@@ -68,7 +68,7 @@ jobs:
       - name: Start React frontend and install Chromium
         working-directory: apps/web
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build
           python -m playwright install --with-deps chromium
           npm run dev -- --host 127.0.0.1 --port 5173 > /tmp/we-smoke-web.log 2>&1 &
