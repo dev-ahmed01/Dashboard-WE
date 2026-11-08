@@ -1,20 +1,22 @@
 """Workspace by Emlen API. Publishing is local only; the public WordPress site is not changed."""
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import PurePath
+from pathlib import PurePath, Path
 from urllib.parse import urlsplit
 from uuid import uuid4
 from xml.sax.saxutils import escape as xml_escape
 import json
 import re
-import json
 
+from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
 from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, update, or_
+from sqlalchemy import select, func, update, or_, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -30,8 +32,14 @@ from .seo import metadata_html, safe_slug
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
-    if s.app_environment == 'production' and (len(s.jwt_secret) < 32 or s.database_url.startswith('sqlite')):
-        raise RuntimeError('Production requires secure JWT_SECRET and PostgreSQL DATABASE_URL')
+    if s.app_environment == 'production' and (
+        len(s.jwt_secret) < 32
+        or not s.database_url.startswith('postgresql+psycopg://')
+        or any('CHANGE_ME' in value for value in (
+            s.jwt_secret, s.database_url, s.admin_password, s.s3_secret_key,
+        ))
+    ):
+        raise RuntimeError('Production requires configured secrets and PostgreSQL')
     with SessionLocal() as db:
         seed_admin(db)
     ObjectStore().ensure_bucket()
@@ -87,7 +95,31 @@ class Login(BaseModel):
 
 @app.get('/api/health')
 def health():
+    """Liveness only: the process can respond, but backing stores may be unavailable."""
     return {'ok':True,'service':'Workspace by Emlen API'}
+
+
+@lru_cache(maxsize=1)
+def _migration_heads() -> set[str]:
+    config = AlembicConfig(str(Path(__file__).resolve().parents[1] / 'alembic.ini'))
+    return set(ScriptDirectory.from_config(config).get_heads())
+
+
+@app.get('/api/health/ready')
+def readiness():
+    """Fail closed if PostgreSQL schema or object storage is not ready for editors."""
+    try:
+        with SessionLocal() as db:
+            db.execute(text('SELECT 1'))
+            revisions = set(db.execute(text('SELECT version_num FROM alembic_version')).scalars())
+            if not revisions or revisions != _migration_heads():
+                raise ValueError('Schema revision mismatch')
+        store = ObjectStore()
+        store.client.head_bucket(Bucket=store.bucket)
+    except Exception:
+        # Never expose database/storage endpoints, credentials or exception details.
+        raise HTTPException(status_code=503, detail='Service unavailable') from None
+    return {'status':'ready'}
 
 
 @app.post('/api/auth/login')

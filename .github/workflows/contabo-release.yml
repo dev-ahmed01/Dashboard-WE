@@ -1,0 +1,87 @@
+name: Contabo production recovery rehearsal
+on:
+  pull_request:
+    paths:
+      - 'compose.production.yaml'
+      - 'ops/contabo/**'
+      - 'apps/api/**'
+      - 'apps/web/Dockerfile'
+      - 'apps/web/package-lock.json'
+      - '.github/workflows/contabo-release.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate private scripts and archive exporter syntax
+        run: |
+          bash -n ops/contabo/prepare-production.sh
+          bash -n ops/contabo/preflight.sh
+          bash -n ops/contabo/backup.sh
+          bash -n ops/contabo/restore-drill.sh
+          bash -n ops/contabo/smoke.sh
+          python3 -m py_compile apps/api/app/object_backup.py
+      - name: Install disposable age encryption helper
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+      - name: Generate disposable production secrets and verify Docker isolation
+        run: |
+          bash ops/contabo/prepare-production.sh we-ci.internal.test ci-admin@example.test
+          docker network create emlen_ingress
+          bash ops/contabo/preflight.sh
+      - name: Build production API image with executable backup helper
+        run: |
+          docker compose --env-file .env.production -f compose.production.yaml build api
+      - name: Create production-mode PostgreSQL schema on fresh private stores
+        run: |
+          docker compose --env-file .env.production -f compose.production.yaml up -d --wait db minio
+          docker compose --env-file .env.production -f compose.production.yaml \
+            run --rm api alembic upgrade head
+          docker compose --env-file .env.production -f compose.production.yaml \
+            up -d --wait api
+      - name: Insert controlled synthetic object and verify the archive stream
+        run: |
+          docker compose --env-file .env.production -f compose.production.yaml \
+            run --rm --no-deps -T api python - <<'PY'
+          import os, boto3
+          from botocore.exceptions import ClientError
+          client=boto3.client('s3',endpoint_url=os.environ['S3_ENDPOINT_URL'],
+                             aws_access_key_id=os.environ['S3_ACCESS_KEY'],
+                             aws_secret_access_key=os.environ['S3_SECRET_KEY'],
+                             region_name='us-east-1')
+          bucket=os.environ['S3_BUCKET']
+          try:
+              client.create_bucket(Bucket=bucket)
+          except ClientError as exc:
+              if exc.response.get('Error',{}).get('Code') not in ('BucketAlreadyOwnedByYou','BucketAlreadyExists'):
+                  raise
+          client.put_object(Bucket=bucket,Key='migration-ci/manifest-test.txt',
+                            Body=b'checked paired sql-and-object restore',
+                            ContentType='text/plain')
+          PY
+      - name: Encrypt SQL and media together, then restore into a NEW Compose project
+        run: |
+          docker compose --env-file .env.production -f compose.production.yaml stop api web
+          age-keygen -o /tmp/we-ci-age.key 2>/dev/null
+          export BACKUP_AGE_RECIPIENT
+          BACKUP_AGE_RECIPIENT="$(age-keygen -y /tmp/we-ci-age.key)"
+          export BACKUP_DIR="$PWD/ops/contabo/backups"
+          bash ops/contabo/backup.sh
+          SQL="$(find "$BACKUP_DIR" -maxdepth 1 -name '*.database.dump.age' -type f -print -quit)"
+          OBJECTS="$(find "$BACKUP_DIR" -maxdepth 1 -name '*.objects.tar.age' -type f -print -quit)"
+          test -n "$SQL" && test -n "$OBJECTS"
+          RESTORE_ACK=ISOLATED_NEW_DATABASE \
+            AGE_IDENTITY_FILE=/tmp/we-ci-age.key \
+            bash ops/contabo/restore-drill.sh "$SQL" "$OBJECTS"
+          rm -f /tmp/we-ci-age.key
+      - name: Summarize failed container status without printing secrets
+        if: failure()
+        run: |
+          docker compose --env-file .env.production -f compose.production.yaml ps || true

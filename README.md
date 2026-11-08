@@ -16,11 +16,13 @@ Production-oriented, self-hostable **template CMS + SEO manager**. Frontend and 
 
 1. Copy `.env.example` to `.env` and replace all secrets. Use long, unique passwords. **The previous `workspace` / `workspace*123` login is intentionally not present.**
 2. Install current Docker Engine and Docker Compose.
-3. Run `docker compose up --build -d` from the repository root.
+3. Run `docker compose up -d db minio`, then `docker compose run --rm api alembic upgrade head`, then `docker compose up --build -d` from the repository root. Migrations are explicit one-off release actions; they no longer run every time the API container starts.
 4. Open `http://localhost:8080`. The first administrator uses `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
 5. Keep the service bound to `127.0.0.1` until you configure HTTPS and restricted admin access through a trusted reverse proxy or Cloudflare Access.
 
 Do not publish ports 5432 or 9000 to the internet. Configure off-host backups for both the PostgreSQL volume and MinIO bucket.
+
+For an isolated WE staging instance on the **shared Contabo VPS** with SaS and AE, use [the shared-ingress runbook](ops/CONTABO_SHARED_VPS.md) instead of publishing a second proxy. That topology keeps PostgreSQL and media storage private and requires one host-wide HTTPS entry point.
 
 ## Business workflow
 
@@ -88,3 +90,11 @@ The client can self-host on a VPS with one Compose stack initially. Scale the AP
 ### Verification and remaining limits
 
 Backend automated tests: `cd apps/api && python -m pytest -q`. The suite includes the formerly failing cases and standalone V11 regression scenarios. Frontend CI builds through GitHub Actions (`npm run build`). Real multiuser browser/UAT, PostgreSQL+MinIO deployment, restore drills, and live WordPress integration still require staging verification before production.
+
+## Contabo production migration package
+
+The production deployment is now prepared at [ops/contabo/DEPLOY.md](ops/contabo/DEPLOY.md). It uses an independent Docker Compose project with private PostgreSQL and S3-compatible media, one shared SaS/Caddy HTTPS ingress, first-run private secret generation, schema migrations as explicit release operations, and guarded encrypted **paired SQL+S3** backup and isolated restore tools.
+
+The frontend build uses committed `apps/web/package-lock.json` and `npm ci`; API container/CI uses the fully pinned `apps/api/requirements.lock.txt`. The separate `Contabo production recovery rehearsal` GitHub workflow tests a synthetic database and object, encrypts archives and restores them into a fresh project. This is **not** an off-host disaster recovery acceptance or live VPS validation.
+
+**Do not expose the admin hostname until HTTPS, approved admin access controls (SSO/MFA or an identity-aware gateway), real backup custody and deployment checks are operational.** Source CI does not approve real student/customer records, working outgoing email, or an existing public website cutover.
