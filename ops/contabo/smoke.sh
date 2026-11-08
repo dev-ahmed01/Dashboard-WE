@@ -10,7 +10,7 @@ if [[ ! "$HOST" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ || "$HOST" != *.* ]]; then
 fi
 BASE="https://$HOST"
 curl --fail --silent --show-error --proto '=https' --tlsv1.2 "$BASE/api/health" >/dev/null
-curl --fail --silent --show-error --proto '=https' --tlsv1.2 "$BASE/api/health/ready" | grep -q '"ok":true'
+curl --fail --silent --show-error --proto '=https' --tlsv1.2 "$BASE/api/health/ready" | grep -q '"status":"ready"'
 curl --fail --silent --show-error --proto '=https' --tlsv1.2 "$BASE/" | grep -q '<div id="root"'
 CODE="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' "$BASE/api/auth/me")"
 [[ "$CODE" == 401 || "$CODE" == 403 ]] || {
