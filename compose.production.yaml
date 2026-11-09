@@ -59,17 +59,22 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     init: true
-    networks: [private]
+    networks:
+      private:
+        aliases: [we-prod-api]
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NGINX_CONFIG: deploy/nginx.production.conf
     restart: unless-stopped
     depends_on:
       api: {condition: service_healthy}
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
     init: true
     networks:
       private: {}
