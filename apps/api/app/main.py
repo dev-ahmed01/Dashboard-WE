@@ -27,6 +27,7 @@ from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
+from .official_templates import OFFICIAL_PAGES, official_key, fetch_official, make_template, read_only_section
 
 
 @asynccontextmanager
@@ -62,7 +63,7 @@ def template_json(t: Template):
 
 
 def page_json(p: Page):
-    return {'id':p.id,'template_id':p.template_id,'template_name':(p.template_snapshot or {}).get('name',''),'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat(),
+    return {'id':p.id,'template_id':p.template_id,'template_name':(p.template_snapshot or {}).get('name',''),'template_category':(p.template_snapshot or {}).get('category','Solution Category'),'title':p.title,'slug':p.slug,'values':p.values,'seo':p.seo,'status':p.status,'published_version':p.published_version,'updated_at':p.updated_at.isoformat(),
             'edit_version':p.edit_version,'archived':p.archived,
             'has_unpublished_changes':bool(p.published_version and p.edit_version>p.published_edit_version)}
 
@@ -284,6 +285,59 @@ def delete_one_template(template_id:int,payload:DeleteTemplatesRequest,db:Sessio
     return remove_templates(db,user,[t])
 
 
+@app.get('/api/official/catalog')
+def official_catalog(_:User=Depends(current_user)):
+    """The three source pages and their modules, without importing anything."""
+    return [{'code':x.code,'name':x.title,'category':x.category,'source_url':'https://workspacebyemlen.co.uk'+x.path}
+            for x in OFFICIAL_PAGES]
+
+
+@app.post('/api/official/bootstrap')
+def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
+    """Idempotently import the approved public designs as editable draft templates.
+
+    Existing Category templates, pages, publications and object-storage keys are
+    never overwritten. Deleting or archiving a seed page is respected. Errors
+    for one source are isolated from other sources.
+    """
+    store=ObjectStore()
+    result={'templates_created':0,'pages_created':0,'existing':0,'unavailable':[]}
+    for item in OFFICIAL_PAGES:
+        key=official_key(item.code)
+        existing=db.scalar(select(Template).where(Template.object_key==key).limit(1))
+        if existing:
+            result['existing']+=1
+            continue
+        try:
+            source,sections,fields=make_template(item,fetch_official(item))
+            # Preserve exactly the approved source in immutable object storage.
+            store.put(key,source.encode('utf-8'),'text/html')
+            t=Template(name=item.title,category=item.category,object_key=key,
+                       fields=fields,sections=sections,version=1,approved=True)
+            db.add(t);db.flush()
+            slug=item.page_slug
+            occupied=db.scalar(select(Page.id).where(Page.slug==slug))
+            if occupied:
+                slug=f'{slug}-{t.id}'
+            p=Page(template_id=t.id,title=item.page_title,slug=slug,values={},
+                   template_snapshot={**template_json(t),'object_key':key,
+                                      'source_url':'https://workspacebyemlen.co.uk'+item.path},
+                   seo={'seo_title':'','description':'','noindex':True,'nofollow':True,
+                        'noarchive':False,'noimageindex':False,'nosnippet':False,
+                        'canonical_override':''},status='draft')
+            db.add(p);db.flush()
+            audit(db,user,'official_template_seed',str(t.id),
+                  {'module':item.category,'section_count':len(sections),'page_id':p.id})
+            db.commit()
+            result['templates_created']+=1
+            result['pages_created']+=1
+        except (ValueError,UnicodeError,RuntimeError,Exception):
+            db.rollback()
+            # Do not expose provider internals/credentials or change stored data.
+            result['unavailable'].append(item.title)
+    return result
+
+
 @app.post('/api/templates/import',status_code=201)
 async def import_template(file:UploadFile=File(...),name:str='',category:str='Solution Category',
    db:Session=Depends(get_db),user:User=Depends(admin)):
@@ -323,9 +377,13 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     if set(f.key for f in payload.fields)!=set(existing) or len(payload.fields)!=len(existing):
         fail(422,'Mapping must include each detected field exactly once')
     updated=[]
+    section_names={s['id']:s['name'] for s in t.sections}
     for entry in payload.fields:
         f=dict(existing[entry.key]);f['mode']=entry.mode;f['label']=entry.label
-        if entry.mode=='global':
+        if read_only_section(t.category,section_names.get(f['section_id'],'')):
+            # Property testimonials are deliberately non-editable, even for admins.
+            f['mode']='static'
+        if f['mode']=='global':
             if not entry.global_key or not re.fullmatch(r'[a-z][a-z0-9_]{1,100}',entry.global_key):
                 fail(422,'Global fields need a valid shared-content key')
             f['global_key']=entry.global_key
