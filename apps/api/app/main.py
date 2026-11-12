@@ -9,6 +9,7 @@ from uuid import uuid4
 from xml.sax.saxutils import escape as xml_escape
 import json
 import re
+import logging
 
 from alembic.config import Config as AlembicConfig
 from alembic.script import ScriptDirectory
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
     ObjectStore().ensure_bucket()
     yield
 
+logger=logging.getLogger(__name__)
 app = FastAPI(title='Workspace by Emlen Page Manager API', version='10.0', lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[get_settings().cors_origin], allow_methods=['GET','POST','PUT','PATCH','DELETE'], allow_headers=['Authorization','Content-Type'])
 
@@ -271,9 +273,17 @@ def remove_templates(db:Session,user:User,selected:list[Template]):
 
 
 @app.delete('/api/templates')
-def delete_all_templates(payload:DeleteTemplatesRequest,db:Session=Depends(get_db),user:User=Depends(admin)):
+def delete_all_templates(payload:DeleteTemplatesRequest,category:str|None=None,db:Session=Depends(get_db),user:User=Depends(admin)):
     if not payload.confirm:fail(422,'Please confirm template removal')
-    selected=db.scalars(select(Template).where(Template.is_deleted==False).order_by(Template.id)).all()
+    query=select(Template).where(Template.is_deleted==False)
+    if category:
+        if category not in ('Solution Category','Solution','Sub-solution','Property'):
+            fail(422,'Unknown template category')
+        if category=='Solution':
+            query=query.where(Template.category.in_(['Solution','Sub-solution']))
+        else:
+            query=query.where(Template.category==category)
+    selected=db.scalars(query.order_by(Template.id)).all()
     return remove_templates(db,user,selected)
 
 
@@ -331,7 +341,8 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
             db.commit()
             result['templates_created']+=1
             result['pages_created']+=1
-        except (ValueError,UnicodeError,RuntimeError,Exception):
+        except Exception:
+            logger.exception('Official template seed unavailable for %s',item.code)
             db.rollback()
             # Do not expose provider internals/credentials or change stored data.
             result['unavailable'].append(item.title)
@@ -649,8 +660,9 @@ def validate_repeater_value(key,value,t):
         entries=json.loads(value)
     except (TypeError,ValueError):
         fail(422,'Repeater entries must contain valid JSON')
-    if not isinstance(entries,list) or len(entries)>MAX_ADDITIONS:
-        fail(422,'Repeater supports up to 12 additional items')
+    limit=min(MAX_ADDITIONS,max(0,int(group.get('max_additions',MAX_ADDITIONS))))
+    if not isinstance(entries,list) or len(entries)>limit:
+        fail(422,f'This repeater supports up to {limit} additional items')
     for entry in entries:
         if not isinstance(entry,dict):
             fail(422,'Every repeater item must be an object')
