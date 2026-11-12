@@ -60,6 +60,14 @@ def run():
         page.locator(".navigation").get_by_role("button", name="Solution").click()
         expect(page.get_by_role("heading", name="Solution", exact=True)).to_be_visible()
         expect(page.get_by_text("One Person Office", exact=False).first).to_be_visible(timeout=30000)
+        page.locator(".tabs").get_by_role("tab", name="Add Page").click()
+        page.locator("#category-template-select").select_option(label="One Person Office — Approved 2026")
+        frame=page.frame_locator('iframe[title="Selected template preview"]')
+        expect(frame.locator('style[data-we-approved-design="v2"]')).to_have_count(1,timeout=30000)
+        assert frame.locator(".sol-grid").evaluate("(el) => getComputedStyle(el).display")=="grid", "Bundled design must style the preview"
+        assert frame.locator("#consultation .lm-offer-big").count()==1, "Static lead magnet remains visible"
+        assert frame.locator("#why-us #enquiry").count()==1, "Static Why Us enquiry remains visible"
+        page.locator(".tabs").get_by_role("tab", name="All Pages").click()
         page.locator(".navigation").get_by_role("button", name="Property").click()
         expect(page.get_by_role("heading", name="Property", exact=True)).to_be_visible()
         expect(page.get_by_text("Workspace Property", exact=False).first).to_be_visible(timeout=30000)
