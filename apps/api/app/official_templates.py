@@ -223,8 +223,17 @@ PROPERTY_CSS = """
 #photos .property-cms-gallery figure:first-child{grid-column:span 2;grid-row:span 2}
 #photos .property-cms-gallery img{display:block;width:100%;height:100%;min-height:160px;object-fit:cover}
 #photos .property-cms-gallery figcaption{position:absolute;left:10px;bottom:10px;background:rgba(255,255,255,.86);border-radius:18px;padding:6px 10px;font:600 12px Poppins,Arial,sans-serif}
+#testimonials .property-cms-reviews{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;width:min(1290px,calc(100% - 40px));margin:24px auto}
+#testimonials .property-cms-review{margin:0;background:linear-gradient(140deg,#fff,#fff7f3);border:1px solid #f0e8e2;border-radius:23px;padding:24px;box-shadow:0 9px 25px rgba(66,37,27,.055)}
+#testimonials .property-cms-review blockquote{margin:13px 0 22px;font:500 16px/1.52 Poppins,Arial,sans-serif;color:#292320}
+#testimonials .property-cms-review strong{display:block;font:700 14px Poppins,Arial,sans-serif;color:#161616}
+#testimonials .property-cms-review small{display:block;color:#716866;font:400 12px Poppins,Arial,sans-serif}
+#locations .property-cms-map-link{display:inline-flex;margin:13px 0;padding:10px 16px;border-radius:999px;background:#ed2024;color:#fff;text-decoration:none;font:700 13px Poppins,Arial,sans-serif}
+
 @media(max-width:900px){#property-cms-solutions .property-tab-cards{grid-template-columns:repeat(2,minmax(0,1fr))}#photos .property-cms-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){#testimonials .property-cms-reviews{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){#property-cms-solutions .property-cms-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}#property-cms-solutions .property-tab-cards{grid-template-columns:1fr}}
+@media(max-width:580px){#testimonials .property-cms-reviews{grid-template-columns:1fr}}
 """
 
 PROPERTY_CARD_TABS = (
@@ -317,6 +326,36 @@ def hydrate_property(html: str) -> str:
         amenities=soup.find(id='amenities')
         if amenities:amenities.insert_after(section)
         else:(soup.find('main') or soup.body).append(section)
+    # Restore approved live testimonial copy as FIXED, read-only cards.
+    # This extracts quoted literals from the known official page source without
+    # executing any script or inventing reviews/attribution.
+    testimonials=soup.find(id='testimonials')
+    if testimonials and not testimonials.select_one('.property-cms-reviews'):
+        review_match=re.search(r'const\s+reviews\s*=\s*\[([\s\S]*?)\];',html)
+        if review_match:
+            review_records=re.findall(
+                r"\{tag:'([^']+)',quote:'([^']+)',initial:'([^']+)',name:'([^']+)',role:'([^']+)'\}",
+                review_match.group(1))
+            if review_records:
+                reviews=soup.new_tag('div')
+                reviews['class']='property-cms-reviews'
+                for tag,quote,_initial,name,role in review_records[:8]:
+                    card=soup.new_tag('article');card['class']='property-cms-review'
+                    tag_el=soup.new_tag('small');tag_el.string=tag
+                    quote_el=soup.new_tag('blockquote');quote_el.string=quote
+                    author=soup.new_tag('strong');author.string=name
+                    desc=soup.new_tag('small');desc.string=role
+                    card.extend([tag_el,quote_el,author,desc]);reviews.append(card)
+                testimonials.append(reviews)
+    # An editable map destination remains available even though security
+    # sandboxing removes embedded third-party map iframes from previews.
+    locations=soup.find(id='locations')
+    if locations and not locations.select_one('.property-cms-map-link'):
+        map_link=soup.new_tag('a',href='https://www.google.com/maps/search/?api=1&query=Workspace+by+Emlen+Jayanagar')
+        map_link['class']='property-cms-map-link'
+        map_link.string='View workspace on Google Maps'
+        map_frame=locations.select_one('.we-lc__mapframe') or locations
+        map_frame.append(map_link)
     # Populate JS-rendered FAQ only if the source contains no actual cards.
     faqs=soup.find(id='faqs') or soup.find(id='faq')
     if faqs:
