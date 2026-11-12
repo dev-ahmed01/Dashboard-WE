@@ -1005,7 +1005,7 @@ export default function App(){
   }
   function addRepeatEntry(group:Repeater){
     const previous=repeatEntries(group)
-    if(previous.length >= Math.min(group.max_additions||12,12))return
+    if(previous.length >= Math.min(group.max_additions??12,12))return
     // New rows inherit the original card's layout and content from HTML.
     // Do not serialize original images (often large embedded base64 data),
     // which could exceed the page API's size cap before any field is edited.
@@ -1065,7 +1065,7 @@ export default function App(){
     const suffix=group.kind==='benefit_bullets'?'bullet point':group.kind==='faqs'?'FAQ':(group.kind==='solutions'||group.kind==='options')?'option':group.kind==='other_solutions'?'solution link':group.kind==='benefits'?'benefit':'card'
     const title=group.kind==='highlights'?'Highlights cards':group.kind==='benefits'?'Benefits':group.kind==='faqs'?'Frequently asked questions':group.kind==='benefit_bullets'?'Bullet points':group.name
     const original=group.items.length
-    const maxAdditions=Math.min(group.max_additions||12,12)
+    const maxAdditions=Math.min(group.max_additions??12,12)
     return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} in template · {additions.length} added</small></div>
