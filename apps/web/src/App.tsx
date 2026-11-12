@@ -233,7 +233,6 @@ export default function App(){
   const [nav,setNav]=useState<Nav>('Category')
   const [tab,setTab]=useState<Tab>('All Pages')
   const officialBootstrapStarted=useRef(false)
-  const [officialSyncing,setOfficialSyncing]=useState(false)
   const [templates,setTemplates]=useState<Template[]>([])
   const [pages,setPages]=useState<Page[]>([])
   const [editor,setEditor]=useState<{page:Page;template:Template}|null>(null)
@@ -390,18 +389,21 @@ export default function App(){
     preloadOfficialTemplates()
   },[user?.role])
   async function preloadOfficialTemplates(){
-    setOfficialSyncing(true)
+    // Silent, automatic, idempotent setup on the administrator's first login.
+    // All three templates are bundled inside the private API image; no upload,
+    // public-site fetch, or manual "preload" action is required.
     try {
       const result=await api<{templates_created:number;pages_created:number;existing:number;unavailable:string[]}>(
         '/api/official/bootstrap',{method:'POST'})
       await refresh()
-      if(result.unavailable.length){
-        setError('Could not preload: '+result.unavailable.join(', ')+'. Check public site availability, then retry.')
-      }else if(result.templates_created){
-        setMessage(result.templates_created+' official templates and draft pages are ready to edit.')
+      if(result.unavailable.length) {
+        setError('Approved page templates are unavailable. Contact the dashboard administrator.')
+      } else {
+        setError('')
       }
-    }catch(err){showError(err)}
-    finally{setOfficialSyncing(false)}
+    }catch(err){
+      showError(err)
+    }
   }
   useEffect(()=>{if(!user)return;setMessage('');if(nav==='Shared Content'){api<Record<string,string>>('/api/shared').then(setShared).catch(showError);api<typeof sharedUsage>('/api/shared/usage').then(setSharedUsage).catch(showError)};if(nav==='SEO')api<typeof redirects>('/api/redirects').then(setRedirects).catch(showError);if(nav==='Team Access'&&user.role==='admin')api<typeof team>('/api/users').then(setTeam).catch(showError);if(nav==='Media Library')api<typeof media>('/api/media').then(setMedia).catch(showError);if(nav==='SEO')api<typeof seoStatus>('/api/seo/status').then(setSeoStatus).catch(showError);if(nav==='Archived')api<Page[]>('/api/pages?include_archived=true').then(ps=>setArchivedPages(ps.filter(p=>p.archived))).catch(showError)},[nav,user])
   function showError(e:unknown){setError(e instanceof Error?e.message:String(e));setMessage('')}
@@ -1515,18 +1517,7 @@ export default function App(){
   {isModuleNav(nav)&&<div className="category-page">
     <div className="category-heading">
       <h1>{nav}</h1>
-      <p>{MODULE_INFO[nav].subtitle}</p>
-      {user.role==='admin'&&<button className="outline module-preload" type="button" disabled={busy||officialSyncing}
-        onClick={preloadOfficialTemplates}><UploadCloud size={16}/>{officialSyncing?'Loading approved pages…':'Preload approved templates'}</button>}
     </div>
-    {nav!=='Category'&&<details className="module-blueprint">
-      <summary><LayoutTemplate size={17}/> {nav} page form <span>{MODULE_INFO[nav].sections.length} sections</span><ChevronRight size={16}/></summary>
-      <div className="module-blueprint-grid">{MODULE_INFO[nav].sections.map(item=>
-        <div key={item} className="module-blueprint-item">
-          {item.toLowerCase().includes('read-only')&&<LockKeyhole size={15}/>}
-          <span>{item}</span></div>)}
-      </div>
-    </details>}
     <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label={nav+' views'}>
       {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
         <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
