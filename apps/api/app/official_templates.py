@@ -5,10 +5,9 @@ fetch destinations, never overwrites users' templates/pages, and seeds DRAFTS
 rather than publishing to the public site.
 """
 from dataclasses import dataclass
-from urllib.parse import urljoin, urlsplit
+from pathlib import Path
+from urllib.parse import urljoin
 import re
-
-import httpx
 from bs4 import BeautifulSoup
 
 from .template_engine import extract
@@ -111,23 +110,30 @@ def prepare_html(html: str) -> str:
 
 
 def fetch_official(item: OfficialPage) -> str:
-    url = PUBLIC_SITE + item.path
-    # Fixed host and redirect disabled prevent unexpected SSRF targets.
-    with httpx.Client(timeout=httpx.Timeout(18.0), follow_redirects=False,
-                      headers={'User-Agent': 'WorkspaceEmlenAdminTemplateSync/1.0'}) as client:
-        with client.stream('GET', url) as response:
-            response.raise_for_status()
-            if urlsplit(str(response.url)).hostname != 'workspacebyemlen.co.uk':
-                raise ValueError('Unexpected template source')
-            if 'text/html' not in response.headers.get('content-type', ''):
-                raise ValueError('Official source was not HTML')
-            chunks=[];size=0
-            for chunk in response.iter_bytes():
-                size += len(chunk)
-                if size > MAX_SOURCE_BYTES:
-                    raise ValueError('Official HTML exceeds the importer limit')
-                chunks.append(chunk)
-    return prepare_html(b''.join(chunks).decode('utf-8'))
+    """Import the approved, versioned HTML *bundled inside the API image*.
+
+    The production API network is internal-only and deliberately has no
+    internet egress. Never fetch live site pages during login or bootstrap.
+    These snapshots are copied from the public WE repo's built HTML, so they
+    include real content, section markup and hashed stylesheet references.
+    The browser loads normal public assets via HTTPS while the API stays private.
+    """
+    names = {
+        'managed': 'managed.html',
+        'one-person': 'one-person.html',
+        'property': 'property.html',
+    }
+    filename = names.get(item.code)
+    if filename is None:
+        raise ValueError('Unknown official template')
+    path = Path(__file__).with_name('official_pages') / filename
+    try:
+        source = path.read_text(encoding='utf-8')
+    except OSError as exc:
+        raise RuntimeError(f'Missing bundled approved template: {item.code}') from exc
+    if '<html' not in source.lower() or '<section' not in source.lower():
+        raise ValueError(f'Invalid bundled approved template: {item.code}')
+    return prepare_html(source)
 
 
 def _rename_sections(category: str, sections: list[dict]) -> list[dict]:
