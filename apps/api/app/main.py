@@ -433,8 +433,10 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     section_names={s['id']:s['name'] for s in t.sections}
     for entry in payload.fields:
         f=dict(existing[entry.key]);f['mode']=entry.mode;f['label']=entry.label
-        if read_only_section(t.category,section_names.get(f['section_id'],'')):
-            # Property testimonials are deliberately non-editable, even for admins.
+        if (read_only_section(t.category,section_names.get(f['section_id'],'')) or
+            (f.get('kind')=='link' and not str(f.get('default') or '').strip())):
+            # Lead magnets, enquiry, testimonials and non-navigating buttons
+            # are permanent content, not editable destination fields.
             f['mode']='static'
         if f['mode']=='global':
             if not entry.global_key or not re.fullmatch(r'[a-z][a-z0-9_]{1,100}',entry.global_key):
@@ -584,8 +586,12 @@ def enable_link_and_icon_editing(page_id:int,payload:dict,db:Session=Depends(get
                                      'object_key':get_template(db,p.template_id).object_key}
     updated=[]
     count=0
+    names={sec['id']:sec['name'] for sec in snapshot.get('sections',[])}
     for field in snapshot['fields']:
-        if field.get('mode')=='static' and field.get('kind') in ('link','icon'):
+        locked=read_only_section(snapshot.get('category',''),
+            names.get(field.get('section_id'),''))
+        empty_link=field.get('kind')=='link' and not str(field.get('default') or '').strip()
+        if not locked and not empty_link and field.get('mode')=='static' and field.get('kind') in ('link','icon'):
             updated.append({**field,'mode':'page'})
             count+=1
         else:updated.append(field)
@@ -637,6 +643,10 @@ def upgrade_page_repeaters(page_id:int,payload:dict,db:Session=Depends(get_db),u
                 field['default']=previous['default']
         elif field['key'] in repeated:
             field['mode']='page'
+        if (read_only_section(original.get('category',''),
+                next((sec['name'] for sec in sections if sec['id']==field['section_id']),'')) or
+            (field['kind']=='link' and not str(field.get('default') or '').strip())):
+            field['mode']='static'
     # Existing locked/static choices remain locked. The upgrade enables only
     # fields that were not previously detected and are in repeatable groups.
     key=f'pages/{p.id}/repeater-upgrade-{uuid4().hex}.html'
