@@ -53,8 +53,17 @@ def test_all_approved_pages_are_bundled_offline_and_editable():
             assert 'https://workspacebyemlen.co.uk/assets/img/jayanagar-workspace-' in source
             assert 'What workspace options are available?' in source
             assert any(sec['name']=='5 · Solutions' for sec in sections)
+        names={sec['name'] for sec in sections}
         if item.code=='one-person':
-            assert any('Options' in sec['name'] for sec in sections)
+            assert {'1A · Hero','1B · Values','3 · Options','4 · Customisation',
+                    '6 · Benefits','7 · How to Get Started','8 · Locations',
+                    '9 · FAQs'}.issubset(names)
+        if item.code=='property':
+            assert {'1A · Hero','2 · Photos','4 · Amenities','5 · Solutions',
+                    '6 · Location & Landmarks','7 · Testimonials','9 · FAQs'}.issubset(names)
+        if item.code=='managed':
+            assert {'1 · Hero','2 · Office Types','5 · Benefits',
+                    '6 · Why Us','7 · FAQs'}.issubset(names)
 
 
 def test_asset_refs_are_safe_and_absolute():
