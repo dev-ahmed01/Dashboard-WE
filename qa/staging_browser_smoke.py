@@ -45,7 +45,7 @@ def run():
                 "(el, key) => parseFloat(getComputedStyle(el)[key])", property_name
             )
         assert px(".category-heading h1") == 32, "Page title should be 32px"
-        assert px(".category-heading p") == 13, "Description should be 13px"
+        assert page.locator(".category-heading p").count() == 0, "Dashboard heading has no redundant description"
         assert px(".category-tabs button") == 14, "Tab labels should be 14px"
         assert px(".category-sidebar .nav-item") == 13, "Sidebar label should be 13px"
         assert px(".category-table-head") == 11, "Table header should be 11px"
@@ -59,12 +59,15 @@ def run():
         # Each module reuses the approved Category tabs without losing the editor.
         page.locator(".navigation").get_by_role("button", name="Solution").click()
         expect(page.get_by_role("heading", name="Solution", exact=True)).to_be_visible()
-        assert page.get_by_text("1A · Hero", exact=False).count() > 0
+        expect(page.get_by_text("One Person Office", exact=False).first).to_be_visible(timeout=30000)
         page.locator(".navigation").get_by_role("button", name="Property").click()
         expect(page.get_by_role("heading", name="Property", exact=True)).to_be_visible()
-        assert page.get_by_text("Testimonials: read-only", exact=False).count() > 0
+        expect(page.get_by_text("Workspace Property", exact=False).first).to_be_visible(timeout=30000)
         page.locator(".navigation").get_by_role("button", name="Category").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible()
+        expect(page.get_by_text("Managed Offices", exact=False).first).to_be_visible(timeout=30000)
+        assert page.locator(".module-blueprint").count() == 0
+        assert page.locator(".module-preload").count() == 0
         assert page.get_by_text("CONTENT MANAGEMENT").count() == 0
         tabs = page.locator(".category-tabs").get_by_role("tab")
         assert tabs.count() == 3
