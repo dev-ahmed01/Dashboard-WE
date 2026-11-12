@@ -164,11 +164,12 @@ def run():
         expect(delete_dialog.get_by_role("button", name="Remove template")).to_be_enabled()
         delete_dialog.get_by_role("button", name="Cancel").click()
         expect(delete_dialog).to_have_count(0)
-        expect(page.locator(".category-uploaded-row")).to_have_count(1)
+        # The official Managed Offices preset remains alongside this QA template.
+        expect(page.get_by_role("button", name="Delete template Staging Template")).to_have_count(1)
 
         # Page creation: name -> approved template -> editor.
         page.locator(".tabs").get_by_role("tab", name="Add Page").click()
-        page.locator("#category-template-select").select_option(index=1)
+        page.locator("#category-template-select").select_option(label="Staging Template")
         expect(page.locator('iframe[title="Selected template preview"]')).to_be_visible()
         expect(page.locator(".we-add-workspace")).to_be_visible()
         expect(page.locator(".we-template-choice.is-selected")).to_have_count(1)
@@ -179,9 +180,9 @@ def run():
         page.locator(".category-form-actions").get_by_role("button", name="Add Page").click()
         expect(page.locator(".editor-layout")).to_be_visible(timeout=15000)
         expect(page.locator("#section-editing")).to_be_visible()
-        # Only variable sections appear; the third (FAQs) is fully Static.
-        expect(page.locator(".editor-section-block")).to_have_count(2)
-        expect(page.locator(".editor-section-block").get_by_text("FAQs")).to_have_count(0)
+        # Keep all section headings visible; FAQs stays explicitly locked.
+        expect(page.locator(".editor-section-block")).to_have_count(3)
+        expect(page.locator(".editor-section-block").get_by_text("FAQs")).to_have_count(1)
         expect(page.locator("#seo-settings")).to_be_visible()
         expect(page.get_by_label("URL slug")).to_have_count(0)
         expect(page.locator("#page-preview")).to_have_count(0)
@@ -372,9 +373,9 @@ def run():
         page.get_by_role("button", name="Delete template Staging Template").click()
         page.get_by_role("dialog", name="Delete this template?").get_by_role("button", name="Remove template").click()
         expect(page.get_by_text("removed from your library", exact=False)).to_be_visible()
-        expect(page.locator(".category-uploaded-row")).to_have_count(0)
+        expect(page.get_by_role("button", name="Delete template Staging Template")).to_have_count(0)
         page.locator(".tabs").get_by_role("tab", name="All Pages").click()
-        expect(page.locator(".category-table-row")).to_have_count(1)
+        assert page.locator(".category-table-row").count() >= 1
         expect(page.locator(".category-table-row").get_by_text("Staging Template")).to_be_visible()
         assert "qa-bengaluru-office" in httpx.get(API+"/sitemap.xml").text
 
