@@ -143,23 +143,78 @@ def fetch_official(item: OfficialPage) -> str:
     return prepare_html(source)
 
 
-def _rename_sections(category: str, sections: list[dict]) -> list[dict]:
+# Stable section IDs come from the approved public website markup, not
+# descriptions that may change with each marketing copy revision.
+OFFICIAL_SECTION_IDS = {
+    'Solution Category': {
+        'top': '1 · Hero',
+        'offices': '2 · Office Types',
+        'other-wrap': '3 · Other Solutions',
+        'office-checklist': '4 · Office Consultation',
+        'benefits': '5 · Benefits',
+        'why-us': '6 · Why Us',
+        'faq': '7 · FAQs',
+    },
+    'Solution': {
+        'home': '1A · Hero',
+        'values': '1B · Values',
+        'options': '3 · Options',
+        'customise': '4 · Customisation',
+        'benefits': '6 · Benefits',
+        'consultation': 'Office Consultation',
+        'how-it-works': '7 · How to Get Started',
+        'locations': '8 · Locations',
+        'why-us': 'Why Us',
+        'faqs': '9 · FAQs',
+    },
+    'Property': {
+        'top': '1A · Hero',
+        'photos': '2 · Photos',
+        'highlights': '3 · Highlights',
+        'amenities': '4 · Amenities',
+        'property-cms-solutions': '5 · Solutions',
+        'locations': '6 · Location & Landmarks',
+        'testimonials': '7 · Testimonials',
+        'enquiry': '8 · Enquiry',
+        'faqs': '9 · FAQs',
+    },
+}
+
+
+def _rename_sections(category: str, sections: list[dict], html: str) -> list[dict]:
+    """Map each exact extracted node back to its original, stable section ID.
+
+    Marketing headings can change without renaming editor sections. The
+    sanitizer has already attached data-we-section IDs, so this is a precise
+    mapping even if designers add content or rearrange nesting.
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    official = OFFICIAL_SECTION_IDS.get(category, {})
     presets = (SOLUTION_SECTIONS if category == 'Solution' else
                PROPERTY_SECTIONS if category == 'Property' else CATEGORY_SECTIONS)
-    already=set();result=[]
+    used = set()
+    result = []
     for index, original in enumerate(sections):
-        section=dict(original)
-        name=str(section['name']).lower().strip()
-        # Default numbered names provide no meaningful hint, but first is
-        # the hero in all three approved designs.
-        candidates=[(title,markers) for title,markers in presets
-                    if any(mark in name for mark in markers)]
+        section = dict(original)
+        node = soup.find(attrs={'data-we-section': section['id']})
+        original_id = (str(node.get('id') or '').lower().strip() if node else '')
+        candidates = []
+        if original_id in official:
+            candidates.append(official[original_id])
+        if node:
+            for class_name in node.get('class', []):
+                if str(class_name).lower() in official:
+                    candidates.append(official[str(class_name).lower()])
+        # Legacy HTML fragments may have no canonical section IDs.
+        hint = (original_id + ' ' + str(section['name'])).lower().strip()
+        candidates.extend(title for title, markers in presets
+                          if any(marker in hint for marker in markers))
         if index == 0 and not candidates:
-            candidates=[presets[0]]
-        for title, _markers in candidates:
-            if title not in already:
+            candidates.append(presets[0][0])
+        for title in candidates:
+            if title not in used:
                 section['name'] = title
-                already.add(title)
+                used.add(title)
                 break
         result.append(section)
     return result
@@ -462,7 +517,7 @@ def make_template(item: OfficialPage, html: str):
     if item.category == 'Property':
         html = hydrate_property(html)
     source, sections, fields = extract(html)
-    sections = _rename_sections(item.category, sections)
+    sections = _rename_sections(item.category, sections, source)
     fields = _auto_fields(item.category, sections, fields)
     source, sections = overlay_metadata(source, sections, fields)
     # Solution option cards stop at FOUR total, not four extra copies.
