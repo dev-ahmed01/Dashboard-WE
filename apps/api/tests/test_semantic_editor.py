@@ -79,6 +79,30 @@ def test_office_options_have_original_regular_generic_and_highlight_variants():
     assert modified.find('style',attrs={'data-we-variant-css':'true'})
 
 
+def test_category_office_card_layout_presets_are_consistent():
+    html='''<!doctype html><html><head></head><body><main>
+    <section id="office-types"><h2>Offices</h2><div class="office-grid">
+    <a class="office-tile" href="#enquiry"><h3>One Person</h3><p>Private</p></a>
+    <a class="office-tile" href="#enquiry"><h3>Small Team</h3><p>Collaborate</p></a>
+    <a class="office-tile" href="#enquiry"><h3>Large Team</h3><p>Grow</p></a>
+    </div></section></main></body></html>'''
+    source,sections,fields=extract(html)
+    group=next(g for sec in sections for g in sec.get('repeaters',[])
+               if g['kind']=='solutions')
+    i,j=group['items'][:2]
+    values={
+       '__variant__'+group['id']+'__'+i['id']:'generic',
+       '__variant__'+group['id']+'__'+j['id']:'highlight',
+    }
+    markup=BeautifulSoup(render(source,fields,values,{}),'html.parser')
+    generic=markup.find(attrs={'data-we-repeat-item':i['id']})
+    highlight=markup.find(attrs={'data-we-repeat-item':j['id']})
+    assert 'grid-column:span 2!important' in generic.get('style','')
+    assert 'height:365px!important' in generic.get('style','')
+    assert 'outline:3px solid #ed2024' in highlight.get('style','')
+    assert 'grid-column:span 1!important' in highlight.get('style','')
+
+
 def test_existing_annotations_and_saved_keys_survive_repair():
     item,(source,sections,fields)=solution()
     old_soup=BeautifulSoup(source,'html.parser')
