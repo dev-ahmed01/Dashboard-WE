@@ -1031,6 +1031,28 @@ export default function App(){
   function deleteRepeatEntry(group:Repeater,index:number){
     putRepeatEntries(group,repeatEntries(group).filter((_,i)=>i!==index))
   }
+  function selectOptionLayout(group:Repeater,variant:'regular'|'generic'|'highlight',
+                              itemId?:string,addedIndex?:number){
+    if(!editor)return
+    const next={...editor.page.values}
+    const extras=repeatEntries(group).map(x=>({...x}))
+    if(addedIndex!==undefined&&extras[addedIndex]){
+      extras[addedIndex].__variant=variant
+    }else if(itemId){
+      next['__variant__'+group.id+'__'+itemId]=variant
+    }
+    if(variant==='highlight'){
+      // Exactly one highlighted card per office-option group.
+      group.items.forEach(x=>{
+        if(x.id!==itemId)next['__variant__'+group.id+'__'+x.id]='regular'
+      })
+      extras.forEach((x,i)=>{
+        if(i!==addedIndex && x.__variant==='highlight')extras[i].__variant='regular'
+      })
+    }
+    if(extras.length)next['__repeat__'+group.id]=JSON.stringify(extras)
+    changeCanvasValues(next,'option-layout-'+group.id)
+  }
   function existingItemFields(item:RepeaterItem,section:Section){
     const nested=variableRepeaterGroups(section,editor?.template.fields||[])
       .filter(x=>x.parent_item_id===item.id)
@@ -1059,7 +1081,7 @@ export default function App(){
               {(group.kind==='solutions'||group.kind==='options')&&<div className="editor-repeat-variant">
                 <span>Solution card layout</span>
                 <div className="editor-solution-tabs" role="tablist" aria-label={'Style for '+item.title}>
-                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>changeField('__variant__'+group.id+'__'+item.id,v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>selectOptionLayout(group,v,item.id)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
                 </div>
                 <small>Regular keeps the original size; Generic makes this card wider; Highlight accents one card.</small>
               </div>}
@@ -1081,7 +1103,7 @@ export default function App(){
               {(group.kind==='solutions'||group.kind==='options')&&<div className="editor-repeat-variant">
                 <span>Solution card layout</span>
                 <div className="editor-solution-tabs" role="tablist" aria-label={'Style for new '+suffix+' '+(index+1)}>
-                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>updateRepeatEntry(group,index,'__variant',v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>selectOptionLayout(group,v,undefined,index)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
                 </div>
                 <small>Regular keeps the original size; Generic makes this card wider; Highlight accents one card.</small>
               </div>}
