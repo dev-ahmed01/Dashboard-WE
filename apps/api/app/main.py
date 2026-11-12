@@ -754,9 +754,18 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
     if payload.values is not None:
         allowed={f['key']:f for f in t['fields'] if f['mode']=='page'}
         extra_keys={k for k in payload.values if k.startswith(REPEAT_PREFIX) or k.startswith(VARIANT_PREFIX) or k==DESIGN_KEY}
-        if not (set(payload.values)-extra_keys).issubset(allowed):
+        unknown=set(payload.values)-extra_keys-set(allowed)
+        # A draft created before the official template repair may still carry
+        # values for newly locked controls. Preserve those historic values
+        # unchanged for rollback, but never accept a new edit to them.
+        saved=p.values or {}
+        if any(k not in saved or payload.values[k]!=saved[k] for k in unknown):
             fail(422,'Attempted to change static or shared template fields')
         for key in extra_keys:
+            if key in saved and payload.values[key]==saved[key]:
+                # Same principle for older repeater entries: don't reject a
+                # routine Save simply because a now-static FAQ field existed.
+                continue
             if key==DESIGN_KEY:
                 try: validate_design(payload.values[key],t['sections'],t['fields'])
                 except ValueError as exc:fail(422,str(exc))
