@@ -772,6 +772,8 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
             else:validate_repeater_value(key,payload.values[key],t)
         newvals=dict(p.values or {})
         for key,value in payload.values.items():
+            if key in unknown:
+                continue  # unchanged legacy static value is already in newvals
             if key in extra_keys:
                 newvals[key]=value
                 continue
