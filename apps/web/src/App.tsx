@@ -183,7 +183,7 @@ function pageEditorBlocks(source:Field[]):EditorBlock[]{
   }
   return blocks.filter(b=>b.fields.length>0)
 }
-function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):string{
+function fieldDisplayName(f:Field,kind:EditorBlock['kind'],_position:number):string{
   if(f.kind==='link')return 'Button destination'
   if(f.kind==='icon')return f.attr==='class'?'Icon class (advanced)':'Replacement icon image URL'
   if(f.kind==='image')return kind==='card'?'Card image':'Image'
