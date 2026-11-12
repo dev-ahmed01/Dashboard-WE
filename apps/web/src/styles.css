@@ -2165,3 +2165,10 @@
   .category-sidebar .navigation{gap:5px}
   .category-heading .module-preload{margin-bottom:6px}
 }
+
+
+.property-solutions-switch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 17px;padding:8px;border-radius:18px;background:rgba(255,244,237,.76);border:1px solid #f0e5df}
+.property-solutions-switch button{padding:13px 10px;border:1px solid transparent;border-radius:12px;background:transparent;color:#5e5551;font-weight:700;font-size:13px}
+.property-solutions-switch button:hover{background:rgba(255,255,255,.8)}
+.property-solutions-switch button.selected{background:#ed2024;color:#fff;box-shadow:0 9px 19px rgba(237,32,36,.16)}
+@media(max-width:740px){.property-solutions-switch{grid-template-columns:repeat(2,minmax(0,1fr))}}
