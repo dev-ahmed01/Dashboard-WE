@@ -113,7 +113,10 @@ def test_legacy_page_upgrade_preserves_user_edits_and_is_idempotent(client):
                   values={},seo={'noindex':True,'nofollow':True},status='draft')
         db.add(demo);db.flush()
         f=next(f for f in template.fields if f['mode']=='page' and f['kind']=='text')
-        demo.values={f['key']:'My independently edited heading'}
+        fixed_section=next(sec for sec in template.sections if sec['name']=='Office Consultation')
+        formerly_editable=next(x for x in template.fields if x['section_id']==fixed_section['id'] and x['kind']=='text')
+        demo.values={f['key']:'My independently edited heading',
+                     formerly_editable['key']:'Legacy consultation draft value'}
         template.object_key=old
         template.version+=1
         db.commit()
@@ -127,7 +130,14 @@ def test_legacy_page_upgrade_preserves_user_edits_and_is_idempotent(client):
     assert saved.status_code==200
     page=saved.json()['page']
     assert page['values'][f['key']]=='My independently edited heading'
+    assert page['values'][formerly_editable['key']]=='Legacy consultation draft value'
     assert page['edit_version']>before_rev
+    allowed=put_page(client,target,auth,{'values':page['values']})
+    assert allowed.status_code==200,allowed.text
+    hostile=dict(page['values'])
+    hostile[formerly_editable['key']]='Unexpected edit to locked consultation'
+    rejected=put_page(client,target,auth,{'values':hostile})
+    assert rejected.status_code==422
     result=client.post('/api/official/bootstrap',headers=auth)
     assert result.json()['existing']==3 and result.json()['repaired']==0
     assert len(client.get('/api/templates',headers=auth).json())==3
