@@ -52,6 +52,36 @@ def test_property_testimonials_cannot_be_edited():
     assert all(f['mode']=='static' for f in fields if f['section_id']==review['id'])
 
 
+
+def test_property_source_hydrates_script_only_sections():
+    item=next(x for x in OFFICIAL_PAGES if x.code=='property')
+    source=HTML.replace(
+        '<section id="options">',
+        '<section id="photos"><h2>Photos</h2><div id="weGalGrid"></div></section><section id="options">'
+    ).replace(
+        '<section id="faq"><h2>FAQs</h2><div class="faq-list">',
+        '<section id="faqs"><h2>FAQs</h2><div class="faq-list">'
+    )
+    source=source.replace(
+        '<details><summary>What is included?</summary><p>Wi-Fi</p></details>',
+        ''
+    ).replace(
+        '<details><summary>Are rooms available?</summary><p>Yes</p></details>',
+        ''
+    )
+    html,sections,fields=make_template(item,prepare_html(source))
+    assert html.count('class="property-cms-card"')==10
+    assert html.count('class="property-cms-panel"')==4
+    assert html.count('<figure')>=4
+    assert 'What amenities are included?' in html
+    sol=next(s for s in sections if s['name']=='5 · Solutions')
+    groups=sol.get('repeaters',[])
+    assert {'Private Office','Coworking','Meeting Rooms','Additional'}.issubset(
+        {g['name'] for g in groups}
+    )
+    assert any(f['mode']=='page' for f in fields if f['section_id']==sol['id'])
+
+
 def test_idempotent_bootstrap_preserves_other_templates(client,monkeypatch):
     auth=login(client)
     monkeypatch.setattr(main,'fetch_official',lambda item:prepare_html(HTML))
