@@ -246,6 +246,7 @@ export default function App(){
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
   const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
+  const [propertySolutionsTab,setPropertySolutionsTab]=useState('Private Office')
   useEffect(()=>{
     if(!activeEditorSection)return
     const id=activeEditorSection
@@ -1457,6 +1458,11 @@ export default function App(){
       <div className="editor-content-workspace"><div className="editor-section-rows">
          {editableSections.map(section=>{
            const ordered=sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id))
+           const propertySolutions=editor.template.category==='Property'&&/solutions/i.test(section.name)
+           const tabNames=['Private Office','Coworking','Meeting Rooms','Additional']
+           const sectionItems=propertySolutions?ordered.items.filter(part=>
+             part.kind!=='group'||!part.group||!tabNames.includes(part.group.name)||part.group.name===propertySolutionsTab
+           ):ordered.items
            const sectionOpen=section.id===activeSectionId
            return <div className="editor-section-block" key={section.id} id={'edit-section-'+section.id}>
              <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
@@ -1465,11 +1471,17 @@ export default function App(){
                <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
              </button>
              {sectionOpen&&<div className="editor-page-ordered-list">
+               {propertySolutions&&<div className="property-solutions-switch" role="tablist" aria-label="Property workspace solution types">
+                 {tabNames.map(type=><button key={type} type="button" role="tab"
+                   aria-selected={propertySolutionsTab===type}
+                   className={propertySolutionsTab===type?'selected':''}
+                   onClick={()=>setPropertySolutionsTab(type)}>{type}</button>)}
+               </div>}
                {ordered.items.length===0&&<div className="editor-locked-section"><LockKeyhole size={17}/>
                    {editor.template.category==='Property'&&/testimonials|reviews/i.test(section.name)
                      ?'Testimonials are read-only to protect approved reviews.'
                      :'This section is Static. Its original design stays in the preview.'}</div>}
-               {ordered.items.map((part,i)=>part.kind==='group'&&part.group
+               {sectionItems.map((part,i)=>part.kind==='group'&&part.group
                  ?renderRepeaterGroup(part.group,section)
                  :part.block?editorBlockControl(part.block,i):null)}
              </div>}
