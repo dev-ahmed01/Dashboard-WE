@@ -277,9 +277,17 @@ def hydrate_property(html: str) -> str:
                 sources.append(url)
             if len(sources)>=5:break
         if not sources:
-            # Four explicit, editable photo slots. Blank until the editor uploads
-            # genuine property photography; never substitute an unrelated logo.
-            sources=['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+XUm6SAAAAABJRU5ErkJggg==']
+            # Real, approved Workspace by Emlen public-site photography.
+            # The compiled website keeps gallery data in external JavaScript,
+            # which is intentionally disabled in CMS previews. These stable,
+            # existing assets preserve a usable, fully populated gallery.
+            sources = [
+                PUBLIC_SITE+'/assets/img/jayanagar-workspace-8305969a.jpg',
+                PUBLIC_SITE+'/assets/img/jp-nagar-workspace-7a871d3c.webp',
+                PUBLIC_SITE+'/assets/img/bannerghatta-road-workspace-e85c27e2.webp',
+                PUBLIC_SITE+'/assets/img/arekere-workspace-f3cbd409.webp',
+                PUBLIC_SITE+'/assets/img/welcome-area-712a74c1.webp',
+            ]
         if sources:
             wrapper=soup.new_tag('div')
             wrapper['class']='property-cms-gallery'
@@ -332,30 +340,51 @@ def hydrate_property(html: str) -> str:
         amenities=soup.find(id='amenities')
         if amenities:amenities.insert_after(section)
         else:(soup.find('main') or soup.body).append(section)
-    # Restore approved live testimonial copy as FIXED, read-only cards.
-    # This extracts quoted literals from the known official page source without
-    # executing any script or inventing reviews/attribution.
+
+    # Original four approved reviews from WE property's reference source.
+    # Keep the source text fixed and never offer editable testimonial fields.
     testimonials=soup.find(id='testimonials')
     if testimonials and not testimonials.select_one('.property-cms-reviews'):
-        review_match=re.search(r'const\s+reviews\s*=\s*\[([\s\S]*?)\];',html)
-        if review_match:
-            review_records=re.findall(
-                r"\{tag:'([^']+)',quote:'([^']+)',initial:'([^']+)',name:'([^']+)',role:'([^']+)'\}",
-                review_match.group(1))
-            if review_records:
-                reviews=soup.new_tag('div')
-                reviews['class']='property-cms-reviews'
-                for tag,quote,_initial,name,role in review_records[:8]:
-                    card=soup.new_tag('article');card['class']='property-cms-review'
-                    tag_el=soup.new_tag('small');tag_el.string=tag
-                    quote_el=soup.new_tag('blockquote');quote_el.string=quote
-                    author=soup.new_tag('strong');author.string=name
-                    desc=soup.new_tag('small');desc.string=role
-                    card.extend([tag_el,quote_el,author,desc]);reviews.append(card)
-                testimonials.append(reviews)
+        approved_reviews=(
+            ('Genuine support',
+             'Their professionalism and attention to detail make a noticeable difference in the overall experience.',
+             'Saritha Kumari','Henry Harvin Education'),
+            ('Thoughtful spaces',
+             'The space is modern, clean, and well-equipped.',
+             'Jnanesh K','Workspace visitor'),
+            ('Great location',
+             'The best you can ask for in the heart of Jayanagar, near main road, yet very quiet.',
+             'Saandeep K Das','Upman Placements Pvt Ltd'),
+            ('Everyday comfort',
+             'Excellent workplace in Jayanagar 3rd block.',
+             'K Anand Anand','Workspace visitor'),
+        )
+        reviews=soup.new_tag('div')
+        reviews['class']='property-cms-reviews'
+        for tag,quote,name,role in approved_reviews:
+            card=soup.new_tag('article');card['class']='property-cms-review'
+            tag_el=soup.new_tag('small');tag_el.string=tag
+            quote_el=soup.new_tag('blockquote');quote_el.string=quote
+            author=soup.new_tag('strong');author.string=name
+            desc=soup.new_tag('small');desc.string=role
+            card.extend([tag_el,quote_el,author,desc]);reviews.append(card)
+        testimonials.append(reviews)
     # An editable map destination remains available even though security
     # sandboxing removes embedded third-party map iframes from previews.
     locations=soup.find(id='locations')
+    if locations:
+        # The location stage was otherwise empty without the public JS.
+        stage=locations.find(id='weLcPhotos')
+        if stage is not None and not stage.find('img'):
+            photo=soup.new_tag('img',alt='Workspace by Emlen — Jayanagar office')
+            photo['src']=PUBLIC_SITE+'/assets/img/jayanagar-workspace-8305969a.jpg'
+            photo['style']='width:100%;height:100%;object-fit:cover;display:block;border-radius:20px'
+            stage.append(photo)
+        detail=locations.find(id='weLcCard')
+        if detail is not None and not detail.get_text(' ',strip=True):
+            title=soup.new_tag('h3');title.string='Jayanagar workspace'
+            copy=soup.new_tag('p');copy.string='Jayanagar 3rd Block, Bengaluru'
+            detail.extend([title,copy])
     if locations and not locations.select_one('.property-cms-map-link'):
         map_link=soup.new_tag('a',href='https://www.google.com/maps/search/?api=1&query=Workspace+by+Emlen+Jayanagar')
         map_link['class']='property-cms-map-link'
@@ -367,12 +396,18 @@ def hydrate_property(html: str) -> str:
     if faqs:
         wrapper=faqs.select_one('.faq-list')
         if wrapper is not None and not wrapper.find('details'):
+            # Approved public-site FAQ copy, not generic placeholder text.
             content=(
-                ('Can I visit before choosing?', 'Contact our team to arrange a workspace visit.'),
-                ('What amenities are included?', 'Facilities may vary by office and plan; please confirm when enquiring.'),
-                ('Are private offices available?', 'Ask about private office formats for your team.'),
-                ('Can I book a meeting room?', 'Our team can explain the available meeting room options.'),
-                ('How do I get a quote?', 'Submit your workspace requirements using the enquiry form.'),
+                ('What workspace options are available?',
+                 'Explore private offices, coworking, meeting rooms and flexible workspace options. The best choice depends on your team size, preferred location and working style.'),
+                ('Can I choose a short-term plan?',
+                 'There are flexible options for different needs. Our team can confirm available terms and minimum commitments for your chosen workspace.'),
+                ('Are the offices fully furnished?',
+                 'Our managed office options are designed to be move-in ready. Exact furniture, facilities and inclusions depend on the office and plan you select.'),
+                ('Which locations can I choose from?',
+                 'Our current featured neighbourhoods are Jayanagar, JP Nagar, Bannerghatta Road and Arekere. Ask our team about exact addresses and current availability.'),
+                ('How quickly can I move in?',
+                 'It depends on the office you choose, availability and any requested changes. The team can confirm the expected move-in date after understanding your needs.'),
             )
             for question,answer in content:
                 detail=soup.new_tag('details')
