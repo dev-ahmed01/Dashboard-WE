@@ -67,7 +67,51 @@ CATEGORY_SECTIONS = (
 
 
 def official_key(code: str) -> str:
+    return f'templates/official-workspace-{code}-editor-v2.html'
+
+
+def legacy_official_key(code: str) -> str:
     return f'templates/official-workspace-{code}-2026.html'
+
+
+def embedded_styles(item: OfficialPage, html: str) -> str:
+    """Embed reviewed CSS with the official page to fix sandboxed srcdoc previews.
+
+    Bundled style assets follow the same build revision as the source HTML.
+    No remote CSS or JavaScript execution is required for the admin preview.
+    """
+    soup=BeautifulSoup(html,'html.parser')
+    if soup.find('style',attrs={'data-we-approved-design':'v2'}):
+        return html
+    css_dir=Path(__file__).with_name('official_pages')/'css'
+    sources={
+        'managed':'category.css',
+        'one-person':'one-person.css',
+        'property':'property.css',
+    }
+    approved={'site.css','site-navigation.css',sources[item.code]}
+    css=[]
+    for tag in list(soup.find_all('link',rel=lambda x:x and 'stylesheet' in x)):
+        url=str(tag.get('href',''))
+        if '/assets/css/' not in url:continue
+        filename=url.rsplit('/',1)[-1]
+        lookup=('site.css' if filename=='site.css' else
+                'site-navigation.css' if filename.startswith('site-navigation.') else
+                sources[item.code] if filename.startswith(sources[item.code].split('.')[0]+'.') else None)
+        if lookup in approved:
+            if lookup not in css:css.append(lookup)
+            tag.decompose()
+    for filename in ('site.css','site-navigation.css',sources[item.code]):
+        if filename not in css:css.append(filename)
+    style=soup.new_tag('style')
+    style['data-we-approved-design']='v2'
+    style.string='\n'.join((css_dir/filename).read_text(encoding='utf-8')
+                           for filename in css)
+    (soup.head or soup.html).append(style)
+    output=str(soup)
+    if len(output.encode('utf-8'))>MAX_SOURCE_BYTES:
+        raise ValueError('Official template plus bundled CSS exceeds the importer limit')
+    return output
 
 
 def prepare_html(html: str) -> str:
@@ -220,43 +264,102 @@ def _rename_sections(category: str, sections: list[dict], html: str) -> list[dic
     return result
 
 
-def _auto_fields(category: str, sections: list[dict], fields: list[dict]) -> list[dict]:
+def read_only_section(category: str, name: str) -> bool:
+    text=name.lower()
+    if category == 'Property':
+        return 'testimonial' in text or 'review' in text
+    if category in ('Solution', 'Solution Category'):
+        return 'consultation' in text or 'why us' in text
+    return False
+
+
+def _auto_fields(category: str, sections: list[dict], fields: list[dict],
+                 source: str, preserve_existing: bool=False) -> list[dict]:
+    """Assign editorial fields only to actual content and actionable CTAs.
+
+    Button-like selectors/tabs and FAQs must not gain destination controls.
+    This works on both freshly imported templates and pre-existing annotated
+    official sources without changing their field keys or saved page values.
+    """
+    soup=BeautifulSoup(source,'html.parser')
     names={s['id']:s['name'].lower() for s in sections}
-    output=[]
     counters={}
-    for item in fields:
-        field=dict(item)
-        sec=names.get(field['section_id'], '')
-        read_only = category == 'Property' and (
-            'testimonial' in sec or 'review' in sec
-        )
-        # Do not make icons and layout-only SVGs free-form editors.
-        field['mode'] = ('page' if not read_only and
-                         field['kind'] in ('text','textarea','image','link') else 'static')
-        field['global_key']=None
-        if field['mode']=='page':
-            key=(field['section_id'],field.get('kind'),field.get('tag'))
-            counters[key]=counters.get(key,0)+1
-            no=counters[key]
-            if field['kind']=='image':
-                name='Featured image' if 'photo' in sec and no==1 else 'Image' if no==1 else f'Image {no}'
-            elif field['kind']=='link':
-                name='CTA link' if no==1 else f'CTA link {no}'
-            elif field.get('tag')=='h1':
-                name='Heading'
-            elif field.get('tag') in ('h2','h3','h4','h5','h6'):
-                name='Heading' if no==1 else f'Card / subheading {no}'
-            elif field.get('tag')=='summary' and 'faq' in sec:
-                name=f'Question {no}'
-            elif field.get('tag')=='li':
-                name=f'Highlight / bullet point {no}'
-            elif field.get('tag')=='p':
-                name='Description' if no==1 else f'Description {no}'
-            else:
-                name=str(field.get('label') or 'Text')[:95]
-            field['label'] = name
-        output.append(field)
-    return output
+    result=[]
+    for raw in fields:
+        f=dict(raw)
+        section=names.get(f['section_id'],'')
+        marker=f.get('marker') or 'data-we-field'
+        node=soup.find(attrs={marker:f['key']})
+        ancestor=node
+        classes=set()
+        while ancestor is not None and getattr(ancestor,'name',None):
+            classes.update(ancestor.get('class',[]))
+            ancestor=ancestor.parent
+        is_faq='faq' in section or bool(classes&{'faq-item','faq-toggle','faq-answer'})
+        selection=bool(classes&{'cz-seg-btn','cz-tile','bn-dot','bn-dot-n','bn-dot-bar',
+                                'cz-seg','bn-nav','faq-sign','we-tabs','sol-tab'})
+        if node is not None and (node.has_attr('data-size') or node.has_attr('data-pref') or
+                                  node.has_attr('data-i') or node.get('role') in ('tab','radio','switch')):
+            selection=True
+        question=is_faq and (f.get('tag') in ('button','summary') or
+               bool(classes&{'faq-toggle'}))
+        answer=is_faq and bool(classes&{'faq-answer'})
+        is_empty_link=f.get('kind')=='link' and str(f.get('default') or '').strip() in ('','#','#!')
+        is_faq_link=f.get('kind')=='link' and bool(classes&{'faq-item','faq-toggle'})
+        is_control_link=f.get('kind')=='link' and (selection or is_faq_link)
+        locked=read_only_section(category,section) or selection or is_empty_link or is_control_link
+        if f['kind']=='icon' or locked:
+            f['mode']='static'
+        elif not preserve_existing:
+            f['mode']='page' if f['kind'] in ('text','textarea','image','link') else 'static'
+        f['global_key']=f.get('global_key') if f['mode']=='global' else None
+
+        if f['kind']=='image':
+            name='Office card image' if 'options' in section or 'solutions' in section else 'Image'
+        elif f['kind']=='link':
+            name='CTA destination'
+        elif question:
+            name='Question'
+        elif answer:
+            name='Answer'
+        elif f['tag']=='h1':
+            name='Main heading'
+        elif f.get('tag') in ('h2','h3','h4','h5','h6'):
+            name='Heading'
+        elif f.get('tag')=='li':
+            val=' '.join(str(f.get('default','')).split())
+            name=('Bullet point — '+val[:62]) if val else 'Bullet point'
+        elif f.get('tag')=='p':
+            name='Description'
+        elif f.get('tag') in ('a','button'):
+            name='CTA text' if f['kind'] in ('text','textarea') else 'CTA destination'
+        elif f.get('tag') in ('div','strong','b','span'):
+            name='Description' if f['kind']=='textarea' else 'Text'
+        else:
+            name='Description' if f['kind']=='textarea' else 'Text'
+        # Preserve an explicitly custom admin label when refining old fields.
+        previous=str(f.get('label') or '')
+        old_generated=previous.startswith(('Text:','Paragraph:','Button text:','Link destination:',
+                                           'List item:', 'H1 heading:','H2 heading:','H3 heading:')) or (
+                                           previous in ('Description','CTA link','Link to anchor / destination'))
+        if not preserve_existing or old_generated or not previous:
+            f['label']=name[:120]
+        result.append(f)
+    return result
+
+
+def refine_existing(item: OfficialPage, source: str, sections: list[dict],
+                    fields: list[dict]):
+    """Migrate an old official template non-destructively; keep field IDs.
+
+    Saved values remain keyed to the exact same annotated elements. New
+    repeaters/variants are re-detected; published snapshots are not altered.
+    """
+    source=embedded_styles(item,source)
+    sections=[dict(sec) for sec in sections]
+    fields=_auto_fields(item.category,sections,fields,source,preserve_existing=True)
+    source,sections=overlay_metadata(source,sections,fields)
+    return source,sections,fields
 
 
 
@@ -516,9 +619,9 @@ def make_template(item: OfficialPage, html: str):
     """Return sanitized HTML, named sections and automatically editable fields."""
     if item.category == 'Property':
         html = hydrate_property(html)
-    source, sections, fields = extract(html)
+    source, sections, fields = extract(embedded_styles(item,html))
     sections = _rename_sections(item.category, sections, source)
-    fields = _auto_fields(item.category, sections, fields)
+    fields = _auto_fields(item.category, sections, fields, source)
     source, sections = overlay_metadata(source, sections, fields)
     # Solution option cards stop at FOUR total, not four extra copies.
     for section in sections:
@@ -530,8 +633,3 @@ def make_template(item: OfficialPage, html: str):
                     group['max_additions']=max(0,4-len(group['items']))
     return source, sections, fields
 
-
-def read_only_section(category: str, name: str) -> bool:
-    return category == 'Property' and any(token in name.lower() for token in (
-        'testimonial', 'review'
-    ))
