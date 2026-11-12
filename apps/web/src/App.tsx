@@ -992,7 +992,7 @@ export default function App(){
          value.startsWith('/')&&!value.startsWith('//')?<small>This is a website page path. Test it after the page is published.</small>:
          <small>Enter a full website URL, a section anchor (#enquiry), a phone number starting with tel:, or an email starting with mailto:.</small>}
       </div>}
-      {field.kind!=='icon'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
+      {field.kind!=='icon'&&field.kind!=='link'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
       {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
     </div>
   }
@@ -1124,7 +1124,7 @@ export default function App(){
                     ?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
                     :<small>Use a URL, #anchor, tel: or mailto: destination.</small>}</div>}
                   {(field.kind==='image'||field.kind==='icon'&&field.attr!=='icon_src')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
-                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+                  {field.kind!=='image'&&field.kind!=='icon'&&field.kind!=='link'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
                 </div>
               })}
               <div className="editor-repeat-actions">
