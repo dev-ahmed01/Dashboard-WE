@@ -341,14 +341,11 @@ def run():
         page.get_by_label("Meta description").fill("A staging-only office page for verifying metadata and publication.")
         expect(page.locator(".we-seo-workspace")).to_be_visible()
         expect(page.locator(".seo-serp-result")).to_contain_text("QA office for Bengaluru")
-        page.get_by_role("tab", name="Social").click()
-        expect(page.locator(".we-social-preview-card")).to_contain_text("QA office for Bengaluru")
+        # Search/Social mode switch was intentionally removed as clutter.
+        assert page.locator(".we-seo-preview-tabs").count()==0
+        expect(page.locator(".we-search-preview-desktop")).to_be_visible()
         page.locator(".we-seo-social-fields summary").click()
         page.get_by_label("Social title").fill("QA social link title")
-        expect(page.locator(".we-social-preview-card")).to_contain_text("QA social link title")
-        page.get_by_role("tab", name="Search").click()
-        page.get_by_role("button", name="Mobile").click()
-        expect(page.locator(".we-search-preview-mobile")).to_be_visible()
         page.get_by_role("radio", name="Index", exact=True).check()
         expect(page.get_by_role("radio", name="Index", exact=True)).to_be_checked()
         page.get_by_role("checkbox", name="Nofollow").check()
