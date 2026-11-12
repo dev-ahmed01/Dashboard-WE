@@ -1514,7 +1514,7 @@ export default function App(){
           {item.toLowerCase().includes('read-only')&&<LockKeyhole size={15}/>}
           <span>{item}</span></div>)}
       </div>
-    </details>
+    </details>}
     <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label={nav+' views'}>
       {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
         <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
