@@ -220,6 +220,7 @@ PROPERTY_CSS = """
 #property-cms-tab-additional:checked~.property-cms-panels #property-cms-additional{display:block}
 #property-cms-solutions .property-tab-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
 #property-cms-solutions .property-cms-card{padding:22px;border-radius:24px;background:linear-gradient(145deg,#fff,#fff8f2);border:1px solid #eee7e4;box-shadow:0 12px 24px rgba(64,38,29,.06)}
+#property-cms-solutions .property-cms-card-photo{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:15px;margin:0 0 15px;background:#f8ebe0}
 #property-cms-solutions .property-cms-card h3{font:800 22px/1.2 'Bricolage Grotesque',Arial,sans-serif}
 #property-cms-solutions .property-cms-card p{margin:12px 0;font:400 14px/1.65 Poppins,Arial,sans-serif;color:#514b47}
 #property-cms-solutions .property-cms-card small{display:block;color:#ed2024;margin:10px 0;font:700 13px Poppins,Arial,sans-serif}
@@ -243,12 +244,41 @@ PROPERTY_CSS = """
 """
 
 PROPERTY_CARD_TABS = (
-    ('private', 'Private Office', ('One Person Office','Small Team Office','Large Team Office','Full Floor Office')),
-    ('coworking', 'Coworking', ('Coworking Option 1','Coworking Option 2')),
-    ('meeting', 'Meeting Rooms', ('Meeting Room Option 1','Meeting Room Option 2')),
-    ('additional', 'Additional', ('Additional Solution 1','Additional Solution 2')),
+    ('private', 'Private Office', (
+        ('One Person Office','A quiet, private workspace to focus on what matters.','Private workspace',
+         'one-person-office-dfb5956b.webp'),
+        ('Small Team Office','A comfortable team base without the setup overhead.','Team-ready',
+         'jp-nagar-workspace-7a871d3c.webp'),
+        ('Large Team Office','More space to collaborate, plan and keep growing.','Room to grow',
+         'bannerghatta-road-workspace-e85c27e2.webp'),
+        ('Full Floor Office','A dedicated workspace for larger teams and operations.','Dedicated floor',
+         'workstations-2d09a12b.jpg'),
+    )),
+    ('coworking', 'Coworking', (
+        ('Dedicated Desk','Keep a familiar desk in a shared professional environment.','Regular workspace',
+         'community-work-17db361c.jpg'),
+        ('Coworking Access Plans','Flexible access for hybrid work and changing schedules.','Flexible access',
+         'workstations-2d09a12b.jpg'),
+        ('Day Pass','Get a professional place to work whenever you need one.','Day access',
+         'jayanagar-workspace-8305969a.jpg'),
+    )),
+    ('meeting', 'Meeting Rooms', (
+        ('Meeting Rooms','A dedicated setting for team and client conversations.','Professional setting',
+         'meeting-space-dee1cf8a.jpg'),
+        ('Training Rooms','A comfortable space for workshops and group sessions.','Group sessions',
+         'private-meeting-room-ca25c712.webp'),
+    )),
+    ('additional', 'Additional', (
+        ('Virtual Office','Build a professional business presence with a lighter footprint.','Business presence',
+         'welcome-area-712a74c1.webp'),
+        ('Day Office','Use a private workspace for the day when you need extra focus.','Private space',
+         'one-person-office-dfb5956b.webp'),
+        ('Event Space','A flexible environment for hosting professional gatherings.','Events',
+         'community-work-17db361c.jpg'),
+        ('Enterprise & GCC','Discuss tailored workspace needs for larger organisations.','Custom plans',
+         'workstations-2d09a12b.jpg'),
+    )),
 )
-
 
 def hydrate_property(html: str) -> str:
     """Make the approved Property source editable without executing its scripts.
@@ -327,13 +357,17 @@ def hydrate_property(html: str) -> str:
             panel=soup.new_tag('div',id='property-cms-'+code);panel['class']='property-cms-panel'
             cards=soup.new_tag('div');cards['class']='property-tab-cards'
             cards['data-we-repeat-name']=title
-            for name in items:
+            for name,description,highlight,photo in items:
                 card=soup.new_tag('article');card['class']='property-cms-card'
+                image=soup.new_tag('img',alt=f'Illustrative workspace for {name}')
+                image['class']='property-cms-card-photo'
+                image['src']=PUBLIC_SITE+'/assets/img/'+photo
                 heading=soup.new_tag('h3');heading.string=name
-                desc=soup.new_tag('p');desc.string='Tell us your requirements to explore suitable workspace options.'
+                desc=soup.new_tag('p');desc.string=description
+                badge=soup.new_tag('small');badge.string=highlight
                 price=soup.new_tag('small');price.string='Pricing on request · Speak to our team'
                 link=soup.new_tag('a',href='#enquiry');link.string='Get a quote'
-                card.append(heading);card.append(desc);card.append(price);card.append(link)
+                card.extend([image,heading,desc,badge,price,link])
                 cards.append(card)
             panel.append(cards);panels.append(panel)
         inner.append(panels);section.append(inner)
