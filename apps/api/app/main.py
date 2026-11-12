@@ -684,7 +684,7 @@ def validate_repeater_value(key,value,t):
     fields={f['key']:f for f in t['fields']}
     if key.startswith(VARIANT_PREFIX):
         for group in groups.values():
-            if group['kind']!='solutions':continue
+            if group['kind'] not in ('solutions','options'):continue
             if key in {VARIANT_PREFIX+group['id']+'__'+i['id'] for i in group['items']}:
                 if value not in VARIANTS:fail(422,'Unknown solution card style')
                 if not any(fields.get(fk,{}).get('mode')=='page'
@@ -708,7 +708,7 @@ def validate_repeater_value(key,value,t):
     for entry in entries:
         if not isinstance(entry,dict):
             fail(422,'Every repeater item must be an object')
-        if not set(entry).issubset(set(available)|({'__variant'} if group['kind']=='solutions' else set())):
+        if not set(entry).issubset(set(available)|({'__variant'} if group['kind'] in ('solutions','options') else set())):
             fail(422,'Repeater contains a static or unrecognized field')
         if '__variant' in entry and entry['__variant'] not in VARIANTS:
             fail(422,'Invalid solution card style')
