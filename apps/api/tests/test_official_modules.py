@@ -1,7 +1,7 @@
 """Three native CMS modules and their idempotent official template bootstrap."""
 from app import main
 from app.official_templates import (
-    OFFICIAL_PAGES, make_template, prepare_html, official_key, read_only_section,
+    OFFICIAL_PAGES, make_template, prepare_html, official_key, read_only_section, fetch_official,
 )
 from tests.test_persona_qa import client, login, FakeStore
 from app.db import SessionLocal
@@ -24,6 +24,46 @@ HTML="""<!doctype html><html><head>
 <details><summary>Are rooms available?</summary><p>Yes</p></details>
 </div></section>
 </main></body></html>"""
+
+
+
+def test_all_approved_pages_are_bundled_offline_and_editable():
+    """No internet is needed to prepare Category, Solution or Property."""
+    expected={
+        'managed': ('#benefits', 'Managed Offices'),
+        'one-person': ('#how-it-works', 'One Person Office'),
+        'property': ('#testimonials', 'Workspace Property'),
+    }
+    for item in OFFICIAL_PAGES:
+        html=fetch_official(item)
+        assert len(html)>15000
+        assert '<section' in html
+        assert 'https://workspacebyemlen.co.uk/assets/css/' in html
+        assert 'src="/assets/' not in html and 'href="/assets/' not in html
+        source,sections,fields=make_template(item,html)
+        assert len(sections)>=6
+        assert len(fields)>=15
+        assert item.category in ('Solution Category','Solution','Property')
+        assert expected[item.code][0][1:] in source
+        assert source and all('id' in sec for sec in sections)
+        assert any(field['mode']=='page' for field in fields)
+        if item.code=='property':
+            assert 'Saritha Kumari' in source
+            assert 'Saandeep K Das' in source
+            assert 'https://workspacebyemlen.co.uk/assets/img/jayanagar-workspace-' in source
+            assert 'What workspace options are available?' in source
+            assert any(sec['name']=='5 · Solutions' for sec in sections)
+        names={sec['name'] for sec in sections}
+        if item.code=='one-person':
+            assert {'1A · Hero','1B · Values','3 · Options','4 · Customisation',
+                    '6 · Benefits','7 · How to Get Started','8 · Locations',
+                    '9 · FAQs'}.issubset(names)
+        if item.code=='property':
+            assert {'1A · Hero','2 · Photos','4 · Amenities','5 · Solutions',
+                    '6 · Location & Landmarks','7 · Testimonials','9 · FAQs'}.issubset(names)
+        if item.code=='managed':
+            assert {'1 · Hero','2 · Office Types','5 · Benefits',
+                    '6 · Why Us','7 · FAQs'}.issubset(names)
 
 
 def test_asset_refs_are_safe_and_absolute():
@@ -70,10 +110,10 @@ def test_property_source_hydrates_script_only_sections():
         ''
     )
     html,sections,fields=make_template(item,prepare_html(source))
-    assert html.count('class="property-cms-card"')==10
+    assert html.count('class="property-cms-card"')==13
     assert html.count('class="property-cms-panel"')==4
     assert html.count('<figure')>=4
-    assert 'What amenities are included?' in html
+    assert 'What workspace options are available?' in html
     sol=next(s for s in sections if s['name']=='5 · Solutions')
     groups=sol.get('repeaters',[])
     assert {'Private Office','Coworking','Meeting Rooms','Additional'}.issubset(

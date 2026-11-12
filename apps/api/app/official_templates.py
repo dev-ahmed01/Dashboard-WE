@@ -5,10 +5,9 @@ fetch destinations, never overwrites users' templates/pages, and seeds DRAFTS
 rather than publishing to the public site.
 """
 from dataclasses import dataclass
-from urllib.parse import urljoin, urlsplit
+from pathlib import Path
+from urllib.parse import urljoin
 import re
-
-import httpx
 from bs4 import BeautifulSoup
 
 from .template_engine import extract
@@ -92,6 +91,13 @@ def prepare_html(html: str) -> str:
             value = tag.get('href')
             if isinstance(value, str) and value.startswith('/'):
                 tag['href'] = urljoin(PUBLIC_SITE, value)
+        # Bundled page links to approved PDFs/icons are browser assets too.
+        # Without this, the editor preview incorrectly loads /assets/ from
+        # admin.workspacebyemlen.co.uk instead of the public website.
+        if tag.name in ('a', 'link'):
+            value = tag.get('href')
+            if isinstance(value, str) and value.startswith('/assets/'):
+                tag['href'] = urljoin(PUBLIC_SITE, value)
         if tag.get('srcset'):
             parts = []
             for part in str(tag['srcset']).split(','):
@@ -111,42 +117,104 @@ def prepare_html(html: str) -> str:
 
 
 def fetch_official(item: OfficialPage) -> str:
-    url = PUBLIC_SITE + item.path
-    # Fixed host and redirect disabled prevent unexpected SSRF targets.
-    with httpx.Client(timeout=httpx.Timeout(18.0), follow_redirects=False,
-                      headers={'User-Agent': 'WorkspaceEmlenAdminTemplateSync/1.0'}) as client:
-        with client.stream('GET', url) as response:
-            response.raise_for_status()
-            if urlsplit(str(response.url)).hostname != 'workspacebyemlen.co.uk':
-                raise ValueError('Unexpected template source')
-            if 'text/html' not in response.headers.get('content-type', ''):
-                raise ValueError('Official source was not HTML')
-            chunks=[];size=0
-            for chunk in response.iter_bytes():
-                size += len(chunk)
-                if size > MAX_SOURCE_BYTES:
-                    raise ValueError('Official HTML exceeds the importer limit')
-                chunks.append(chunk)
-    return prepare_html(b''.join(chunks).decode('utf-8'))
+    """Import the approved, versioned HTML *bundled inside the API image*.
+
+    The production API network is internal-only and deliberately has no
+    internet egress. Never fetch live site pages during login or bootstrap.
+    These snapshots are copied from the public WE repo's built HTML, so they
+    include real content, section markup and hashed stylesheet references.
+    The browser loads normal public assets via HTTPS while the API stays private.
+    """
+    names = {
+        'managed': 'managed.html',
+        'one-person': 'one-person.html',
+        'property': 'property.html',
+    }
+    filename = names.get(item.code)
+    if filename is None:
+        raise ValueError('Unknown official template')
+    path = Path(__file__).with_name('official_pages') / filename
+    try:
+        source = path.read_text(encoding='utf-8')
+    except OSError as exc:
+        raise RuntimeError(f'Missing bundled approved template: {item.code}') from exc
+    if '<html' not in source.lower() or '<section' not in source.lower():
+        raise ValueError(f'Invalid bundled approved template: {item.code}')
+    return prepare_html(source)
 
 
-def _rename_sections(category: str, sections: list[dict]) -> list[dict]:
+# Stable section IDs come from the approved public website markup, not
+# descriptions that may change with each marketing copy revision.
+OFFICIAL_SECTION_IDS = {
+    'Solution Category': {
+        'top': '1 · Hero',
+        'offices': '2 · Office Types',
+        'other-wrap': '3 · Other Solutions',
+        'office-checklist': '4 · Office Consultation',
+        'benefits': '5 · Benefits',
+        'why-us': '6 · Why Us',
+        'faq': '7 · FAQs',
+    },
+    'Solution': {
+        'home': '1A · Hero',
+        'values': '1B · Values',
+        'options': '3 · Options',
+        'customise': '4 · Customisation',
+        'benefits': '6 · Benefits',
+        'consultation': 'Office Consultation',
+        'how-it-works': '7 · How to Get Started',
+        'locations': '8 · Locations',
+        'why-us': 'Why Us',
+        'faqs': '9 · FAQs',
+    },
+    'Property': {
+        'top': '1A · Hero',
+        'photos': '2 · Photos',
+        'highlights': '3 · Highlights',
+        'amenities': '4 · Amenities',
+        'property-cms-solutions': '5 · Solutions',
+        'locations': '6 · Location & Landmarks',
+        'testimonials': '7 · Testimonials',
+        'enquiry': '8 · Enquiry',
+        'faqs': '9 · FAQs',
+    },
+}
+
+
+def _rename_sections(category: str, sections: list[dict], html: str) -> list[dict]:
+    """Map each exact extracted node back to its original, stable section ID.
+
+    Marketing headings can change without renaming editor sections. The
+    sanitizer has already attached data-we-section IDs, so this is a precise
+    mapping even if designers add content or rearrange nesting.
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    official = OFFICIAL_SECTION_IDS.get(category, {})
     presets = (SOLUTION_SECTIONS if category == 'Solution' else
                PROPERTY_SECTIONS if category == 'Property' else CATEGORY_SECTIONS)
-    already=set();result=[]
+    used = set()
+    result = []
     for index, original in enumerate(sections):
-        section=dict(original)
-        name=str(section['name']).lower().strip()
-        # Default numbered names provide no meaningful hint, but first is
-        # the hero in all three approved designs.
-        candidates=[(title,markers) for title,markers in presets
-                    if any(mark in name for mark in markers)]
+        section = dict(original)
+        node = soup.find(attrs={'data-we-section': section['id']})
+        original_id = (str(node.get('id') or '').lower().strip() if node else '')
+        candidates = []
+        if original_id in official:
+            candidates.append(official[original_id])
+        if node:
+            for class_name in node.get('class', []):
+                if str(class_name).lower() in official:
+                    candidates.append(official[str(class_name).lower()])
+        # Legacy HTML fragments may have no canonical section IDs.
+        hint = (original_id + ' ' + str(section['name'])).lower().strip()
+        candidates.extend(title for title, markers in presets
+                          if any(marker in hint for marker in markers))
         if index == 0 and not candidates:
-            candidates=[presets[0]]
-        for title, _markers in candidates:
-            if title not in already:
+            candidates.append(presets[0][0])
+        for title in candidates:
+            if title not in used:
                 section['name'] = title
-                already.add(title)
+                used.add(title)
                 break
         result.append(section)
     return result
@@ -214,6 +282,7 @@ PROPERTY_CSS = """
 #property-cms-tab-additional:checked~.property-cms-panels #property-cms-additional{display:block}
 #property-cms-solutions .property-tab-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
 #property-cms-solutions .property-cms-card{padding:22px;border-radius:24px;background:linear-gradient(145deg,#fff,#fff8f2);border:1px solid #eee7e4;box-shadow:0 12px 24px rgba(64,38,29,.06)}
+#property-cms-solutions .property-cms-card-photo{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:15px;margin:0 0 15px;background:#f8ebe0}
 #property-cms-solutions .property-cms-card h3{font:800 22px/1.2 'Bricolage Grotesque',Arial,sans-serif}
 #property-cms-solutions .property-cms-card p{margin:12px 0;font:400 14px/1.65 Poppins,Arial,sans-serif;color:#514b47}
 #property-cms-solutions .property-cms-card small{display:block;color:#ed2024;margin:10px 0;font:700 13px Poppins,Arial,sans-serif}
@@ -237,12 +306,41 @@ PROPERTY_CSS = """
 """
 
 PROPERTY_CARD_TABS = (
-    ('private', 'Private Office', ('One Person Office','Small Team Office','Large Team Office','Full Floor Office')),
-    ('coworking', 'Coworking', ('Coworking Option 1','Coworking Option 2')),
-    ('meeting', 'Meeting Rooms', ('Meeting Room Option 1','Meeting Room Option 2')),
-    ('additional', 'Additional', ('Additional Solution 1','Additional Solution 2')),
+    ('private', 'Private Office', (
+        ('One Person Office','A quiet, private workspace to focus on what matters.','Private workspace',
+         'one-person-office-dfb5956b.webp'),
+        ('Small Team Office','A comfortable team base without the setup overhead.','Team-ready',
+         'jp-nagar-workspace-7a871d3c.webp'),
+        ('Large Team Office','More space to collaborate, plan and keep growing.','Room to grow',
+         'bannerghatta-road-workspace-e85c27e2.webp'),
+        ('Full Floor Office','A dedicated workspace for larger teams and operations.','Dedicated floor',
+         'workstations-2d09a12b.jpg'),
+    )),
+    ('coworking', 'Coworking', (
+        ('Dedicated Desk','Keep a familiar desk in a shared professional environment.','Regular workspace',
+         'community-work-17db361c.jpg'),
+        ('Coworking Access Plans','Flexible access for hybrid work and changing schedules.','Flexible access',
+         'workstations-2d09a12b.jpg'),
+        ('Day Pass','Get a professional place to work whenever you need one.','Day access',
+         'jayanagar-workspace-8305969a.jpg'),
+    )),
+    ('meeting', 'Meeting Rooms', (
+        ('Meeting Rooms','A dedicated setting for team and client conversations.','Professional setting',
+         'meeting-space-dee1cf8a.jpg'),
+        ('Training Rooms','A comfortable space for workshops and group sessions.','Group sessions',
+         'private-meeting-room-ca25c712.webp'),
+    )),
+    ('additional', 'Additional', (
+        ('Virtual Office','Build a professional business presence with a lighter footprint.','Business presence',
+         'welcome-area-712a74c1.webp'),
+        ('Day Office','Use a private workspace for the day when you need extra focus.','Private space',
+         'one-person-office-dfb5956b.webp'),
+        ('Event Space','A flexible environment for hosting professional gatherings.','Events',
+         'community-work-17db361c.jpg'),
+        ('Enterprise & GCC','Discuss tailored workspace needs for larger organisations.','Custom plans',
+         'workstations-2d09a12b.jpg'),
+    )),
 )
-
 
 def hydrate_property(html: str) -> str:
     """Make the approved Property source editable without executing its scripts.
@@ -271,9 +369,17 @@ def hydrate_property(html: str) -> str:
                 sources.append(url)
             if len(sources)>=5:break
         if not sources:
-            # Four explicit, editable photo slots. Blank until the editor uploads
-            # genuine property photography; never substitute an unrelated logo.
-            sources=['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+XUm6SAAAAABJRU5ErkJggg==']
+            # Real, approved Workspace by Emlen public-site photography.
+            # The compiled website keeps gallery data in external JavaScript,
+            # which is intentionally disabled in CMS previews. These stable,
+            # existing assets preserve a usable, fully populated gallery.
+            sources = [
+                PUBLIC_SITE+'/assets/img/jayanagar-workspace-8305969a.jpg',
+                PUBLIC_SITE+'/assets/img/jp-nagar-workspace-7a871d3c.webp',
+                PUBLIC_SITE+'/assets/img/bannerghatta-road-workspace-e85c27e2.webp',
+                PUBLIC_SITE+'/assets/img/arekere-workspace-f3cbd409.webp',
+                PUBLIC_SITE+'/assets/img/welcome-area-712a74c1.webp',
+            ]
         if sources:
             wrapper=soup.new_tag('div')
             wrapper['class']='property-cms-gallery'
@@ -313,43 +419,68 @@ def hydrate_property(html: str) -> str:
             panel=soup.new_tag('div',id='property-cms-'+code);panel['class']='property-cms-panel'
             cards=soup.new_tag('div');cards['class']='property-tab-cards'
             cards['data-we-repeat-name']=title
-            for name in items:
+            for name,description,highlight,photo in items:
                 card=soup.new_tag('article');card['class']='property-cms-card'
+                image=soup.new_tag('img',alt=f'Illustrative workspace for {name}')
+                image['class']='property-cms-card-photo'
+                image['src']=PUBLIC_SITE+'/assets/img/'+photo
                 heading=soup.new_tag('h3');heading.string=name
-                desc=soup.new_tag('p');desc.string='Tell us your requirements to explore suitable workspace options.'
+                desc=soup.new_tag('p');desc.string=description
+                badge=soup.new_tag('small');badge.string=highlight
                 price=soup.new_tag('small');price.string='Pricing on request · Speak to our team'
                 link=soup.new_tag('a',href='#enquiry');link.string='Get a quote'
-                card.append(heading);card.append(desc);card.append(price);card.append(link)
+                card.extend([image,heading,desc,badge,price,link])
                 cards.append(card)
             panel.append(cards);panels.append(panel)
         inner.append(panels);section.append(inner)
         amenities=soup.find(id='amenities')
         if amenities:amenities.insert_after(section)
         else:(soup.find('main') or soup.body).append(section)
-    # Restore approved live testimonial copy as FIXED, read-only cards.
-    # This extracts quoted literals from the known official page source without
-    # executing any script or inventing reviews/attribution.
+
+    # Original four approved reviews from WE property's reference source.
+    # Keep the source text fixed and never offer editable testimonial fields.
     testimonials=soup.find(id='testimonials')
     if testimonials and not testimonials.select_one('.property-cms-reviews'):
-        review_match=re.search(r'const\s+reviews\s*=\s*\[([\s\S]*?)\];',html)
-        if review_match:
-            review_records=re.findall(
-                r"\{tag:'([^']+)',quote:'([^']+)',initial:'([^']+)',name:'([^']+)',role:'([^']+)'\}",
-                review_match.group(1))
-            if review_records:
-                reviews=soup.new_tag('div')
-                reviews['class']='property-cms-reviews'
-                for tag,quote,_initial,name,role in review_records[:8]:
-                    card=soup.new_tag('article');card['class']='property-cms-review'
-                    tag_el=soup.new_tag('small');tag_el.string=tag
-                    quote_el=soup.new_tag('blockquote');quote_el.string=quote
-                    author=soup.new_tag('strong');author.string=name
-                    desc=soup.new_tag('small');desc.string=role
-                    card.extend([tag_el,quote_el,author,desc]);reviews.append(card)
-                testimonials.append(reviews)
+        approved_reviews=(
+            ('Genuine support',
+             'Their professionalism and attention to detail make a noticeable difference in the overall experience.',
+             'Saritha Kumari','Henry Harvin Education'),
+            ('Thoughtful spaces',
+             'The space is modern, clean, and well-equipped.',
+             'Jnanesh K','Workspace visitor'),
+            ('Great location',
+             'The best you can ask for in the heart of Jayanagar, near main road, yet very quiet.',
+             'Saandeep K Das','Upman Placements Pvt Ltd'),
+            ('Everyday comfort',
+             'Excellent workplace in Jayanagar 3rd block.',
+             'K Anand Anand','Workspace visitor'),
+        )
+        reviews=soup.new_tag('div')
+        reviews['class']='property-cms-reviews'
+        for tag,quote,name,role in approved_reviews:
+            card=soup.new_tag('article');card['class']='property-cms-review'
+            tag_el=soup.new_tag('small');tag_el.string=tag
+            quote_el=soup.new_tag('blockquote');quote_el.string=quote
+            author=soup.new_tag('strong');author.string=name
+            desc=soup.new_tag('small');desc.string=role
+            card.extend([tag_el,quote_el,author,desc]);reviews.append(card)
+        testimonials.append(reviews)
     # An editable map destination remains available even though security
     # sandboxing removes embedded third-party map iframes from previews.
     locations=soup.find(id='locations')
+    if locations:
+        # The location stage was otherwise empty without the public JS.
+        stage=locations.find(id='weLcPhotos')
+        if stage is not None and not stage.find('img'):
+            photo=soup.new_tag('img',alt='Workspace by Emlen — Jayanagar office')
+            photo['src']=PUBLIC_SITE+'/assets/img/jayanagar-workspace-8305969a.jpg'
+            photo['style']='width:100%;height:100%;object-fit:cover;display:block;border-radius:20px'
+            stage.append(photo)
+        detail=locations.find(id='weLcCard')
+        if detail is not None and not detail.get_text(' ',strip=True):
+            title=soup.new_tag('h3');title.string='Jayanagar workspace'
+            copy=soup.new_tag('p');copy.string='Jayanagar 3rd Block, Bengaluru'
+            detail.extend([title,copy])
     if locations and not locations.select_one('.property-cms-map-link'):
         map_link=soup.new_tag('a',href='https://www.google.com/maps/search/?api=1&query=Workspace+by+Emlen+Jayanagar')
         map_link['class']='property-cms-map-link'
@@ -361,12 +492,18 @@ def hydrate_property(html: str) -> str:
     if faqs:
         wrapper=faqs.select_one('.faq-list')
         if wrapper is not None and not wrapper.find('details'):
+            # Approved public-site FAQ copy, not generic placeholder text.
             content=(
-                ('Can I visit before choosing?', 'Contact our team to arrange a workspace visit.'),
-                ('What amenities are included?', 'Facilities may vary by office and plan; please confirm when enquiring.'),
-                ('Are private offices available?', 'Ask about private office formats for your team.'),
-                ('Can I book a meeting room?', 'Our team can explain the available meeting room options.'),
-                ('How do I get a quote?', 'Submit your workspace requirements using the enquiry form.'),
+                ('What workspace options are available?',
+                 'Explore private offices, coworking, meeting rooms and flexible workspace options. The best choice depends on your team size, preferred location and working style.'),
+                ('Can I choose a short-term plan?',
+                 'There are flexible options for different needs. Our team can confirm available terms and minimum commitments for your chosen workspace.'),
+                ('Are the offices fully furnished?',
+                 'Our managed office options are designed to be move-in ready. Exact furniture, facilities and inclusions depend on the office and plan you select.'),
+                ('Which locations can I choose from?',
+                 'Our current featured neighbourhoods are Jayanagar, JP Nagar, Bannerghatta Road and Arekere. Ask our team about exact addresses and current availability.'),
+                ('How quickly can I move in?',
+                 'It depends on the office you choose, availability and any requested changes. The team can confirm the expected move-in date after understanding your needs.'),
             )
             for question,answer in content:
                 detail=soup.new_tag('details')
@@ -380,7 +517,7 @@ def make_template(item: OfficialPage, html: str):
     if item.category == 'Property':
         html = hydrate_property(html)
     source, sections, fields = extract(html)
-    sections = _rename_sections(item.category, sections)
+    sections = _rename_sections(item.category, sections, source)
     fields = _auto_fields(item.category, sections, fields)
     source, sections = overlay_metadata(source, sections, fields)
     # Solution option cards stop at FOUR total, not four extra copies.
