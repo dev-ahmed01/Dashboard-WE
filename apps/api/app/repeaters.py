@@ -176,9 +176,11 @@ def set_variant(node: Tag, variant: str):
         # Override positional template classes such as tile-3 (span 2).
         # Explicit styles are constrained to presets and leave mobile layout
         # responsive via a separate media rule in apply_design.
-        span=2 if variant=='highlight' else 1
-        height=345 if variant=='highlight' else 265 if variant=='generic' else 300
+        span=2 if variant=='generic' else 1
+        height=365 if variant=='generic' else 300
         node['style']=node.get('style','')+f';grid-column:span {span}!important;height:{height}px!important;'
+        if variant=='highlight':
+            node['style']+=';outline:3px solid #ed2024!important;outline-offset:-3px;box-shadow:0 22px 48px rgba(237,32,36,.17)!important;'
     node['data-we-variant'] = variant
 
 
@@ -241,7 +243,8 @@ def apply_extras(soup, fields: list[dict], values: dict, change_field):
     style['data-we-variant-css']='true'
     style.string=(
         '@media(max-width:900px){'
-        '.sol-grid>.we-variant-generic,.property-tab-cards>.we-variant-generic{'
+        '.sol-grid>.we-variant-generic,.property-tab-cards>.we-variant-generic,'
+        '.office-grid>.we-variant-generic{'
         'grid-column:span 1!important;}}'
         '.sol-grid>.we-variant-highlight .sol-glass{'
         'background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(255,243,240,.88))!important;}'
