@@ -11,6 +11,8 @@ from bs4 import Tag
 
 GROUPS = (
     ('highlights', 'Highlights cards', '.cards', 'article'),
+    ('solutions', 'Office options', '.options-grid', 'article'),
+    ('solutions', 'Property solutions', '.property-tab-cards', 'article'),
     ('solutions', 'Solutions cards', '.office-grid', 'a'),
     ('other_solutions', 'Other solutions', '.other-pill-grid', 'a'),
     ('benefits', 'Benefit cards', '.benefit-list', 'article'),
@@ -117,6 +119,7 @@ def discover(soup, sections: list[dict], fields: list[dict]):
                               'variant':_variant(child)})
             parent_item = wrapper.find_parent(attrs={'data-we-repeat-item': True})
             parent_id = parent_item.get('data-we-repeat-item') if parent_item else None
+            title=str(wrapper.get('data-we-repeat-name') or title)[:100]
             # A Solution page has at most FOUR office-option cards total.
             # Keep this cap in metadata for both the editor and API validator.
             if 'options' in str(meta.get('name','')).lower() and kind in ('cards','solutions'):
