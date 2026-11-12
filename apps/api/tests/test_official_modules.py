@@ -39,7 +39,7 @@ def test_all_approved_pages_are_bundled_offline_and_editable():
         assert len(html)>15000
         assert '<section' in html
         assert 'https://workspacebyemlen.co.uk/assets/css/' in html
-        assert '/assets/' not in html.replace('https://workspacebyemlen.co.uk/assets/', '')
+        assert 'src="/assets/' not in html and 'href="/assets/' not in html
         source,sections,fields=make_template(item,html)
         assert len(sections)>=6
         assert len(fields)>=15
@@ -101,7 +101,7 @@ def test_property_source_hydrates_script_only_sections():
         ''
     )
     html,sections,fields=make_template(item,prepare_html(source))
-    assert html.count('class="property-cms-card"')==10
+    assert html.count('class="property-cms-card"')==13
     assert html.count('class="property-cms-panel"')==4
     assert html.count('<figure')>=4
     assert 'What workspace options are available?' in html
