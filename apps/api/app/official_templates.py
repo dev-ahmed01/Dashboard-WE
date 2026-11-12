@@ -91,6 +91,13 @@ def prepare_html(html: str) -> str:
             value = tag.get('href')
             if isinstance(value, str) and value.startswith('/'):
                 tag['href'] = urljoin(PUBLIC_SITE, value)
+        # Bundled page links to approved PDFs/icons are browser assets too.
+        # Without this, the editor preview incorrectly loads /assets/ from
+        # admin.workspacebyemlen.co.uk instead of the public website.
+        if tag.name in ('a', 'link'):
+            value = tag.get('href')
+            if isinstance(value, str) and value.startswith('/assets/'):
+                tag['href'] = urljoin(PUBLIC_SITE, value)
         if tag.get('srcset'):
             parts = []
             for part in str(tag['srcset']).split(','):
