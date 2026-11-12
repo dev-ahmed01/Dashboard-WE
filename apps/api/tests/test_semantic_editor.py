@@ -56,8 +56,8 @@ def test_office_options_have_original_regular_generic_and_highlight_variants():
     groups=[g for g in sec['repeaters'] if g['kind']=='options']
     assert len(groups)==1,groups
     group=groups[0]
-    assert len(group['items'])==3
-    assert group['max_additions']==1
+    assert len(group['items'])==4
+    assert group['max_additions']==0
     original=render(src,fields,{}, {})
     regular=BeautifulSoup(original,'html.parser')
     assert regular.select_one('.sol-grid > li.sol-item') is not None
