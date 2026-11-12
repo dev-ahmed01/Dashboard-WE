@@ -197,6 +197,14 @@ def make_template(item: OfficialPage, html: str):
     sections = _rename_sections(item.category, sections)
     fields = _auto_fields(item.category, sections, fields)
     source, sections = overlay_metadata(source, sections, fields)
+    # Solution option cards stop at FOUR total, not four extra copies.
+    for section in sections:
+        if item.category == 'Solution' and 'options' in section['name'].lower():
+            for group in section.get('repeaters', []):
+                if group['kind'] in ('cards','solutions','options'):
+                    group['kind']='options'
+                    group['name']='Office options'
+                    group['max_additions']=max(0,4-len(group['items']))
     return source, sections, fields
 
 
