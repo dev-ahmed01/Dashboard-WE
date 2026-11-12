@@ -287,9 +287,14 @@ def extract(source: str):
                         add_field(tag, 'textarea' if len(value) > 110 else 'text', 'text', value,
                                   'Button text' if tag.name == 'button' or 'btn' in tag.get('class', []) else 'Link text')
                     url = str(tag.get('href', '') if tag.name == 'a' else tag.get('data-we-link', ''))
-                    add_field(tag, 'link', 'href' if tag.name == 'a' else 'data-we-link', url,
-                              'Button link' if tag.name == 'button' else 'Link destination',
-                              marker='data-we-link-field')
+                    # Button-shaped controls are NOT automatically links:
+                    # FAQ accordions, office-size options, tabs and step dots
+                    # must retain their interaction semantics and must never
+                    # become an editable "Button destination" input.
+                    if url and url not in ('#', '#!') and is_safe_link(url):
+                        add_field(tag, 'link', 'href' if tag.name == 'a' else 'data-we-link', url,
+                                  'Button link' if tag.name == 'button' else 'Link destination',
+                                  marker='data-we-link-field')
                 elif 2 <= len(value) <= 1000:
                     if tag.find_parent(list(HEADINGS | {'p', 'li', 'label'})):
                         continue
