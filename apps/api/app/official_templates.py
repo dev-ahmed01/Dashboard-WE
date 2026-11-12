@@ -261,6 +261,10 @@ def hydrate_property(html: str) -> str:
             if url not in sources:
                 sources.append(url)
             if len(sources)>=5:break
+        if not sources:
+            # Four explicit, editable photo slots. Blank until the editor uploads
+            # genuine property photography; never substitute an unrelated logo.
+            sources=['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+XUm6SAAAAABJRU5ErkJggg==']
         if sources:
             wrapper=soup.new_tag('div')
             wrapper['class']='property-cms-gallery'
