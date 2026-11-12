@@ -323,8 +323,9 @@ export default function App(){
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
   const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
-  const editableSections=editor?editor.template.sections.filter(section=>
-    sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
+  // Keep ALL mapped sections visible, including intentionally locked
+  // Property Testimonials, so section order always matches the source page.
+  const editableSections=editor?editor.template.sections:[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
@@ -382,11 +383,30 @@ export default function App(){
     if(uploaded){const next=t.find(x=>x.id===uploaded.id);if(next)setUploaded(next)}
   }
   useEffect(()=>{if(!accessToken)return;api<{email:string;role:string}>('/api/auth/me').then(u=>{setUser(u);refresh().catch(showError)}).catch(()=>{accessToken='';sessionStorage.removeItem('emlen_access_token')})},[])
+  useEffect(()=>{
+    if(user?.role!=='admin'||officialBootstrapStarted.current)return
+    officialBootstrapStarted.current=true
+    preloadOfficialTemplates()
+  },[user?.role])
+  async function preloadOfficialTemplates(){
+    setOfficialSyncing(true)
+    try {
+      const result=await api<{templates_created:number;pages_created:number;existing:number;unavailable:string[]}>(
+        '/api/official/bootstrap',{method:'POST'})
+      await refresh()
+      if(result.unavailable.length){
+        setError('Could not preload: '+result.unavailable.join(', ')+'. Check public site availability, then retry.')
+      }else if(result.templates_created){
+        setMessage(result.templates_created+' official templates and draft pages are ready to edit.')
+      }
+    }catch(err){showError(err)}
+    finally{setOfficialSyncing(false)}
+  }
   useEffect(()=>{if(!user)return;setMessage('');if(nav==='Shared Content'){api<Record<string,string>>('/api/shared').then(setShared).catch(showError);api<typeof sharedUsage>('/api/shared/usage').then(setSharedUsage).catch(showError)};if(nav==='SEO')api<typeof redirects>('/api/redirects').then(setRedirects).catch(showError);if(nav==='Team Access'&&user.role==='admin')api<typeof team>('/api/users').then(setTeam).catch(showError);if(nav==='Media Library')api<typeof media>('/api/media').then(setMedia).catch(showError);if(nav==='SEO')api<typeof seoStatus>('/api/seo/status').then(setSeoStatus).catch(showError);if(nav==='Archived')api<Page[]>('/api/pages?include_archived=true').then(ps=>setArchivedPages(ps.filter(p=>p.archived))).catch(showError)},[nav,user])
   function showError(e:unknown){setError(e instanceof Error?e.message:String(e));setMessage('')}
   async function action(fn:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await fn()}catch(e){showError(e)}finally{setBusy(false)}}
   function notify(msg:string){setMessage(msg);setError('')}
-  function logout(){if(!mayLeave())return;accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null);setPublicationInfo(null);setSelectedTemplate(null);setUploaded(null);setMappingId(null);setNewName('');setNav('Category');setTab('All Pages')}
+  function logout(){if(!mayLeave())return;accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null);setPublicationInfo(null);setSelectedTemplate(null);setUploaded(null);setMappingId(null);setNewName('');setNav('Category');setTab('All Pages');officialBootstrapStarted.current=false}
   async function login(){await action(async()=>{
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
@@ -400,7 +420,7 @@ export default function App(){
   async function uploadTemplate(){await action(async()=>{
     if(!templateFile)throw new Error('Choose an HTML template first')
     const form=new FormData();form.append('file',templateFile)
-    const params=new URLSearchParams({name:uploadName||templateFile.name.replace(/\.html$/i,''),category:uploadCategory})
+    const params=new URLSearchParams({name:uploadName||templateFile.name.replace(/\.html$/i,''),category:MODULE_INFO[activeModule].category})
     const t=await api<Template>(`/api/templates/import?${params}`,{method:'POST',body:form});setUploaded(t);setMappingId(t.id);await refresh();notify(`${t.sections.length} structural sections detected. Fields are static until you approve their mapping.`)
   })}
   async function saveMapping(t:Template){await action(async()=>{
@@ -424,7 +444,7 @@ export default function App(){
     const target=deletingTemplate
     setBusy(true);setDeleteError('');setError('')
     try{
-      const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
+      const endpoint=target==='all'?'/api/templates?category='+encodeURIComponent(MODULE_INFO[activeModule].category):'/api/templates/'+target.id
       const result=await api<{removed:number;retained_for_pages:number;storage_cleanup_failed:number}>(endpoint,{
         method:'DELETE',body:json({confirm:true})
       })
@@ -1441,10 +1461,14 @@ export default function App(){
            return <div className="editor-section-block" key={section.id} id={'edit-section-'+section.id}>
              <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
                <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
-               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length} content {ordered.items.length===1?'group':'groups'} · Original page order</small></span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length?ordered.items.length+' content '+(ordered.items.length===1?'group':'groups'):'Read-only / Static'} · Original page order</small></span>
                <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
              </button>
              {sectionOpen&&<div className="editor-page-ordered-list">
+               {ordered.items.length===0&&<div className="editor-locked-section"><LockKeyhole size={17}/>
+                   {editor.template.category==='Property'&&/testimonials|reviews/i.test(section.name)
+                     ?'Testimonials are read-only to protect approved reviews.'
+                     :'This section is Static. Its original design stays in the preview.'}</div>}
                {ordered.items.map((part,i)=>part.kind==='group'&&part.group
                  ?renderRepeaterGroup(part.group,section)
                  :part.block?editorBlockControl(part.block,i):null)}
@@ -1480,7 +1504,17 @@ export default function App(){
     <div className="category-heading">
       <h1>{nav}</h1>
       <p>{MODULE_INFO[nav].subtitle}</p>
+      {user.role==='admin'&&<button className="outline module-preload" type="button" disabled={busy||officialSyncing}
+        onClick={preloadOfficialTemplates}><UploadCloud size={16}/>{officialSyncing?'Loading approved pages…':'Preload approved templates'}</button>}
     </div>
+    {nav!=='Category'&&<details className="module-blueprint">
+      <summary><LayoutTemplate size={17}/> {nav} page form <span>{MODULE_INFO[nav].sections.length} sections</span><ChevronRight size={16}/></summary>
+      <div className="module-blueprint-grid">{MODULE_INFO[nav].sections.map(item=>
+        <div key={item} className="module-blueprint-item">
+          {item.toLowerCase().includes('read-only')&&<LockKeyhole size={15}/>}
+          <span>{item}</span></div>)}
+      </div>
+    </details>
     <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label={nav+' views'}>
       {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
         <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
@@ -1493,7 +1527,7 @@ export default function App(){
         <div className="category-filters" role="group" aria-label="Page status filter">
           {(['All','Published','Draft'] as const).map(name=>
             <button type="button" key={name} className={filter===name?'active':''} aria-pressed={filter===name} onClick={()=>{setFilter(name);setSelectedPageIds([])}}>
-              {name} <span>{name==='All'?pages.length:name==='Published'?pages.filter(p=>p.status==='published').length:pages.filter(p=>p.status==='draft'||p.has_unpublished_changes).length}</span>
+              {name} <span>{name==='All'?modulePages.length:name==='Published'?modulePages.filter(p=>p.status==='published').length:modulePages.filter(p=>p.status==='draft'||p.has_unpublished_changes).length}</span>
             </button>
           )}
         </div>
@@ -1548,7 +1582,7 @@ export default function App(){
       </div>
       <div className="category-upload-fields">
         <label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label>
-        <label>Category<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value)}>{['Solution Category','Sub-solution','Country','City','Property'].map(x=><option key={x}>{x}</option>)}</select></label>
+        <label>Category<select value={MODULE_INFO[activeModule].category} disabled><option>{MODULE_INFO[activeModule].category}</option></select></label>
         <button type="button" className="primary" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>
       </div>
       <div className="category-mapping-layout mapping-area">
@@ -1560,6 +1594,7 @@ export default function App(){
           {mapping?<div className="category-expanded-sections">
             {mapping.sections.map((sec,i)=>{
               const fields=mapping.fields.filter(f=>f.section_id===sec.id)
+              const isReadOnly=mapping.category==='Property'&&/testimonials|reviews/i.test(sec.name)
               const isStatic=fields.every(f=>f.mode==='static')
               const isOpen=(openMappingSection===null?mapping.sections[0]?.id:openMappingSection)===sec.id
               const variableCount=fields.filter(f=>f.mode==='page').length
@@ -1573,7 +1608,7 @@ export default function App(){
                   </div>
                   <label className="category-static-toggle">
                     <span>Static</span>
-                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic} disabled={!fields.length} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
+                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic||isReadOnly} disabled={!fields.length||isReadOnly} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
                     <span className="category-static-track" aria-hidden="true"/>
                   </label>
                   <button type="button" className="category-section-expand" aria-expanded={isOpen} aria-controls={'section-map-'+sec.id} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>
@@ -1617,7 +1652,7 @@ export default function App(){
                     </div>)}
                     {!fields.length&&<p className="category-no-fields">No detected fields in this section.</p>}
                   </div>
-                  {isStatic&&<div className="category-locked-note"><LockKeyhole size={14}/> This section is locked. Turn off Static to adjust links, heading levels or field behavior.</div>}
+                  {(isStatic||isReadOnly)&&<div className="category-locked-note"><LockKeyhole size={14}/>{isReadOnly?'Testimonials are permanently read-only.': 'This section is locked. Turn off Static to adjust links, heading levels or field behavior.'}</div>}
                 </div>}
               </section>
             })}
@@ -1635,16 +1670,16 @@ export default function App(){
       </div>}
       <div className="category-uploaded-list">
         <div className="category-uploaded-heading">
-          <h2>Uploaded Templates <span>({templates.length})</span></h2>
-          {templates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
+          <h2>Uploaded Templates <span>({moduleTemplates.length})</span></h2>
+          {moduleTemplates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
         </div>
         <div className="category-uploaded-table">
-          {templates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
+          {moduleTemplates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
             <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
             <span className={'category-status '+(t.approved?'category-approved':'category-draft')}>{t.approved?'Approved':'Needs mapping'}</span>
             <div className="category-template-row-actions"><button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button><button type="button" className="category-template-delete-one" onClick={()=>openDeleteDialog(t)} disabled={busy} aria-label={'Delete template '+t.name} title={'Delete '+t.name}><Trash2 size={15}/> Delete</button></div>
           </div>)}
-          {!templates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
+          {!moduleTemplates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
         </div>
       </div>
     </div>}
