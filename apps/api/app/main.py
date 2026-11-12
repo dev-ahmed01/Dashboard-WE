@@ -28,7 +28,8 @@ from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
-from .official_templates import OFFICIAL_PAGES, official_key, fetch_official, make_template, read_only_section
+from .official_templates import (OFFICIAL_PAGES, official_key, legacy_official_key,
+    fetch_official, make_template, refine_existing, read_only_section)
 
 
 @asynccontextmanager
@@ -311,16 +312,58 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
     for one source are isolated from other sources.
     """
     store=ObjectStore()
-    result={'templates_created':0,'pages_created':0,'existing':0,'unavailable':[]}
+    result={'templates_created':0,'pages_created':0,'existing':0,
+            'repaired':0,'drafts_repaired':0,'unavailable':[]}
     for item in OFFICIAL_PAGES:
         key=official_key(item.code)
-        existing=db.scalar(select(Template).where(Template.object_key==key).limit(1))
+        legacy=legacy_official_key(item.code)
+        existing=db.scalar(select(Template).where(
+            Template.object_key.in_([key,legacy])).limit(1))
         if existing:
-            result['existing']+=1
+            # One-time, additive upgrade for the previously preloaded designs.
+            # Keep old objects intact for rollback, and preserve page values,
+            # SEO, custom slugs and published snapshots.
+            if existing.object_key==key:
+                result['existing']+=1
+                continue
+            try:
+                old_source=store.get(existing.object_key).decode('utf-8')
+                upgraded,sections,fields=refine_existing(
+                    item,old_source,existing.sections,existing.fields)
+                store.put(key,upgraded.encode('utf-8'),'text/html')
+                old_key=existing.object_key
+                existing.object_key=key
+                existing.fields=fields
+                existing.sections=sections
+                existing.version+=1
+                count=0
+                for page in db.scalars(select(Page).where(
+                    Page.template_id==existing.id)).all():
+                    snapshot=page.template_snapshot or {}
+                    if (page.published_version or page.archived or
+                        snapshot.get('object_key')!=old_key):
+                        continue
+                    # Snapshot source only: user-entered text/images/options
+                    # and draft metadata are never overwritten.
+                    page.template_snapshot={
+                        **snapshot,'object_key':key,
+                        'sections':sections,'fields':fields,'version':existing.version}
+                    page.edit_version+=1
+                    page.updated_at=utcnow()
+                    count+=1
+                audit(db,user,'official_template_editor_repair',str(existing.id),
+                      {'code':item.code,'drafts':count})
+                db.commit()
+                result['repaired']+=1
+                result['drafts_repaired']+=count
+            except Exception:
+                logger.exception('Official template repair unavailable for %s',item.code)
+                db.rollback()
+                result['unavailable'].append(item.title)
             continue
         try:
             source,sections,fields=make_template(item,fetch_official(item))
-            # Preserve exactly the approved source in immutable object storage.
+            # The official source and local CSS are versioned together.
             store.put(key,source.encode('utf-8'),'text/html')
             t=Template(name=item.title,category=item.category,object_key=key,
                        fields=fields,sections=sections,version=1,approved=True)
@@ -344,7 +387,6 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
         except Exception:
             logger.exception('Official template seed unavailable for %s',item.code)
             db.rollback()
-            # Do not expose provider internals/credentials or change stored data.
             result['unavailable'].append(item.title)
     return result
 
@@ -391,8 +433,10 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     section_names={s['id']:s['name'] for s in t.sections}
     for entry in payload.fields:
         f=dict(existing[entry.key]);f['mode']=entry.mode;f['label']=entry.label
-        if read_only_section(t.category,section_names.get(f['section_id'],'')):
-            # Property testimonials are deliberately non-editable, even for admins.
+        if (read_only_section(t.category,section_names.get(f['section_id'],'')) or
+            (f.get('kind')=='link' and not str(f.get('default') or '').strip())):
+            # Lead magnets, enquiry, testimonials and non-navigating buttons
+            # are permanent content, not editable destination fields.
             f['mode']='static'
         if f['mode']=='global':
             if not entry.global_key or not re.fullmatch(r'[a-z][a-z0-9_]{1,100}',entry.global_key):
@@ -542,8 +586,12 @@ def enable_link_and_icon_editing(page_id:int,payload:dict,db:Session=Depends(get
                                      'object_key':get_template(db,p.template_id).object_key}
     updated=[]
     count=0
+    names={sec['id']:sec['name'] for sec in snapshot.get('sections',[])}
     for field in snapshot['fields']:
-        if field.get('mode')=='static' and field.get('kind') in ('link','icon'):
+        locked=read_only_section(snapshot.get('category',''),
+            names.get(field.get('section_id'),''))
+        empty_link=field.get('kind')=='link' and not str(field.get('default') or '').strip()
+        if not locked and not empty_link and field.get('mode')=='static' and field.get('kind') in ('link','icon'):
             updated.append({**field,'mode':'page'})
             count+=1
         else:updated.append(field)
@@ -595,6 +643,10 @@ def upgrade_page_repeaters(page_id:int,payload:dict,db:Session=Depends(get_db),u
                 field['default']=previous['default']
         elif field['key'] in repeated:
             field['mode']='page'
+        if (read_only_section(original.get('category',''),
+                next((sec['name'] for sec in sections if sec['id']==field['section_id']),'')) or
+            (field['kind']=='link' and not str(field.get('default') or '').strip())):
+            field['mode']='static'
     # Existing locked/static choices remain locked. The upgrade enables only
     # fields that were not previously detected and are in repeatable groups.
     key=f'pages/{p.id}/repeater-upgrade-{uuid4().hex}.html'
@@ -642,7 +694,7 @@ def validate_repeater_value(key,value,t):
     fields={f['key']:f for f in t['fields']}
     if key.startswith(VARIANT_PREFIX):
         for group in groups.values():
-            if group['kind']!='solutions':continue
+            if group['kind'] not in ('solutions','options'):continue
             if key in {VARIANT_PREFIX+group['id']+'__'+i['id'] for i in group['items']}:
                 if value not in VARIANTS:fail(422,'Unknown solution card style')
                 if not any(fields.get(fk,{}).get('mode')=='page'
@@ -666,7 +718,7 @@ def validate_repeater_value(key,value,t):
     for entry in entries:
         if not isinstance(entry,dict):
             fail(422,'Every repeater item must be an object')
-        if not set(entry).issubset(set(available)|({'__variant'} if group['kind']=='solutions' else set())):
+        if not set(entry).issubset(set(available)|({'__variant'} if group['kind'] in ('solutions','options') else set())):
             fail(422,'Repeater contains a static or unrecognized field')
         if '__variant' in entry and entry['__variant'] not in VARIANTS:
             fail(422,'Invalid solution card style')
@@ -702,15 +754,26 @@ def validated_page_changes(p: Page, payload: PageUpdate, db: Session) -> dict:
     if payload.values is not None:
         allowed={f['key']:f for f in t['fields'] if f['mode']=='page'}
         extra_keys={k for k in payload.values if k.startswith(REPEAT_PREFIX) or k.startswith(VARIANT_PREFIX) or k==DESIGN_KEY}
-        if not (set(payload.values)-extra_keys).issubset(allowed):
+        unknown=set(payload.values)-extra_keys-set(allowed)
+        # A draft created before the official template repair may still carry
+        # values for newly locked controls. Preserve those historic values
+        # unchanged for rollback, but never accept a new edit to them.
+        saved=p.values or {}
+        if any(k not in saved or payload.values[k]!=saved[k] for k in unknown):
             fail(422,'Attempted to change static or shared template fields')
         for key in extra_keys:
+            if key in saved and payload.values[key]==saved[key]:
+                # Same principle for older repeater entries: don't reject a
+                # routine Save simply because a now-static FAQ field existed.
+                continue
             if key==DESIGN_KEY:
                 try: validate_design(payload.values[key],t['sections'],t['fields'])
                 except ValueError as exc:fail(422,str(exc))
             else:validate_repeater_value(key,payload.values[key],t)
         newvals=dict(p.values or {})
         for key,value in payload.values.items():
+            if key in unknown:
+                continue  # unchanged legacy static value is already in newvals
             if key in extra_keys:
                 newvals[key]=value
                 continue

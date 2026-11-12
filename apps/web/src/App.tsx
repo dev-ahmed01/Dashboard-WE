@@ -183,7 +183,7 @@ function pageEditorBlocks(source:Field[]):EditorBlock[]{
   }
   return blocks.filter(b=>b.fields.length>0)
 }
-function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):string{
+function fieldDisplayName(f:Field,kind:EditorBlock['kind'],_position:number):string{
   if(f.kind==='link')return 'Button destination'
   if(f.kind==='icon')return f.attr==='class'?'Icon class (advanced)':'Replacement icon image URL'
   if(f.kind==='image')return kind==='card'?'Card image':'Image'
@@ -192,20 +192,18 @@ function fieldDisplayName(f:Field,kind:EditorBlock['kind'],position:number):stri
   if(kind==='card'&&f.tag==='p')return 'Card description'
   if(f.tag==='h1')return 'Main headline'
   if(f.tag&&/^h[2-6]$/.test(f.tag))return 'Section heading ('+f.tag.toUpperCase()+')'
-  if(f.tag==='li')return 'List item '+position
-  if(f.tag==='p'){
-    const val=excerpt(f.default,42)
-    return val?'Text: '+val:'Paragraph'
-  }
+  if(f.tag==='li')return 'Bullet point — '+excerpt(f.default,48)
+  if(f.tag==='p')return 'Description'
   return f.kind==='textarea'?'Description':f.label.replace(/^(?:Text|Paragraph|H[1-6] heading):\s*/i,'').slice(0,70)||'Text'
 }
 function repeaterFieldName(group:Repeater,field:Field,number:number):string{
-  if(field.kind==='image')return group.kind==='solutions'?'Background image':group.kind==='benefits'?'Benefit image':'Card image'
+  if(field.kind==='image')return (group.kind==='solutions'||group.kind==='options')?'Background image':group.kind==='benefits'?'Benefit image':'Card image'
   if(field.kind==='icon')return 'Icon (optional)'
-  if(field.kind==='link')return 'Link to anchor / destination'
+  if(field.kind==='link')return 'CTA destination'
   if(group.kind==='benefit_bullets')return 'Bullet point '+number
-  if(group.kind==='faqs')return field.tag==='summary'?'Question':'Answer'
-  if(group.kind==='solutions')return 'Solution name'
+  if(group.kind==='faqs')return field.tag==='summary'||field.tag==='button'?'Question':'Answer'
+  if(group.kind==='options')return field.tag==='h3'?'Option name':field.tag==='p'?'Option description':field.tag==='a'?'CTA text':fieldDisplayName(field,'card',number)
+  if(group.kind==='solutions')return field.tag==='h3'?'Solution name':field.tag==='p'?'Description':fieldDisplayName(field,'card',number)
   if(group.kind==='other_solutions')return 'Solution name'
   if(group.kind==='benefits')return field.tag?.startsWith('h')?'Benefit heading':'Benefit description'
   if(group.kind==='highlights')return field.label.startsWith('Card title:')?'Card heading':'Card description'
@@ -994,7 +992,7 @@ export default function App(){
          value.startsWith('/')&&!value.startsWith('//')?<small>This is a website page path. Test it after the page is published.</small>:
          <small>Enter a full website URL, a section anchor (#enquiry), a phone number starting with tel:, or an email starting with mailto:.</small>}
       </div>}
-      {field.kind!=='icon'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
+      {field.kind!=='icon'&&field.kind!=='link'&&(field.kind==='image'&&value.startsWith('data:')?<small className="editor-ordered-help">Leave blank to keep the original photo; paste a URL to replace it.</small>:hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>)}
       {isFieldLocked(field.key)&&<small className="editor-ordered-help"><LockKeyhole size={12}/> Locked in visual editor</small>}
     </div>
   }
@@ -1007,12 +1005,12 @@ export default function App(){
   }
   function addRepeatEntry(group:Repeater){
     const previous=repeatEntries(group)
-    if(previous.length >= Math.min(group.max_additions||12,12))return
+    if(previous.length >= Math.min(group.max_additions??12,12))return
     // New rows inherit the original card's layout and content from HTML.
     // Do not serialize original images (often large embedded base64 data),
     // which could exceed the page API's size cap before any field is edited.
     const entry:Record<string,string>={}
-    if(group.kind==='solutions')entry.__variant='regular'
+    if(group.kind==='solutions'||group.kind==='options')entry.__variant='regular'
     const newKey=group.id+'-added-'+previous.length
     setLastAddedRepeater(newKey)
     putRepeatEntries(group,[...previous,entry])
@@ -1033,6 +1031,28 @@ export default function App(){
   function deleteRepeatEntry(group:Repeater,index:number){
     putRepeatEntries(group,repeatEntries(group).filter((_,i)=>i!==index))
   }
+  function selectOptionLayout(group:Repeater,variant:'regular'|'generic'|'highlight',
+                              itemId?:string,addedIndex?:number){
+    if(!editor)return
+    const next={...editor.page.values}
+    const extras=repeatEntries(group).map(x=>({...x}))
+    if(addedIndex!==undefined&&extras[addedIndex]){
+      extras[addedIndex].__variant=variant
+    }else if(itemId){
+      next['__variant__'+group.id+'__'+itemId]=variant
+    }
+    if(variant==='highlight'){
+      // Exactly one highlighted card per office-option group.
+      group.items.forEach(x=>{
+        if(x.id!==itemId)next['__variant__'+group.id+'__'+x.id]='regular'
+      })
+      extras.forEach((x,i)=>{
+        if(i!==addedIndex && x.__variant==='highlight')extras[i].__variant='regular'
+      })
+    }
+    if(extras.length)next['__repeat__'+group.id]=JSON.stringify(extras)
+    changeCanvasValues(next,'option-layout-'+group.id)
+  }
   function existingItemFields(item:RepeaterItem,section:Section){
     const nested=variableRepeaterGroups(section,editor?.template.fields||[])
       .filter(x=>x.parent_item_id===item.id)
@@ -1042,10 +1062,10 @@ export default function App(){
   }
   function renderRepeaterGroup(group:Repeater,section:Section,nested=false){
     const additions=repeatEntries(group)
-    const suffix=group.kind==='benefit_bullets'?'bullet point':group.kind==='faqs'?'FAQ':group.kind==='solutions'?'solution':group.kind==='other_solutions'?'solution link':group.kind==='benefits'?'benefit':'card'
+    const suffix=group.kind==='benefit_bullets'?'bullet point':group.kind==='faqs'?'FAQ':(group.kind==='solutions'||group.kind==='options')?'option':group.kind==='other_solutions'?'solution link':group.kind==='benefits'?'benefit':'card'
     const title=group.kind==='highlights'?'Highlights cards':group.kind==='benefits'?'Benefits':group.kind==='faqs'?'Frequently asked questions':group.kind==='benefit_bullets'?'Bullet points':group.name
     const original=group.items.length
-    const maxAdditions=Math.min(group.max_additions||12,12)
+    const maxAdditions=Math.min(group.max_additions??12,12)
     return <div className={'editor-repeat-group '+(nested?'nested':'')} key={group.id}>
       <div className="editor-repeat-heading">
         <div><strong>{title}</strong><small>{original} in template · {additions.length} added</small></div>
@@ -1058,12 +1078,12 @@ export default function App(){
           return <details className="editor-repeat-item" key={item.id}>
             <summary><span className="editor-repeat-item-num">{String(index+1).padStart(2,'0')}</span><span>{item.title||suffix+' '+(index+1)}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
-              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+              {(group.kind==='solutions'||group.kind==='options')&&<div className="editor-repeat-variant">
                 <span>Solution card layout</span>
                 <div className="editor-solution-tabs" role="tablist" aria-label={'Style for '+item.title}>
-                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>changeField('__variant__'+group.id+'__'+item.id,v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(editor?.page.values['__variant__'+group.id+'__'+item.id]||item.variant||'regular')===v} onClick={()=>selectOptionLayout(group,v,item.id)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
                 </div>
-                <small>Choose a layout above, then edit the image, name and link below.</small>
+                <small>Regular keeps the original size; Generic makes this card wider; Highlight accents one card.</small>
               </div>}
               {available.map((field,i)=>editorFieldControl(field,i+1,group.kind==='benefits'?'card':'text',repeaterFieldName(group,field,i+1)))}
               {subGroups.map(n=>renderRepeaterGroup(n,section,true))}
@@ -1080,12 +1100,12 @@ export default function App(){
             ref={node=>{if(node&&lastAddedRepeater===group.id+'-added-'+index&&!node.dataset.initialized){node.open=true;node.dataset.initialized='yes'}}}>
             <summary><span className="editor-repeat-item-num">{String(original+index+1).padStart(2,'0')}</span><span>New {suffix} {index+1}</span><ChevronRight size={15}/></summary>
             <div className="editor-repeat-fields">
-              {group.kind==='solutions'&&<div className="editor-repeat-variant">
+              {(group.kind==='solutions'||group.kind==='options')&&<div className="editor-repeat-variant">
                 <span>Solution card layout</span>
                 <div className="editor-solution-tabs" role="tablist" aria-label={'Style for new '+suffix+' '+(index+1)}>
-                  {(['regular','highlight','generic'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>updateRepeatEntry(group,index,'__variant',v)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
+                  {(['regular','generic','highlight'] as const).map(v=><button key={v} type="button" role="tab" aria-selected={(item.__variant||'regular')===v} onClick={()=>selectOptionLayout(group,v,undefined,index)}>{v[0].toUpperCase()+v.slice(1)}</button>)}
                 </div>
-                <small>Choose a layout, then edit its image, name and destination below.</small>
+                <small>Regular keeps the original size; Generic makes this card wider; Highlight accents one card.</small>
               </div>}
               {fields.map((field,i)=>{
                 const title=repeaterFieldName(group,field,i+1)
@@ -1104,7 +1124,7 @@ export default function App(){
                     ?<a href={value.trim()} target="_blank" rel="noopener noreferrer"><ArrowUpRight size={14}/> Test this link</a>
                     :<small>Use a URL, #anchor, tel: or mailto: destination.</small>}</div>}
                   {(field.kind==='image'||field.kind==='icon'&&field.attr!=='icon_src')&&<small className="editor-ordered-help">Leave blank to reuse the original {suffix} image or icon.</small>}
-                  {field.kind!=='image'&&field.kind!=='icon'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
+                  {field.kind!=='image'&&field.kind!=='icon'&&field.kind!=='link'&&hintForField(field)&&<small className="editor-ordered-help">{hintForField(field)}</small>}
                 </div>
               })}
               <div className="editor-repeat-actions">

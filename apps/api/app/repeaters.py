@@ -12,11 +12,13 @@ from bs4 import Tag
 GROUPS = (
     ('highlights', 'Highlights cards', '.cards', 'article'),
     ('solutions', 'Office options', '.options-grid', 'article'),
+    ('solutions', 'Office options', '.sol-grid', 'li'),
     ('solutions', 'Property solutions', '.property-tab-cards', 'article'),
     ('solutions', 'Solutions cards', '.office-grid', 'a'),
     ('other_solutions', 'Other solutions', '.other-pill-grid', 'a'),
     ('benefits', 'Benefit cards', '.benefit-list', 'article'),
     ('faqs', 'FAQs', '.faq-list', 'details'),
+    ('faqs', 'FAQ questions and answers', '.faq-list', 'article'),
     ('benefit_bullets', 'Benefit bullet points', '.benefit-row ul', 'li'),
 )
 MAX_ADDITIONS = 12
@@ -161,6 +163,15 @@ def set_variant(node: Tag, variant: str):
         classes.remove('office-special')
     classes.append('we-variant-'+variant)
     node['class'] = classes
+    if 'sol-item' in classes or 'property-cms-card' in classes:
+        # Regular keeps the approved proportions; Generic spans two columns,
+        # and Highlight retains the card size with a strong premium accent.
+        # Mobile CSS below resets the extra column span.
+        if variant == 'generic':
+            node['style']=str(node.get('style',''))+';grid-column:span 2!important;'
+        elif variant == 'highlight':
+            inner=node.select_one('.sol-card') or node
+            inner['style']=str(inner.get('style',''))+';outline:3px solid #ed2024!important;outline-offset:-3px;box-shadow:0 22px 48px rgba(237,32,36,.17)!important;'
     if 'office-tile' in classes:
         # Override positional template classes such as tile-3 (span 2).
         # Explicit styles are constrained to presets and leave mobile layout
@@ -182,7 +193,7 @@ def apply_extras(soup, fields: list[dict], values: dict, change_field):
     for group in groups:
         for item in group['items']:
             key=VARIANT_PREFIX+group['id']+'__'+item['id']
-            if key in values and group['kind']=='solutions':
+            if key in values and group['kind'] in ('solutions','options'):
                 node=soup.find(attrs={'data-we-repeat-item':item['id']})
                 if node:set_variant(node,values[key])
     for group in groups:
@@ -216,7 +227,7 @@ def apply_extras(soup, fields: list[dict], values: dict, change_field):
                 target=clone.find(attrs={marker:key})
                 if target:
                     change_field(soup,target,field,value)
-            if group['kind']=='solutions':
+            if group['kind'] in ('solutions','options'):
                 set_variant(clone,entry.get('__variant','regular'))
             # Give focused copies unique IDs and never rewrite original fields.
             for tag in [clone,*clone.find_all(True)]:
@@ -224,6 +235,20 @@ def apply_extras(soup, fields: list[dict], values: dict, change_field):
                     if tag.get(marker):
                         tag[marker]=group['id']+'_added_'+str(index)+'_'+tag[marker]
             wrapper.append(clone)
+    # Responsive size variants apply only to editable option-card wrappers,
+    # not to the rest of the website's original cards or navigation.
+    style=soup.new_tag('style')
+    style['data-we-variant-css']='true'
+    style.string=(
+        '@media(max-width:900px){'
+        '.sol-grid>.we-variant-generic,.property-tab-cards>.we-variant-generic{'
+        'grid-column:span 1!important;}}'
+        '.sol-grid>.we-variant-highlight .sol-glass{'
+        'background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(255,243,240,.88))!important;}'
+        '.property-tab-cards>.we-variant-highlight{'
+        'background:linear-gradient(150deg,#fff,#fff0ed)!important;}'
+    )
+    (soup.head or soup.body).append(style)
 
 
 DESIGN_KEY='__design__'

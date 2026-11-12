@@ -1,5 +1,4 @@
-import {useState} from 'react'
-import {Check, CircleHelp, Globe2, LayoutTemplate, MoreHorizontal, WandSparkles} from 'lucide-react'
+import {Check, CircleHelp, MoreHorizontal, WandSparkles} from 'lucide-react'
 
 type SEO={
   seo_title:string; description:string; noindex:boolean; nofollow:boolean;
@@ -24,8 +23,6 @@ function robotsLabel(seo:SEO){
 }
 
 export default function SeoSettings({page,fields,shared,published,onChange}:Props){
-  const [previewKind,setPreviewKind]=useState<'search'|'social'>('search')
-  const [previewSize,setPreviewSize]=useState<'desktop'|'mobile'>('desktop')
   const seo=page.seo||({} as SEO)
   const fieldText=(field:Field)=>{
     const edited=field.mode==='page'?page.values[field.key]
@@ -45,8 +42,6 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
   const displayTitle=seoTitle||fallbackTitle
   const displayDescription=seoDescription||sourceDescription
   const siteUrl='https://workspacebyemlen.co.in/'+page.slug.replace(/^\/+|\/+$/g,'')+'/'
-  const socialTitle=(seo.og_title||'').trim()||displayTitle
-  const socialDescription=(seo.og_description||'').trim()||displayDescription
   const canFill=(!seoTitle&&!!fallbackTitle)||(!seoDescription&&!!sourceDescription)
 
   const directives=[
@@ -163,24 +158,9 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
             <h3>How your page appears</h3></div>
           <span className="seo-preview-live"><span/> Live</span>
         </div>
-        <div className="we-seo-preview-switches">
-          <div role="tablist" aria-label="Preview type" className="we-seo-preview-tabs">
-            <button type="button" role="tab" aria-selected={previewKind==='search'}
-              onClick={()=>setPreviewKind('search')}><Globe2 size={14}/> Search</button>
-            <button type="button" role="tab" aria-selected={previewKind==='social'}
-              onClick={()=>setPreviewKind('social')}><LayoutTemplate size={14}/> Social</button>
-          </div>
-          {previewKind==='search'&&<div role="group" aria-label="Search result viewport" className="we-seo-device-buttons">
-            <button type="button" aria-pressed={previewSize==='desktop'}
-              onClick={()=>setPreviewSize('desktop')}>Desktop</button>
-            <button type="button" aria-pressed={previewSize==='mobile'}
-              onClick={()=>setPreviewSize('mobile')}>Mobile</button>
-          </div>}
-        </div>
         {seo.noindex&&<div className="seo-preview-alert"><CircleHelp size={15}/>
           <span>No Index is selected. The result below is a draft illustration only.</span></div>}
-        {previewKind==='search'
-          ?<div className={'seo-serp-result we-search-preview-'+previewSize}>
+        <div className="seo-serp-result we-search-preview-desktop">
             <div className="seo-serp-origin">
               <span className="seo-serp-favicon">w<span>.</span></span>
               <span className="seo-serp-domain"><strong>Workspace by Emlen</strong>
@@ -192,13 +172,6 @@ export default function SeoSettings({page,fields,shared,published,onChange}:Prop
               :<p className={displayDescription?'':'seo-serp-muted'}>
                 {displayDescription||'Enter a meta description to see the search preview.'}</p>}
           </div>
-          :<div className="we-social-preview-card">
-            <div className="we-social-preview-brand">workspace <small>BY EMLEN</small></div>
-            <div className="we-social-preview-copy"><small>workspacebyemlen.co.in</small>
-              <strong>{socialTitle}</strong>
-              <p>{socialDescription||'Add a social description to preview it here.'}</p>
-            </div>
-          </div>}
         <div className="we-seo-preview-footer">
           <span><Check size={13}/> Uses the current unsaved page content</span>
           <p>Search engines and social platforms may choose a different preview.</p>

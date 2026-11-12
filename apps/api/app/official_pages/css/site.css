@@ -1,0 +1,31 @@
+/* Shared, low-specificity additions loaded after each page's own stylesheet. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:84px}
+@media (max-width:760px){html{scroll-padding-top:72px}}
+body{-webkit-tap-highlight-color:transparent}
+.ap-bt a[aria-disabled="true"]{cursor:default;opacity:.62;position:relative;pointer-events:none}
+.ap-bt a[aria-disabled="true"]::after{content:attr(data-soon);display:block;font-size:.68em;font-weight:500;letter-spacing:.04em;opacity:.8}
+
+/* header fit: the original home header wrapped "About Us" / the buttons onto two lines around 1024px, and the
+   extra "All offices" link pushed the one-person-office CTA off-screen. Keep labels on one line, drop the least
+   important items first (they stay reachable from the footer and mobile menu). */
+header.nav .nav-links a,header.nav .nav-cta .btn{white-space:nowrap}
+@media (max-width:1180px){header.nav .nav-cta .btn-line{display:none}}
+@media (max-width:1240px){.navlinks .nav-extra{display:none}}
+
+/* comfortable touch targets for the cross-page footer links */
+@media (pointer:coarse){.sl-row a,.site-footer li a,.footer-links a,.footer-inner nav a{display:inline-flex;align-items:center;min-height:44px}}
+
+/* cross-page link rows (footers) */
+.sl-row{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0;padding:0;list-style:none}
+.sl-row a{color:inherit;text-decoration:none;opacity:.86;padding:6px 0;display:inline-block}
+.sl-row a:hover,.sl-row a:focus-visible{opacity:1;text-decoration:underline;text-underline-offset:3px}
+.sl-footer{background:#161616;color:#fff;padding:44px 20px calc(30px + env(safe-area-inset-bottom));font:500 15px/1.5 var(--body,'Poppins',system-ui,sans-serif)}
+.sl-footer .sl-in{max-width:1180px;margin:0 auto;display:grid;gap:26px}
+.sl-footer .sl-brand{display:block;width:170px;max-width:60%;filter:brightness(0) invert(1)}
+.sl-footer p{margin:0;opacity:.72;max-width:46ch}
+.sl-footer small{opacity:.55;display:block;font-size:13px}
+.sl-footer h4{margin:0 0 6px;font:600 12px/1 var(--body,'Poppins',system-ui,sans-serif);letter-spacing:.12em;text-transform:uppercase;opacity:.55}
+@media (min-width:860px){.sl-footer .sl-in{grid-template-columns:1.3fr 1fr 1fr;gap:48px}}
+.sl-more{margin:22px 0 0;text-align:center}
+.sl-more a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 22px;border-radius:999px;border:1px solid currentColor;color:inherit;font-weight:600;text-decoration:none}
+.sl-more a:hover,.sl-more a:focus-visible{background:rgba(237,32,36,.08)}

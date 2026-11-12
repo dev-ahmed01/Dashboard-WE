@@ -1,0 +1,2378 @@
+/* ---- base ---- */
+:root{--red:#ED2024;--yellow:#FFB900;--ink:#161616;--header:'Bricolage Grotesque',Arial,sans-serif;--body:'Poppins',Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#fffaf5;color:var(--ink);font-family:var(--body)}a{text-decoration:none;color:inherit}.hero{position:relative;overflow:hidden;isolation:isolate;min-height:1080px;background:radial-gradient(ellipse 400px 430px at 3% 51%,rgba(237,32,36,.072),transparent 84%),radial-gradient(ellipse 550px 350px at 103% 16%,rgba(255,185,0,.095),transparent 75%),linear-gradient(109deg,#fffaf6 0%,#fffdfb 58%,#fffaef 100%)}.hero:before{content:'';position:absolute;border:1px solid rgba(237,32,36,.12);border-radius:50%;width:630px;height:630px;left:-385px;top:160px}.hero:after{content:'';position:absolute;border:1px solid rgba(255,185,0,.35);border-radius:50%;width:410px;height:410px;right:-350px;top:154px}.accent{position:absolute;top:-40px;right:23%;width:270px;height:185px;transform:skewX(-43deg);background:linear-gradient(90deg,rgba(237,32,36,.03),rgba(237,32,36,.25) 65%,rgba(237,32,36,.02));clip-path:polygon(25% 0,100% 0,75% 100%,0 100%)}.accent2{position:absolute;top:-30px;right:16%;width:105px;height:175px;transform:skewX(-43deg);background:linear-gradient(90deg,rgba(237,32,36,.23),rgba(237,32,36,.04))}.nav{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:30px;height:90px;max-width:1550px;width:calc(100% - 90px);margin:23px auto 0;border-radius:999px;padding:0 20px 0 34px;border:1.5px solid rgba(255,255,255,.95);background:linear-gradient(115deg,rgba(255,255,255,.58),rgba(255,255,255,.43));box-shadow:0 15px 38px rgba(116,69,47,.08),inset 0 1px 2px #fff9;backdrop-filter:blur(25px) saturate(135%);-webkit-backdrop-filter:blur(25px) saturate(135%)}.brand{display:flex;align-items:center;gap:13px;min-width:270px}.brand-icon{height:50px;width:50px;background:var(--red);border-radius:50%;position:relative}.brand-icon:after{content:'';position:absolute;right:11px;top:9px;background:white;border-radius:50%;width:11px;height:11px}.brand-name{font-family:var(--header);font-size:34px;letter-spacing:-.075em;font-weight:800;line-height:.85}.brand-small{letter-spacing:.29em;font-size:10px;margin-top:10px;font-weight:700}.nav-links{display:flex;align-items:center;justify-content:center;gap:38px;flex:1;white-space:nowrap;font-size:14px;font-weight:600}.nav-links span{color:var(--red);font-size:16px;font-weight:600;margin-left:7px}.nav-cta{display:flex;align-items:center;gap:30px;justify-content:center;white-space:nowrap;background:var(--yellow);border-radius:999px;padding:15px 25px;font-size:14px;font-weight:700;min-height:52px}.nav-cta b{font-size:23px;font-weight:500}.copy{position:relative;z-index:4;margin:73px auto 0;max-width:1390px;text-align:center;padding:0 32px}.eyebrow{font-family:var(--body);font-weight:700;color:var(--red);font-size:15px;text-transform:uppercase;letter-spacing:.2em;margin:0 0 20px}.copy h1{font-family:var(--header);font-size:clamp(48px,4.45vw,75px);letter-spacing:-.06em;line-height:1.08;font-weight:800;max-width:1330px;margin:0 auto;text-wrap:balance}.copy h1 .red{color:var(--red)}.actions{margin-top:31px;display:flex;justify-content:center;gap:15px;align-items:center}.button{display:inline-flex;align-items:center;gap:23px;justify-content:center;border-radius:999px;font-size:17px;font-weight:700;min-width:265px;padding:16px 24px;min-height:65px;box-shadow:0 14px 28px -14px rgba(237,32,36,.35);background:var(--red);color:#fff}.button:nth-child(2){min-width:230px}.button .arr{font-size:23px;line-height:1}.illustration{position:relative;z-index:2;max-width:1590px;width:calc(100% - 45px);display:block;height:auto;margin:37px auto 0}.cards{position:relative;z-index:3;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;width:calc(100% - 95px);max-width:1550px;margin:17px auto 50px}.card{position:relative;min-height:196px;border-radius:25px;padding:25px 24px 24px;background:linear-gradient(138deg,rgba(255,245,191,.87) 0%,rgba(255,211,92,.91) 61%,rgba(255,185,0,.81) 100%);border:1.7px solid rgba(255,255,255,.92);box-shadow:0 15px 35px rgba(128,88,18,.13),inset 0 2px 0 rgba(255,255,255,.75);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.card:before{content:'';position:absolute;inset:5px;border-radius:20px;border:1px solid rgba(255,255,255,.22);pointer-events:none}.card-title{font-family:var(--header);font-size:24px;letter-spacing:-.055em;font-weight:750;line-height:1.1;max-width:245px;padding-right:20px}.card p{font-size:14px;line-height:1.65;margin:20px 0 0;max-width:310px}.ic{position:absolute;right:18px;top:18px;width:47px;height:47px;display:grid;place-items:center;border-radius:15px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.85)}.ic svg{width:25px;height:25px;fill:none;stroke:#161616;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}@media(max-width:1050px){.nav-links{gap:15px}.brand{min-width:200px}.brand-name{font-size:27px}.copy h1{font-size:clamp(42px,5.2vw,63px)}.card-title{font-size:20px}.card{padding:19px}.card p{font-size:12px}}@media(max-width:740px){.hero{min-height:auto}.nav{margin-top:12px;width:calc(100% - 24px);height:70px;padding:0 14px}.brand-icon{width:37px;height:37px}.brand-icon:after{width:7px;height:7px;right:8px;top:7px}.brand-name{font-size:23px}.brand-small{font-size:8px;margin-top:8px}.nav-links{display:none}.nav-cta{padding:9px 15px;font-size:12px;min-height:42px;gap:8px}.copy{margin-top:65px;padding:0 20px}.eyebrow{font-size:11px}.copy h1{font-size:clamp(35px,8vw,55px);line-height:1.13}.actions{flex-wrap:wrap;gap:10px}.button,.button:nth-child(2){min-width:0;font-size:12px;min-height:48px;padding:10px 14px}.illustration{margin-top:45px;min-width:820px;transform:translateX(calc((100vw - 820px)/2));width:820px;height:auto}.cards{grid-template-columns:repeat(2,1fr);width:calc(100% - 30px);gap:10px;margin-top:16px}.card{min-height:220px;padding:17px 13px}.card-title{font-size:19px}.ic{width:32px;height:32px;right:11px;top:11px}.ic svg{width:18px;height:18px}.card p{font-size:11px;line-height:1.55;margin-top:15px}}
+
+
+/* Full-page refinements. The hero keeps its approved original vector and card design. */
+:root{--red:#ED2024;--yellow:#FFB900;--ink:#161616;--muted:#6c6664;--soft:#fffaf6;--header:'Bricolage Grotesque',Arial,sans-serif;--body:'Poppins',Arial,sans-serif}
+html{scroll-behavior:smooth;scroll-padding-top:114px}body{font-family:var(--body);background:#fff;color:var(--ink)}a{cursor:pointer}button,select,input{font:inherit}button{cursor:pointer}*{box-sizing:border-box}h1,h2,h3{font-family:var(--header)}
+.hero{min-height:auto;padding:0 0 55px}.hero .copy{margin-top:115px!important}.hero .illustration{margin-top:68px!important}.hero .cards{margin-top:23px!important}.hero .card{min-height:175px!important}
+.nav{position:fixed!important;top:13px!important;left:50%!important;transform:translateX(-50%);margin:0!important;z-index:200!important;width:min(1550px,calc(100% - 74px))!important;box-shadow:0 18px 45px rgba(40,30,20,.085),inset 0 1px 1px rgba(255,255,255,.7)!important}
+.mobile-menu{display:none;border:0;background:none;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:14px;min-width:44px;min-height:44px}.mobile-menu span{height:2px;width:22px;background:var(--ink);border-radius:1px}
+.frame{width:min(1450px,calc(100% - 92px));margin:0 auto}.solutions-section{padding:104px 0 90px;background:#fff}.pre-line{width:108px;height:5px;background:var(--red);border-radius:9px;margin-bottom:26px}.solutions-heading{max-width:1050px;font-size:clamp(48px,5.5vw,86px);line-height:1.07;letter-spacing:-.056em;font-weight:800;margin:0 0 22px}.solutions-heading em{color:var(--red);font-style:normal}.solutions-desc{color:#4c4947;font-size:clamp(16px,1.25vw,20px);line-height:1.7;max-width:1210px;margin:0 0 41px}
+.office-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;grid-auto-flow:row}.office-tile{position:relative;display:flex;align-items:flex-end;height:320px;min-width:0;overflow:hidden;border-radius:28px;background:#e8e5e0;isolation:isolate;border:1px solid rgba(255,255,255,.9);box-shadow:0 10px 23px rgba(30,30,30,.065);transition:transform .28s ease,box-shadow .28s ease}.office-tile:hover{transform:translateY(-5px);box-shadow:0 17px 32px rgba(24,24,24,.13)}.tile-3{grid-column:span 2}.office-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;transition:transform .6s ease;z-index:-1}.office-tile:hover img{transform:scale(1.045)}.office-glass{display:flex;align-items:center;gap:12px;justify-content:space-between;min-height:76px;padding:13px 14px 13px 24px;width:calc(100% - 24px);margin:12px;border:1px solid rgba(255,255,255,.68);border-radius:25px;background:linear-gradient(100deg,rgba(255,255,255,.82),rgba(255,255,255,.52));box-shadow:0 9px 25px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.9);backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%)}.office-glass strong{font-family:var(--header);font-size:clamp(20px,1.65vw,27px);font-weight:750;letter-spacing:-.035em;line-height:1.1}.office-arrow{flex:none;width:47px;height:47px;display:grid;place-items:center;border-radius:100%;background:var(--red);color:#fff;font-size:27px;font-weight:400}.office-special{background:#171717;border:1px solid rgba(255,255,255,.18);padding:31px 23px 0;display:flex;flex-direction:column;align-items:stretch}.special-heading{font:750 30px/1.02 var(--header);letter-spacing:-.045em;color:#fff}.special-lines{display:grid;gap:10px;margin-top:28px;color:#fff;font:500 15px var(--body)}.special-lines span:before{content:'✓';color:var(--yellow);font-weight:800;padding-right:13px}.office-special .office-glass{width:100%;margin: auto 0 13px;min-height:61px;padding-left:16px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.38);color:#fff}.office-special .office-glass strong{font-size:16px;font-family:var(--body);font-weight:600;letter-spacing:-.03em}.office-special .office-arrow{width:41px;height:41px}
+.other-wrap{padding:42px 0 24px;background:#fff}.more-solutions{position:relative;overflow:hidden;isolation:isolate;border-radius:32px;background:linear-gradient(121deg,#e91e25,#ed2024 58%,#e72b30);border:1px solid rgba(255,255,255,.4);box-shadow:0 23px 54px rgba(237,32,36,.13);padding:49px 56px 55px;color:#fff}.more-solutions:before{content:'';position:absolute;width:550px;height:500px;border-radius:50%;border:1px solid rgba(255,255,255,.16);right:-160px;bottom:-340px;box-shadow:0 0 0 50px rgba(255,255,255,.025),0 0 0 120px rgba(255,255,255,.02);pointer-events:none}.other-dash{width:81px;height:5px;background:var(--yellow);border-radius:8px;margin-bottom:18px}.more-solutions h2{font-size:clamp(40px,4.35vw,69px);line-height:1.07;letter-spacing:-.055em;max-width:900px;margin:0;font-weight:800}.other-pill-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:38px}.other-pill{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:82px;padding:14px 14px 14px 19px;color:#fff;background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.09));border:1px solid rgba(255,255,255,.34);box-shadow:0 12px 22px rgba(100,0,0,.09),inset 0 1px 1px rgba(255,255,255,.21);border-radius:999px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);font-weight:600;font-size:clamp(12px,.96vw,16px);line-height:1.3;transition:transform .25s,background .25s}.other-pill:hover{transform:translateY(-3px);background:rgba(255,255,255,.27)}.pill-arr{display:grid;place-items:center;flex:none;width:29px;height:29px;background:rgba(255,255,255,.96);color:var(--red);border-radius:50%;font-size:20px}
+.subscribe-section{padding:18px 0 85px;background:#fff}.subscribe-panel{min-height:158px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:30px;padding:32px 45px;border-radius:29px;background:linear-gradient(112deg,rgba(255,255,255,.94),rgba(255,244,242,.92) 68%,rgba(255,255,255,.92));border:1px solid rgba(237,32,36,.095);box-shadow:0 15px 46px rgba(120,60,50,.075),inset 0 1px 0 #fff;backdrop-filter:blur(25px)}.subscribe-panel h2{font-size:clamp(25px,3.1vw,46px);letter-spacing:-.05em;line-height:1.16;margin:0;font-weight:800}.subscribe-panel h2 em{font-style:normal;color:var(--red)}.subscribe-btn,.callback-btn{display:inline-flex;align-items:center;justify-content:center;gap:18px;min-height:58px;padding:16px 31px;border:0;border-radius:999px;background:var(--red);color:#fff;font-family:var(--body);font-size:16px;font-weight:700;box-shadow:0 14px 28px -14px rgba(237,32,36,.35);white-space:nowrap;transition:transform .2s}.subscribe-btn:hover,.callback-btn:hover{transform:translateY(-2px)}
+.benefits-section{padding:90px 0 112px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 9% 27%,rgba(237,32,36,.045),transparent 29%),#fffaf7}.benefits-intro{text-align:center;max-width:940px;margin:0 auto 61px}.kicker{font-size:14px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--red)}.benefits-intro h2{font-size:clamp(45px,5.3vw,79px);line-height:1.05;letter-spacing:-.06em;font-weight:800;margin:17px 0 20px}.benefits-intro h2 em{font-style:normal;color:var(--red)}.benefits-intro p{font-size:17px;line-height:1.7;color:#5a5653;margin:0 auto;max-width:820px}.benefits-intro .callback-btn{margin-top:26px}.benefit-list{display:grid;gap:26px}.benefit-row{display:grid;grid-template-columns:1fr 1fr;gap:35px;min-height:350px;align-items:center;padding:24px 26px;border-radius:34px;border:1.4px solid rgba(255,255,255,.95);background:linear-gradient(116deg,rgba(255,255,255,.88),rgba(255,255,255,.66));box-shadow:0 15px 40px rgba(93,62,53,.07),inset 0 1px 1px rgba(255,255,255,.9);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.benefit-row:nth-child(odd) .benefit-photo{order:-1}.benefit-row:before{content:'';position:absolute}.benefit-text{padding:10px 14px 10px 12px}.benefit-text h3{font-weight:800;font-size:clamp(29px,2.65vw,42px);line-height:1.12;letter-spacing:-.05em;margin:0 0 14px}.benefit-text p{font-size:15px;line-height:1.7;color:#554f4b;margin:0}.benefit-text ul{padding:0;margin:18px 0 0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px}.benefit-text li{font-weight:600;font-size:13px;line-height:1.45;padding-left:22px;position:relative}.benefit-text li:before{content:'✓';position:absolute;left:0;top:1px;color:var(--red);font-weight:800}.benefit-photo{height:310px;overflow:hidden;border-radius:22px;background:#e9dfd8}.benefit-photo img{width:100%;height:100%;object-fit:cover;display:block}.benefit-row:nth-child(odd){border-left:4px solid var(--red)}.benefit-row:nth-child(even){border-left:4px solid var(--yellow)}.copy-pending{border-left:2px solid #d6bdb4;padding-left:12px;color:#8a746b!important;font-style:italic}
+.why-section{padding:112px 0 115px;background:#fff}.why-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}.why-kicker,.form-kicker{font-size:15px;color:var(--red);text-transform:uppercase;letter-spacing:.19em;font-weight:800;margin:0 0 17px}.why-copy h2{font-weight:800;font-size:clamp(43px,4.3vw,65px);letter-spacing:-.055em;line-height:1.09;margin:0 0 22px}.why-copy h2 em{font-style:normal;color:var(--red)}.why-desc{font-size:16px;line-height:1.77;color:#625c5b;margin:0 0 43px}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;margin:0 0 29px}.metric{padding:22px 14px 20px;min-height:149px;border:1px solid #ece9e8;border-top:2px solid rgba(237,32,36,.75);background:linear-gradient(137deg,#fff,rgba(250,250,250,.83));border-radius:26px;box-shadow:0 13px 31px rgba(25,25,25,.06),inset 0 1px 0 white;backdrop-filter:blur(20px)}.metric:nth-child(2){border-top-color:var(--yellow)}.metric strong{font:800 clamp(33px,3.4vw,51px) var(--header);letter-spacing:-.04em;color:var(--red);display:block}.metric:nth-child(2) strong{color:var(--ink)}.metric .star{color:var(--yellow);font-size:.7em}.metric span{font-size:12px;color:#4a4543;white-space:nowrap}.testimonial{border-radius:27px;border:1px solid #efeded;background:linear-gradient(145deg,#fff,rgba(248,248,248,.78));box-shadow:0 13px 34px rgba(20,20,20,.057),inset 0 1px 0 white;padding:33px 37px}.quote-symbol{font-family:Georgia,serif;font-size:65px;color:var(--red);line-height:.55}.testimonial blockquote{margin:20px 0 23px;line-height:1.8;font-size:15px;color:#333}.testimonial strong{display:block;font-size:15px}.testimonial small{font-size:13px;color:#67615d}
+.enquiry-panel{padding:45px 46px 54px;border-radius:39px;background:linear-gradient(145deg,#fff,#fcfcfc);border:1px solid #eaeaea;box-shadow:0 25px 65px rgba(25,25,25,.075),inset 0 1px 0 white;backdrop-filter:blur(20px)}.enquiry-panel h2{margin:0 0 10px;font:800 clamp(33px,3vw,48px)/1.13 var(--header);letter-spacing:-.05em}.form-subtitle{color:#655f5d;line-height:1.5;margin:0 0 27px;font-size:14px}.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:19px 17px}.field{display:flex;flex-direction:column;gap:9px;min-width:0}.field label{font-size:13px;font-weight:700;color:#181818}.field label span{color:#6b6562;font-weight:500}.field input,.field select{width:100%;height:59px;background:#fff;border:1px solid #e5e1df;border-radius:16px;padding:0 17px;font-size:14px;color:#262320;outline:none}.field input:focus,.field select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(237,32,36,.08)}.field.full{grid-column:1/-1}.form-submit{width:100%;min-height:63px;margin-top:29px}.form-note{font-size:12px;color:#7a7471;margin:15px 0 0;line-height:1.5}
+.faq-section{padding:135px 0 160px;background:#fff}.faq-grid{display:grid;grid-template-columns:0.85fr 1.35fr;gap:75px;align-items:center}.faq-copy h2{font-size:clamp(53px,5vw,82px);font-weight:800;letter-spacing:-.06em;line-height:.99;margin:0 0 27px}.faq-copy h2 em{font-style:normal;color:var(--red)}.faq-copy p{font-size:17px;line-height:1.62;max-width:390px;color:#5a5655;margin:0 0 31px}.faq-list{display:grid;gap:17px}.faq-item{border-radius:26px;border:1px solid #e9e8e8;background:#fff;box-shadow:0 7px 17px rgba(0,0,0,.037);overflow:hidden}.faq-item summary{cursor:pointer;list-style:none;padding:26px 30px;font:750 clamp(17px,1.5vw,22px) var(--header);letter-spacing:-.027em;display:flex;justify-content:space-between;align-items:center;gap:20px}.faq-item summary::-webkit-details-marker{display:none}.faq-toggle{color:var(--red);font-size:30px;line-height:.6;font-weight:400}.faq-item[open] .faq-toggle{transform:rotate(45deg)}.faq-answer{font-size:15px;line-height:1.7;color:#5d5754;padding:0 30px 27px;max-width:900px}
+/* Subscription modal and interaction states */
+.modal-backdrop{position:fixed;inset:0;z-index:500;background:rgba(22,22,22,.53);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:22px}.modal-backdrop.open{display:flex}.modal-panel{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;border-radius:28px;background:#fff;padding:34px;box-shadow:0 35px 95px #0003}.modal-close{position:absolute;right:20px;top:15px;background:#f8f8f8;border:1px solid #eee;border-radius:50%;width:41px;height:41px;font-size:25px}.modal-panel h2{font:800 37px/1.05 var(--header);letter-spacing:-.05em;margin:15px 30px 12px 0}.modal-panel p{font-size:14px;color:#635f5d;line-height:1.6;margin:0 0 22px}.modal-form{display:grid;gap:15px}.modal-form .field input,.modal-form .field select{height:53px}.checkboxline{display:flex;align-items:start;gap:10px;font-size:12px;line-height:1.55;color:#4b4645}.checkboxline input{width:17px;height:17px;accent-color:var(--red);margin-top:2px;flex:none}.modal-msg{font-size:13px;line-height:1.55;color:#574642;min-height:20px;margin:0}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:1250px){.frame{width:min(100% - 55px,1450px)}.other-pill-grid{grid-template-columns:repeat(3,1fr)}.why-grid{gap:28px}.office-grid{gap:15px}.office-tile{height:265px}.office-glass{min-height:68px}.office-glass strong{font-size:20px}.metric{padding:15px 10px}.metric span{white-space:normal}.nav .nav-links{gap:15px!important;font-size:12px!important}.nav .brand{min-width:220px!important}}
+@media(max-width:850px){.nav{height:71px!important;padding:0 12px 0 19px!important;width:calc(100% - 28px)!important;gap:12px!important}.nav .brand{min-width:0!important}.nav .brand-name{font-size:24px!important}.nav .brand-icon{width:39px!important;height:39px!important}.nav .brand-small{font-size:7px!important}.nav .nav-links{display:none;position:absolute;top:calc(100% + 10px);left:0;right:0;border-radius:24px;background:rgba(255,255,255,.97);border:1px solid #eee;box-shadow:0 15px 35px #0002;padding:20px;flex-direction:column;align-items:start;gap:15px!important;font-size:15px!important}.nav .nav-links.open{display:flex}.nav .nav-cta{font-size:12px!important;padding:11px 14px!important;min-width:0}.mobile-menu{display:flex}.hero .copy{margin-top:115px!important}.hero{overflow:hidden}.hero .cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}.solutions-section{padding:70px 0}.office-grid{grid-template-columns:repeat(2,1fr)}.tile-3{grid-column:span 2}.office-special{height:300px}.other-pill-grid{grid-template-columns:repeat(2,1fr)}.more-solutions{padding:40px 29px}.benefit-row{gap:20px}.benefit-text ul{grid-template-columns:1fr}.why-grid,.faq-grid{grid-template-columns:1fr}.enquiry-panel{max-width:700px}.why-grid{gap:42px}.faq-section{padding:85px 0 100px}.faq-grid{gap:43px}.subscribe-panel{grid-template-columns:1fr}.subscribe-btn{width:max-content}}
+@media(max-width:600px){.frame{width:calc(100% - 30px)}.nav .nav-cta{display:none}.hero .copy{margin-top:105px!important}.hero .cards{grid-template-columns:1fr 1fr!important}.hero .card{min-height:210px!important}.solutions-heading{font-size:43px}.solutions-desc{font-size:15px}.office-grid{grid-template-columns:1fr}.tile-3{grid-column:span 1}.office-tile{height:300px}.other-pill-grid{grid-template-columns:1fr 1fr;gap:10px}.more-solutions{border-radius:23px;padding:30px 18px}.other-pill{min-height:72px;padding:11px;font-size:12px}.pill-arr{width:25px;height:25px}.subscribe-section{padding-bottom:65px}.subscribe-panel{padding:24px;min-height:0}.subscribe-panel h2{font-size:29px}.subscribe-btn{width:100%}.benefits-section{padding:75px 0}.benefits-intro h2{font-size:44px}.benefits-intro p{font-size:14px}.benefit-row{grid-template-columns:1fr;padding:16px}.benefit-row .benefit-photo{order:-1}.benefit-photo{height:215px}.benefit-text{padding:13px 6px 9px}.benefit-text ul{grid-template-columns:1fr}.why-section{padding:75px 0}.why-copy h2{font-size:46px}.why-desc{font-size:14px}.metrics{gap:7px}.metric{padding:13px 9px;min-height:116px;border-radius:18px}.metric strong{font-size:31px}.metric span{font-size:10px}.testimonial{padding:26px}.enquiry-panel{border-radius:26px;padding:28px 20px}.field-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.faq-copy h2{font-size:54px}.faq-item summary{font-size:18px;padding:20px}.faq-answer{padding:0 20px 23px}.modal-panel{padding:27px 20px}.modal-panel h2{font-size:32px}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}html{scroll-behavior:auto}}
+
+/* Typography and legibility pass — WCAG 2.2 / USWDS informed.
+   Preserve approved colours, brand fonts, section order, visual composition and media. */
+html {font-size:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body {line-height:1.5;overflow-wrap:break-word}
+:where(a,button,input,select,summary):focus-visible {outline:3px solid #161616;outline-offset:3px}
+:where(h1,h2,h3) {text-wrap:balance;overflow-wrap:normal}
+
+/* 1A Hero and pill navigation */
+.nav .nav-links {font-size:1rem;gap:clamp(13px,1.55vw,30px)}
+.nav .nav-cta {font-size:1rem}
+.eyebrow {font-size:.9375rem;line-height:1.5;letter-spacing:.14em}
+.copy h1 {font-size:clamp(2.75rem,4.45vw,4.5rem);line-height:1.12;letter-spacing:-.045em;font-weight:700}
+.button,.button:nth-child(2) {font-size:1rem;line-height:1.35;min-height:56px;font-weight:600}
+
+/* 1B Yellow highlights — readable descriptions, not microtype */
+.hero .cards {align-items:stretch}
+.hero .card {min-height:205px!important}
+.card-title {font-size:clamp(1.375rem,1.65vw,1.55rem);line-height:1.18;letter-spacing:-.035em;font-weight:700}
+.card p {font-size:1rem;line-height:1.55;margin-top:16px}
+
+/* 2 Solution image grid */
+.solutions-heading {font-size:clamp(2.5rem,4.35vw,4.25rem);line-height:1.11;letter-spacing:-.045em;font-weight:700;max-width:1090px}
+.solutions-desc {font-size:clamp(1rem,1.18vw,1.125rem);line-height:1.7;max-width:75ch}
+.office-glass strong {font-size:clamp(1.25rem,1.6vw,1.5625rem);line-height:1.18;font-weight:700;letter-spacing:-.025em}
+.office-special .office-glass strong {font-size:1rem;line-height:1.32}
+
+/* 3 Other Solutions — accessible white-on-red pill labels */
+.more-solutions h2 {font-size:clamp(2.375rem,3.85vw,3.75rem);line-height:1.12;letter-spacing:-.04em}
+.other-pill {font-size:1rem;line-height:1.45;min-height:86px;padding:16px;overflow-wrap:break-word}
+.pill-arr {flex-shrink:0}
+
+/* 4 Offer — concise one-line visual maintained at desktop */
+.subscribe-panel h2 {font-size:clamp(1.75rem,2.65vw,2.75rem);font-weight:700;line-height:1.18;letter-spacing:-.035em}
+.subscribe-btn,.callback-btn {font-size:1rem;line-height:1.35}
+
+/* 5 Benefits — headline hierarchy, paragraphs and bullets */
+.kicker {font-size:.9375rem;line-height:1.5}
+.benefits-intro h2 {font-size:clamp(2.5rem,4.2vw,4rem);line-height:1.12;font-weight:700;letter-spacing:-.045em}
+.benefits-intro p {font-size:1.125rem;line-height:1.68;max-width:68ch}
+.benefit-row {min-height:0;gap:30px;align-items:center}
+.benefit-text h3 {font-size:clamp(1.75rem,2.15vw,2.125rem);line-height:1.2;font-weight:700;letter-spacing:-.035em}
+.benefit-text p {font-size:1rem;line-height:1.68;max-width:66ch}
+.benefit-text ul {gap:12px 14px}
+.benefit-text li {font-size:1rem;line-height:1.5;font-weight:500;padding-left:23px}
+
+/* 6 Why us, proof cards, testimonial and enquiry */
+.why-kicker,.form-kicker {font-size:.9375rem;line-height:1.5}
+.why-copy h2 {font-size:clamp(2.625rem,3.65vw,3.625rem);line-height:1.14;letter-spacing:-.04em;font-weight:700}
+.why-desc {font-size:1rem;line-height:1.75;max-width:68ch}
+.metric span {font-size:.875rem;line-height:1.5;white-space:normal;display:block}
+.testimonial blockquote {font-size:1rem;line-height:1.75}
+.testimonial strong {font-size:1rem}
+.testimonial small {font-size:.875rem;line-height:1.5}
+.enquiry-panel h2 {font-size:clamp(2rem,2.9vw,2.75rem);line-height:1.15}
+.form-subtitle {font-size:1rem;line-height:1.65}
+.field label {font-size:.9375rem;line-height:1.45}
+.field input,.field select {font-size:1rem;min-height:56px}
+.form-note {font-size:.875rem;line-height:1.6}
+
+/* 7 Plain FAQ — preserve simple, unnumbered accordions */
+.faq-copy h2 {font-size:clamp(2.875rem,4.2vw,4rem);line-height:1.08;letter-spacing:-.045em}
+.faq-copy p {font-size:1.0625rem;line-height:1.65}
+.faq-item summary {font-size:clamp(1.125rem,1.4vw,1.375rem);line-height:1.35;padding:24px 26px;font-weight:700}
+.faq-answer {font-size:1rem;line-height:1.65;padding-left:26px;padding-right:26px}
+
+/* Subscribe popup */
+.modal-panel h2 {font-size:clamp(1.875rem,2.8vw,2.375rem);line-height:1.14}
+.modal-panel p {font-size:1rem;line-height:1.65}
+.checkboxline {font-size:.9375rem;line-height:1.55}
+.modal-msg {font-size:.875rem;line-height:1.6}
+
+@media (max-width:1150px) {
+  /* Condense navigation instead of shrinking links into illegible 12px text */
+  .nav {height:72px!important;padding:0 14px 0 22px!important;gap:15px!important}
+  .nav .nav-links {display:none;position:absolute;top:calc(100% + 10px);left:0;right:0;border-radius:24px;background:rgba(255,255,255,.98);border:1px solid #eae5e3;box-shadow:0 16px 40px #0002;padding:22px;flex-direction:column;align-items:stretch;gap:16px!important;font-size:1rem!important;white-space:normal}
+  .nav .nav-links.open {display:flex}
+  .nav .brand {min-width:0!important}
+  .mobile-menu {display:flex}
+}
+@media (max-width:850px) {
+  .nav .nav-cta {font-size:.9375rem!important}
+  .hero .cards {grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .hero .card {min-height:205px!important}
+  .office-special .office-glass {min-height:72px}
+  .benefit-row {gap:18px}
+  .benefit-text ul {grid-template-columns:1fr}
+  .other-pill-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .other-pill {font-size:1rem;min-height:78px}
+}
+@media (max-width:600px) {
+  .hero .copy {margin-top:108px!important;padding-inline:18px}
+  .eyebrow {font-size:.875rem;letter-spacing:.12em}
+  .copy h1 {font-size:clamp(2.25rem,8.7vw,3.125rem);line-height:1.13}
+  .actions {gap:10px}
+  .button,.button:nth-child(2) {font-size:1rem;min-height:50px;padding:12px 16px}
+  .hero .cards {grid-template-columns:1fr!important;gap:12px!important}
+  .hero .card {min-height:0!important;padding:22px 22px 20px}
+  .card-title {font-size:1.5rem;max-width:none;padding-right:57px}
+  .card p {font-size:1rem;line-height:1.6;max-width:unset;margin-top:13px}
+  .ic {width:42px;height:42px}
+  .solutions-heading {font-size:clamp(2.15rem,9vw,2.625rem);line-height:1.15}
+  .solutions-desc {font-size:1rem;line-height:1.7}
+  .office-glass strong {font-size:1.3125rem}
+  .more-solutions h2 {font-size:clamp(2rem,8vw,2.625rem)}
+  .other-pill-grid {grid-template-columns:1fr;gap:10px}
+  .other-pill {font-size:1rem;min-height:61px;padding:13px 16px}
+  .pill-arr {width:30px;height:30px}
+  .subscribe-panel h2 {font-size:clamp(1.65rem,7vw,2.125rem)}
+  .benefits-intro h2 {font-size:clamp(2.1rem,8.6vw,2.8rem);line-height:1.13}
+  .benefits-intro p {font-size:1rem;line-height:1.68}
+  .benefit-text h3 {font-size:clamp(1.65rem,6.6vw,1.9rem)}
+  .benefit-text p,.benefit-text li {font-size:1rem}
+  .why-copy h2 {font-size:clamp(2.25rem,8vw,2.875rem);line-height:1.14}
+  .why-desc {font-size:1rem;line-height:1.75}
+  .metric strong {font-size:clamp(1.875rem,6vw,2.4rem)}
+  .metric span {font-size:.875rem}
+  .testimonial blockquote {font-size:1rem}
+  .form-subtitle {font-size:1rem}
+  .field label {font-size:.9375rem}
+  .field input,.field select {font-size:1rem}
+  .faq-copy h2 {font-size:clamp(2.625rem,9vw,3.375rem)}
+  .faq-item summary {font-size:1.125rem;line-height:1.35;padding:19px 20px}
+  .faq-answer {font-size:1rem;line-height:1.65;padding:0 20px 22px}
+}
+@media (max-width:420px) {
+  /* Three metric labels could otherwise become three columns of tiny type */
+  .metrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .metric {padding:16px 14px;min-height:122px}
+  .metric:nth-child(3) {grid-column:1/-1;min-height:100px}
+  .brand-name {font-size:23px}
+  .office-tile {height:290px}
+  .nav .brand-small {font-size:9px!important}
+}
+@media (max-width:350px) {
+  .nav .brand-name {font-size:21px!important}
+  .nav {padding-inline:11px!important}
+  .enquiry-panel {padding:24px 16px}
+  .testimonial {padding:22px}
+}
+
+/* Accessible red shade for small text and white-on-red controls:
+   nearly identical brand appearance, but sufficient AA text contrast. */
+:root {--red-aa:color-mix(in srgb,var(--red) 95%,var(--ink))}
+.eyebrow,.kicker,.why-kicker,.form-kicker {color:var(--red-aa)}
+.button,.subscribe-btn,.callback-btn,.form-submit {background:var(--red-aa)}
+.office-arrow {background:var(--red-aa)}
+.other-pill {background:linear-gradient(145deg,rgba(22,22,22,.22),rgba(22,22,22,.17));border-color:rgba(255,255,255,.38)}
+.other-pill:hover {background:linear-gradient(145deg,rgba(22,22,22,.16),rgba(22,22,22,.15))}
+@supports not (color:color-mix(in srgb,red,black)) {
+  :root {--red-aa:#e22023}
+}
+
+
+/* Workspace by Emlen — visual balance pass, 2026-11-03.
+   Purpose: reduce visual overstatement without changing approved structure,
+   imagery, copy, section ordering, or brand design tokens. */
+:root { --space-width: 1330px; }
+html { scroll-padding-top: 100px; }
+.frame { width:min(var(--space-width),calc(100% - 92px)); }
+
+/* Navigation: slim mirror-glass pill, with the approved yellow action. */
+.nav { height:72px!important; max-width:1430px!important;
+  width:calc(100% - 76px)!important; padding:0 17px 0 27px!important;
+  gap:18px!important; top:12px!important;
+  box-shadow:0 12px 30px rgba(42,34,28,.07),inset 0 1px 1px rgba(255,255,255,.75)!important; }
+.nav .brand { min-width:218px!important; gap:10px; }
+.nav .brand-icon { width:43px;height:43px;flex:none; }
+.nav .brand-name { font-size:28px;letter-spacing:-.068em;line-height:.9; }
+.nav .brand-small { font-size:9px;letter-spacing:.25em;margin-top:7px; }
+.nav .nav-links { font-size:14px!important; gap:clamp(12px,1.5vw,25px)!important; font-weight:600; }
+.nav .nav-links span { font-size:13px; margin-left:4px; }
+.nav .nav-cta { padding:10px 20px;min-height:46px;font-size:14px;gap:16px; }
+.nav .nav-cta b { font-size:20px; }
+
+/* 1A Hero: heading still unmistakable, but no longer fills the viewport. */
+.hero {padding-bottom:32px;}
+.hero .copy { margin-top:112px!important;max-width:1150px;padding-inline:24px; }
+.hero .eyebrow { font-size:13px;letter-spacing:.14em;margin-bottom:14px; }
+.hero .copy h1 { max-width:1130px; font-size:clamp(38px,3.45vw,55px);
+  line-height:1.12;letter-spacing:-.043em;font-weight:700; }
+.hero .actions { margin-top:28px;gap:12px; }
+.hero .button,.hero .button:nth-child(2) { min-height:49px;min-width:0;padding:13px 24px;
+  border-radius:14px;font-size:15px;font-weight:600;gap:16px;
+  box-shadow:0 8px 20px rgba(237,32,36,.12); }
+.hero .button .arr {font-size:19px;}
+.hero .illustration { max-width:1420px;width:calc(100% - 76px);margin-top:43px!important; }
+.hero .cards {max-width:1330px;width:calc(100% - 92px);gap:14px;margin-top:14px!important;margin-bottom:35px;}
+.hero .card {min-height:178px!important;padding:20px 21px 18px;border-radius:22px;
+  box-shadow:0 9px 22px rgba(128,88,18,.10),inset 0 1px 0 rgba(255,255,255,.8);}
+.hero .card::before {border-radius:17px;}
+.hero .card-title {font-size:20px;line-height:1.2;letter-spacing:-.03em;font-weight:700;max-width:260px;padding-right:39px;}
+.hero .card p {font-size:15px;line-height:1.5;margin-top:13px;max-width:none;}
+.hero .ic {height:38px;width:38px;border-radius:12px;top:16px;right:16px;}
+.hero .ic svg {width:20px;height:20px;}
+
+/* 2 Solutions: keep asymmetrical seven-card photography mosaic. */
+.solutions-section {padding:76px 0 70px;}
+.pre-line {width:86px;height:4px;margin-bottom:19px;}
+.solutions-heading {font-size:clamp(36px,3.25vw,50px);line-height:1.12;
+  letter-spacing:-.038em;font-weight:700;max-width:1000px;margin-bottom:17px;}
+.solutions-desc {font-size:16px;line-height:1.7;max-width:990px;margin-bottom:31px;}
+.office-grid {gap:16px;}
+.office-tile {height:270px;border-radius:23px;box-shadow:0 8px 20px rgba(30,30,30,.055);}
+.office-tile:hover {transform:translateY(-3px);box-shadow:0 12px 25px rgba(30,30,30,.11);}
+.office-glass {width:calc(100% - 22px);min-height:66px;margin:11px;
+  padding:10px 12px 10px 18px;border-radius:19px;
+  box-shadow:0 7px 20px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.9);}
+.office-glass strong {font-size:clamp(17px,1.5vw,21px);line-height:1.2;font-weight:700;}
+.office-arrow {width:39px;height:39px;font-size:22px;}
+.office-special {padding:23px 20px 0;}
+.special-heading {font-size:25px;line-height:1.12;font-weight:700;}
+.special-lines {font-size:13.5px;margin-top:18px;gap:8px;}
+.office-special .office-glass {min-height:55px;}
+.office-special .office-glass strong {font-size:15px;}
+.office-special .office-arrow {height:36px;width:36px;}
+
+/* 3 Other solutions: smaller coral-red block, same ten service links. */
+.other-wrap {padding:30px 0 22px;}
+.more-solutions {padding:37px 40px 41px;border-radius:27px;
+  box-shadow:0 15px 36px rgba(237,32,36,.12);}
+.other-dash {width:70px;height:4px;margin-bottom:16px;}
+.more-solutions h2 {font-size:clamp(33px,3vw,44px);line-height:1.14;
+  letter-spacing:-.035em;font-weight:700;max-width:810px;}
+.other-pill-grid {gap:13px;margin-top:27px;}
+.other-pill {min-height:66px;font-size:14.5px;line-height:1.35;font-weight:600;
+  padding:12px 13px 12px 16px;border-radius:15px;
+  box-shadow:0 7px 16px rgba(100,0,0,.07),inset 0 1px 1px rgba(255,255,255,.19);}
+.pill-arr {height:28px;width:28px;font-size:19px;}
+
+/* 4 Subscribe: slim CTA ribbon. */
+.subscribe-section {padding:10px 0 70px;}
+.subscribe-panel {min-height:116px;gap:24px;padding:23px 31px;border-radius:24px;}
+.subscribe-panel h2 {font-size:clamp(23px,2.15vw,32px);line-height:1.2;
+  letter-spacing:-.03em;font-weight:700;}
+.subscribe-btn,.callback-btn {font-size:15px;min-height:49px;padding:12px 24px;
+  border-radius:13px;gap:12px;box-shadow:0 8px 18px rgba(237,32,36,.13);}
+
+/* 5 Benefits: readable text, editorial but much less vertically imposing. */
+.benefits-section {padding:77px 0 85px;}
+.benefits-intro {max-width:800px;margin-bottom:42px;}
+.kicker {font-size:12px;letter-spacing:.18em;}
+.benefits-intro h2 {font-size:clamp(34px,3.15vw,48px);line-height:1.14;
+  letter-spacing:-.04em;font-weight:700;margin:13px 0 15px;}
+.benefits-intro p {font-size:16px;line-height:1.65;max-width:65ch;}
+.benefits-intro .callback-btn {margin-top:22px;}
+.benefit-list {gap:20px;}
+.benefit-row {min-height:0;gap:27px;padding:19px 21px;border-radius:28px;
+  box-shadow:0 10px 27px rgba(93,62,53,.06),inset 0 1px 1px rgba(255,255,255,.9);}
+.benefit-text {padding:8px 10px;}
+.benefit-text h3 {font-size:clamp(22px,2.05vw,29px);line-height:1.22;
+  letter-spacing:-.028em;font-weight:700;margin-bottom:10px;}
+.benefit-text p {font-size:15.5px;line-height:1.58;}
+.benefit-text ul {margin-top:13px;gap:9px 10px;}
+.benefit-text li {font-size:15px;line-height:1.4;font-weight:500;padding-left:20px;}
+.benefit-photo {height:253px;border-radius:20px;}
+
+/* 6 Why Us: clean white background and separate glass metric cards. */
+.why-section {padding:84px 0 93px;}
+.why-grid {gap:48px;}
+.why-kicker,.form-kicker {font-size:12px;letter-spacing:.16em;margin-bottom:14px;}
+.why-copy h2 {font-size:clamp(34px,3.05vw,45px);line-height:1.17;
+  letter-spacing:-.035em;font-weight:700;margin-bottom:17px;}
+.why-desc {font-size:15.5px;line-height:1.67;margin-bottom:29px;}
+.metrics {gap:13px;margin-bottom:23px;}
+.metric {min-height:118px;padding:16px 13px;border-radius:22px;
+  box-shadow:0 9px 21px rgba(25,25,25,.055);}
+.metric strong {font-size:clamp(30px,2.5vw,38px);line-height:1.15;font-weight:700;}
+.metric span {font-size:13px;line-height:1.4;}
+.testimonial {padding:25px 27px;border-radius:23px;box-shadow:0 10px 25px rgba(20,20,20,.05);}
+.quote-symbol {font-size:54px;}
+.testimonial blockquote {font-size:15px;line-height:1.62;margin:13px 0 18px;}
+.testimonial strong {font-size:15px;}
+.testimonial small {font-size:13.5px;}
+.enquiry-panel {padding:35px 35px 39px;border-radius:30px;
+  box-shadow:0 17px 44px rgba(25,25,25,.06);}
+.enquiry-panel h2 {font-size:clamp(27px,2.4vw,36px);font-weight:700;line-height:1.18;}
+.form-subtitle {font-size:15px;line-height:1.6;margin-bottom:23px;}
+.field-grid {gap:15px 14px;}
+.field {gap:7px;}
+.field label {font-size:14px;line-height:1.4;}
+.field input,.field select {height:52px;min-height:52px;font-size:16px;padding:0 15px;border-radius:13px;}
+.form-submit {min-height:52px;margin-top:23px;}
+.form-note {font-size:13px;}
+
+/* 7 FAQ: original plain, unnumbered content; less heavy type and whitespace. */
+.faq-section {padding:94px 0 108px;}
+.faq-grid {gap:55px;}
+.faq-copy h2 {font-size:clamp(36px,3.35vw,49px);line-height:1.1;
+  letter-spacing:-.039em;font-weight:700;margin-bottom:19px;}
+.faq-copy p {font-size:16px;line-height:1.65;margin-bottom:23px;}
+.faq-list {gap:12px;}
+.faq-item {border-radius:20px;box-shadow:0 5px 13px rgba(0,0,0,.028);}
+.faq-item summary {font-size:clamp(16px,1.25vw,18px);line-height:1.4;
+  font-weight:650;padding:19px 22px;}
+.faq-toggle {font-size:25px;}
+.faq-answer {font-size:15.5px;line-height:1.6;padding:0 22px 19px;}
+
+/* Popup typography follows the same calmer visual scale. */
+.modal-panel {border-radius:24px;padding:29px;}
+.modal-panel h2 {font-size:31px;font-weight:700;}
+.modal-panel p {font-size:15px;}
+.checkboxline {font-size:14px;}
+
+@media (max-width:1250px) {
+  .frame {width:calc(100% - 64px);}
+  .nav {width:calc(100% - 48px)!important;}
+  .office-tile {height:245px;}
+  .why-grid {gap:28px;}
+  .hero .cards {width:calc(100% - 64px);}
+}
+@media (max-width:1150px) {
+  .nav {height:66px!important;padding:0 12px 0 20px!important;}
+  .nav .brand {min-width:0!important;}
+  .nav .nav-links {display:none;}
+  .nav .nav-links.open {display:flex;}
+  .mobile-menu {display:flex;}
+  .office-special .office-glass strong {font-size:14px;}
+}
+@media (max-width:850px) {
+  .frame {width:calc(100% - 40px);}
+  .hero .cards {width:calc(100% - 40px);grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  .hero .card {min-height:170px!important;}
+  .solutions-section {padding:65px 0;}
+  .solutions-heading {font-size:clamp(34px,5vw,44px);}
+  .more-solutions {padding:32px 28px;}
+  .other-pill-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .benefit-row {gap:16px;}
+  .benefit-photo {height:230px;}
+  .benefit-text ul {grid-template-columns:1fr;}
+  .why-grid {gap:26px;}
+  .why-desc {font-size:15px;}
+  .metric span {font-size:12.5px;}
+  .enquiry-panel {padding:28px 24px;}
+  .faq-grid {gap:30px;}
+}
+@media (max-width:600px) {
+  .frame {width:calc(100% - 32px);}
+  .nav {width:calc(100% - 22px)!important;height:62px!important;top:9px!important;
+    padding:0 10px 0 14px!important;}
+  .nav .brand-icon {width:33px!important;height:33px!important;}
+  .nav .brand-name {font-size:23px!important;}
+  .nav .brand-small {font-size:8px!important;}
+  .nav .nav-cta {min-height:40px;padding:8px 12px;font-size:12px!important;gap:7px;}
+  .nav .nav-cta b {font-size:17px;}
+  .mobile-menu {padding:7px;}
+  .hero .copy {margin-top:100px!important;padding-inline:17px;}
+  .hero .eyebrow {font-size:11px;letter-spacing:.11em;}
+  .hero .copy h1 {font-size:clamp(29px,7.7vw,39px);line-height:1.16;}
+  .hero .actions {gap:9px;margin-top:22px;}
+  .hero .button,.hero .button:nth-child(2) {min-height:44px;min-width:0;
+    font-size:13.5px;padding:10px 13px;border-radius:11px;gap:8px;}
+  .hero .button .arr {font-size:16px;}
+  .hero .illustration {margin-top:34px!important;}
+  .hero .cards {grid-template-columns:1fr!important;gap:11px;margin-top:12px!important;}
+  .hero .card {min-height:0!important;padding:18px 19px 17px;}
+  .hero .card-title {font-size:19px;max-width:none;padding-right:45px;}
+  .hero .card p {font-size:15px;margin-top:9px;line-height:1.5;}
+  .hero .ic {width:34px;height:34px;top:13px;right:13px;}
+  .solutions-section {padding:58px 0 56px;}
+  .solutions-heading {font-size:clamp(30px,7.6vw,37px);line-height:1.16;}
+  .solutions-desc {font-size:15.5px;line-height:1.65;margin-bottom:24px;}
+  .office-tile {height:245px;}
+  .office-glass {min-height:58px;padding:10px 10px 10px 14px;}
+  .office-glass strong {font-size:18px;}
+  .office-arrow {width:35px;height:35px;}
+  .other-wrap {padding:23px 0 15px;}
+  .more-solutions {padding:26px 20px;border-radius:22px;}
+  .more-solutions h2 {font-size:clamp(28px,7.4vw,36px);}
+  .other-pill-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px;}
+  .other-pill {min-height:69px;padding:10px 11px;font-size:13.5px;line-height:1.35;}
+  .pill-arr {height:26px;width:26px;font-size:17px;}
+  .subscribe-section {padding:8px 0 54px;}
+  .subscribe-panel {padding:22px;border-radius:20px;gap:15px;}
+  .subscribe-panel h2 {font-size:clamp(22px,6vw,29px);}
+  .subscribe-btn,.callback-btn {min-height:46px;font-size:14px;padding:11px 17px;}
+  .benefits-section {padding:65px 0 70px;}
+  .benefits-intro {margin-bottom:34px;}
+  .benefits-intro h2 {font-size:clamp(31px,7.6vw,39px);}
+  .benefits-intro p {font-size:15.5px;}
+  .benefit-list {gap:16px;}
+  .benefit-row {padding:15px;border-radius:22px;}
+  .benefit-text {padding:6px;}
+  .benefit-text h3 {font-size:clamp(23px,6vw,27px);}
+  .benefit-text p,.benefit-text li {font-size:15px;}
+  .benefit-photo {height:200px;border-radius:15px;}
+  .why-section {padding:65px 0 68px;}
+  .why-copy h2 {font-size:clamp(31px,7.6vw,38px);}
+  .why-desc {font-size:15px;margin-bottom:25px;}
+  .metrics {gap:10px;}
+  .metric {min-height:108px;padding:13px 11px;border-radius:18px;}
+  .metric strong {font-size:32px;}
+  .testimonial {padding:23px;border-radius:19px;}
+  .testimonial blockquote {font-size:15px;}
+  .enquiry-panel {border-radius:23px;padding:26px 20px;}
+  .enquiry-panel h2 {font-size:29px;}
+  .field label {font-size:14px;}
+  .field input,.field select {height:50px;min-height:50px;}
+  .faq-section {padding:68px 0 80px;}
+  .faq-copy h2 {font-size:clamp(34px,8vw,42px);}
+  .faq-copy p {font-size:15.5px;}
+  .faq-item summary {font-size:16px;padding:17px 19px;}
+  .faq-answer {font-size:15px;padding:0 19px 17px;}
+}
+@media (max-width:375px) {
+  .nav .brand-name {font-size:21px!important;}
+  .nav .nav-cta {padding:8px 10px;font-size:11.5px!important;}
+  .other-pill-grid {grid-template-columns:1fr;}
+  .other-pill {min-height:51px;}
+  .hero .button,.hero .button:nth-child(2) {font-size:12.5px;padding:10px;}
+}
+/* Keep the approved 4.9 Google rating and yellow star together. */
+.metric strong {display:flex;align-items:baseline;gap:4px;white-space:nowrap;}
+.metric strong .star {display:inline!important;font-size:.62em;line-height:1;white-space:nowrap;}
+
+/* ---- base ---- */
+/* Final approved refinements: mirror-glass nav, exact four-card copy, decision checklist. */
+.nav{
+  background:linear-gradient(116deg,rgba(255,255,255,.73) 0%,rgba(255,255,255,.50) 45%,rgba(255,255,255,.62) 100%)!important;
+  border:1px solid rgba(255,255,255,.96)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(160%)!important;
+  backdrop-filter:blur(30px) saturate(160%)!important;
+  box-shadow:0 17px 38px rgba(35,24,20,.105),inset 0 2px 2px rgba(255,255,255,.97),inset 0 -1px 2px rgba(255,255,255,.42)!important;
+}
+.nav:before{content:"";position:absolute;inset:3px;border:1px solid rgba(255,255,255,.55);border-radius:inherit;pointer-events:none}
+.nav .nav-links a{transition:opacity .2s ease}.nav .nav-links a:hover{opacity:.62}
+.nav .nav-cta{gap:0!important;box-shadow:0 7px 20px rgba(255,185,0,.16)}
+/* Four desktop cards: one heading line in each, unchanged full original descriptions. */
+.hero .cards{gap:14px!important}
+.hero .card{padding:22px 14px 20px!important;min-height:190px!important}
+.hero .card-title{font-size:clamp(16px,1.3vw,20px)!important;line-height:1.2!important;letter-spacing:-.046em!important;
+  font-weight:750!important;white-space:nowrap!important;max-width:none!important;padding-right:38px!important;overflow:visible!important}
+.hero .card p{font-size:14px!important;line-height:1.52!important;margin:16px 0 0!important;max-width:100%!important}
+.hero .ic{width:33px!important;height:33px!important;right:12px!important;top:16px!important;border-radius:11px!important}
+.hero .ic svg{width:20px!important;height:20px!important}
+/* Section 4: editorial checklist lead magnet. Editable HTML/CSS, not a flattened screenshot. */
+.checklist-section{position:relative;isolation:isolate;overflow:hidden;padding:70px 0 82px;
+  background:radial-gradient(ellipse 49% 63% at 88% 85%,rgba(237,32,36,.095),transparent 80%),
+   radial-gradient(ellipse 55% 95% at 0% 0%,rgba(255,185,0,.06),transparent 80%),#fffaf8}
+.checklist-section:before{content:"";position:absolute;z-index:-1;width:670px;height:420px;left:-240px;bottom:-270px;border:1px solid rgba(237,32,36,.09);border-radius:50%;transform:rotate(-15deg)}
+.checklist-section:after{content:"";position:absolute;z-index:-1;right:-190px;top:-190px;width:490px;height:490px;border:1px solid rgba(255,255,255,.8);border-radius:45%;transform:rotate(-23deg)}
+.checklist-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(420px,.88fr);align-items:center;gap:40px;min-height:435px}
+.checklist-copy{position:relative;z-index:2;padding-left:8px}
+.checklist-kicker{display:flex;align-items:center;gap:20px;margin:0 0 24px;color:var(--red);font:700 15px/1.4 var(--body);letter-spacing:.18em}
+.checklist-kicker span{display:block;width:75px;height:2px;background:var(--red);opacity:.8}
+.checklist-copy h2{font:800 clamp(33px,3.3vw,49px)/1.13 var(--header);letter-spacing:-.05em;margin:0 0 22px;max-width:690px}
+.checklist-copy h2 em{font-style:normal;color:var(--red)}
+.checklist-description{font:400 clamp(16px,1.24vw,18px)/1.75 var(--body);color:#615b57;max-width:550px;margin:0 0 28px}
+.checklist-cta{display:inline-flex;align-items:center;justify-content:space-between;gap:18px;
+  background:var(--red);color:#fff;border:0;border-radius:999px;padding:15px 21px;min-height:56px;
+  font:700 16px/1.3 var(--body);box-shadow:0 14px 28px -14px rgba(237,32,36,.35);transition:transform .2s,box-shadow .2s}
+.checklist-cta:hover{transform:translateY(-2px);box-shadow:0 15px 28px rgba(237,32,36,.2)}
+.checklist-cta span{font-size:21px}
+.checklist-art{height:440px;max-width:620px;width:100%;position:relative;margin:0 auto;transform:translateY(2px)}
+.checklist-glow{position:absolute;inset:105px 6px 0;background:linear-gradient(140deg,rgba(237,32,36,.12),rgba(255,185,0,.13));filter:blur(25px);border-radius:50%;}
+.paper-back,.paper-front{position:absolute;border:1px solid rgba(255,255,255,.95);border-radius:22px;background:#fffaf5;box-shadow:0 18px 34px rgba(62,41,30,.13)}
+.paper-back{width:54%;height:71%;top:11%;left:15%;transform:rotate(-11deg);padding:60px 23px 18px;background:#fcf7f1}
+.paper-back-right{left:auto;right:9%;top:14%;transform:rotate(10deg);padding:60px 25px}
+.paper-back i{display:block;height:8px;background:#ddd7d1;border-radius:4px;margin:18px auto;opacity:.62;width:86%}
+.paper-back-left i{background:var(--yellow);width:8px;height:8px;border-radius:50%;margin:23px 7px}
+.paper-front{z-index:2;width:59%;height:91%;top:0;left:25%;padding:28px 33px 22px;transform:rotate(-2.5deg)}
+.paper-front h3{font:800 clamp(25px,2.05vw,33px)/1.06 var(--header);letter-spacing:-.045em;margin:0 0 20px;color:#292929}
+.paper-front h3 em{font-style:normal;color:var(--red)}
+.paper-front ul{padding:0;margin:0;list-style:none}
+.paper-front li{font:600 13.8px/1.34 var(--body);border-top:1px solid #eee6df;padding:10px 0 10px 32px;position:relative;white-space:nowrap}
+.paper-front li:before{content:"";width:15px;height:15px;border:1.6px solid #222;position:absolute;top:11px;left:0;border-radius:3px}
+.paper-bookmark{position:absolute;right:26px;top:-1px;background:var(--yellow);height:65px;width:23px;clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
+.paper-envelope{position:absolute;z-index:3;left:15%;right:2%;bottom:-36px;height:100px;
+  border:1px solid rgba(255,255,255,.97);border-radius:14px 14px 26px 26px;background:linear-gradient(120deg,rgba(255,250,245,.96),rgba(255,237,206,.94));
+  box-shadow:0 13px 20px rgba(102,70,45,.12);overflow:hidden}
+.envelope-fold{position:absolute;inset:-55px 0 45px;background:linear-gradient(115deg,rgba(255,255,255,.7),rgba(247,234,223,.85));clip-path:polygon(0 0,50% 100%,100% 0)}
+.paper-envelope p{position:absolute;bottom:11px;left:42px;padding-left:11px;border-left:3px solid var(--red);font:500 12.5px/1.45 var(--body);color:#4f4742;margin:0}
+/* Slightly smaller styling at laptops: 4-column headlines must not wrap. */
+@media(max-width:1350px){
+ .hero .cards{gap:11px!important;width:calc(100% - 58px)!important}
+ .hero .card{padding:20px 10px 19px!important}
+ .hero .card-title{font-size:clamp(15px,1.25vw,18px)!important;padding-right:30px!important}
+ .hero .card p{font-size:13px!important}
+ .hero .ic{right:8px!important;width:29px!important;height:29px!important}
+ .checklist-layout{grid-template-columns:minmax(0,1fr) minmax(390px,.95fr);gap:18px}
+ .paper-front li{font-size:12.8px}
+}
+@media(max-width:1050px){
+ .hero .card-title{white-space:normal!important;font-size:18px!important;line-height:1.12!important}
+ .hero .card{min-height:188px!important}
+ .checklist-layout{grid-template-columns:1fr 1fr;gap:10px}
+ .paper-front{padding:27px 18px}.paper-front h3{font-size:24px}
+ .paper-front li{font-size:11.5px;padding-left:24px}
+}
+@media(max-width:850px){
+ .hero .cards{width:calc(100% - 40px)!important;gap:12px!important}
+ .hero .card{padding:19px 16px!important}
+ .hero .card-title{white-space:nowrap!important;font-size:19px!important}
+ .hero .card p{font-size:15px!important}
+ .checklist-section{padding:62px 0}
+ .checklist-layout{grid-template-columns:1fr;gap:15px}
+ .checklist-copy{padding:0}
+ .checklist-copy h2{max-width:670px}
+ .checklist-art{height:415px;max-width:550px}
+ .paper-front li{font-size:12.5px}
+}
+@media(max-width:600px){
+ .nav{background:rgba(255,255,255,.79)!important;-webkit-backdrop-filter:blur(26px)!important;backdrop-filter:blur(26px)!important}
+ .hero .cards{width:calc(100% - 32px)!important}
+ .hero .card{min-height:auto!important;padding:17px 18px!important}
+ .hero .card-title{font-size:20px!important;white-space:normal!important;padding-right:35px!important}
+ .hero .card p{font-size:15px!important;margin-top:10px!important}
+ .checklist-section{padding:50px 0 55px}
+ .checklist-kicker{font-size:12px;letter-spacing:.1em;gap:10px;margin-bottom:17px}
+ .checklist-kicker span{width:44px}
+ .checklist-copy h2{font-size:clamp(29px,7.8vw,38px);margin-bottom:17px}
+ .checklist-description{font-size:15px;line-height:1.65;margin-bottom:21px}
+ .checklist-cta{font-size:14px;min-height:50px;padding:12px 16px;border-radius:999px}
+ .checklist-art{height:340px;width:min(100%,400px)}
+ .paper-front{left:24%;width:62%;padding:20px 17px;}
+ .paper-front h3{font-size:clamp(19px,5.4vw,27px);margin-bottom:12px}
+ .paper-front li{font-size:10px;padding:8px 0 8px 22px}
+ .paper-front li:before{width:12px;height:12px;top:9px}
+ .paper-envelope{bottom:-9px;height:84px;left:7%;right:0}
+ .paper-envelope p{left:28px;bottom:9px;font-size:10.5px}
+}
+@media(prefers-reduced-motion:reduce){.checklist-cta{transition:none}}
+
+/* ---- emlen-ios-glass-heading-refinement ---- */
+/* ================================================================
+   NOV 03: LOCKED DESIGN — BALANCED HEADING LIFT + iOS MIRROR GLASS
+   This layer changes visual presentation only. It does not alter
+   page sections, navigation destinations, forms, or copy.
+   ================================================================ */
+
+/* Layered translucent iOS-style glass, not a solid white pill. */
+.nav {
+  isolation:isolate;
+  background:
+    linear-gradient(116deg,
+      rgba(207,209,220,.71) 0%,
+      rgba(255,255,255,.19) 22%,
+      rgba(243,215,218,.40) 47%,
+      rgba(247,243,250,.26) 68%,
+      rgba(204,207,220,.67) 100%) !important;
+  border:1.25px solid rgba(255,255,255,.86) !important;
+  -webkit-backdrop-filter:blur(36px) saturate(175%) contrast(104%) !important;
+  backdrop-filter:blur(36px) saturate(175%) contrast(104%) !important;
+  box-shadow:
+    0 12px 34px rgba(40,27,31,.12),
+    0 2px 5px rgba(36,24,30,.045),
+    inset 0 2px 1px rgba(255,255,255,.95),
+    inset 0 -3px 9px rgba(89,72,95,.13),
+    inset 1px 0 3px rgba(255,255,255,.72) !important;
+}
+/* Reflected highlights running through the translucent material. */
+.nav::before,
+.nav::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  border-radius:inherit;
+}
+.nav::before {
+  inset:2px;
+  z-index:0;
+  background:
+    linear-gradient(167deg,rgba(255,255,255,.82) 0%,rgba(255,255,255,.28) 24%,transparent 46%),
+    linear-gradient(94deg,transparent 0%,rgba(255,255,255,.24) 39%,rgba(255,255,255,.52) 47%,transparent 60%);
+  opacity:.46;
+}
+.nav::after {
+  inset:0;
+  z-index:0;
+  border-top:1px solid rgba(255,255,255,.97);
+  border-bottom:1px solid rgba(151,140,149,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+}
+.nav > .brand,
+.nav > .nav-cta,
+.nav > .mobile-menu,
+.nav > .nav-links { z-index:2; }
+/* Keep floating navigation dropdown fully visible when expanded. */
+.nav .nav-links.open { z-index:5; }
+
+/* Selective lift only: retains compact card/CTA sizing from approved page. */
+.hero .copy h1 {
+  font-size:clamp(42px,3.85vw,60px) !important;
+  line-height:1.115 !important;
+  letter-spacing:-.045em !important;
+  max-width:1260px;
+}
+.benefits-intro h2 {
+  font-size:clamp(39px,3.52vw,54px) !important;
+  line-height:1.12 !important;
+  letter-spacing:-.044em !important;
+  max-width:950px;
+}
+.why-copy h2 {
+  font-size:clamp(39px,3.42vw,52px) !important;
+  line-height:1.13 !important;
+  letter-spacing:-.039em !important;
+}
+.enquiry-panel h2 {
+  font-size:clamp(30px,2.65vw,39px) !important;
+  line-height:1.17 !important;
+}
+@media(max-width:850px) {
+  .hero .copy h1 { font-size:clamp(35px,5.5vw,47px) !important; }
+  .benefits-intro h2 { font-size:clamp(34px,4.8vw,43px) !important; }
+  .why-copy h2 { font-size:clamp(34px,4.9vw,43px) !important; }
+}
+@media(max-width:600px) {
+  .nav {
+    background:linear-gradient(115deg,rgba(225,227,235,.65),rgba(255,255,255,.34) 36%,rgba(241,226,231,.57) 70%,rgba(225,226,235,.61)) !important;
+    -webkit-backdrop-filter:blur(28px) saturate(170%) !important;
+    backdrop-filter:blur(28px) saturate(170%) !important;
+  }
+  .hero .copy h1 { font-size:clamp(30px,8vw,40px) !important; }
+  .benefits-intro h2 { font-size:clamp(32px,8.4vw,40px) !important; }
+  .why-copy h2 { font-size:clamp(33px,8.4vw,41px) !important; }
+  .enquiry-panel h2 { font-size:clamp(29px,7.4vw,34px) !important; }
+}
+@media(prefers-reduced-transparency:reduce) {
+  .nav { background:rgba(247,247,249,.95) !important; }
+  .nav::before { opacity:.24; }
+}
+
+/* ---- chatgpt-final-polish ---- */
+:root{--nav-glass1:rgba(255,255,255,.36);--nav-glass2:rgba(255,255,255,.18);--nav-stroke:rgba(255,255,255,.72);}
+body{background:#fffaf5;}
+.nav{background:linear-gradient(135deg,rgba(255,255,255,.44) 0%,rgba(255,255,255,.24) 35%,rgba(255,255,255,.18) 100%)!important;border:1.35px solid rgba(255,255,255,.74)!important;box-shadow:0 18px 42px rgba(64,40,26,.10), inset 0 1px 0 rgba(255,255,255,.92), inset 0 -1px 0 rgba(255,255,255,.28)!important;backdrop-filter:blur(34px) saturate(155%)!important;-webkit-backdrop-filter:blur(34px) saturate(155%)!important;overflow:hidden;isolation:isolate;}
+.nav::before{content:"";position:absolute;inset:2px;border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.18) 42%,rgba(255,255,255,.08));pointer-events:none;}
+.nav::after{content:"";position:absolute;left:26px;right:26px;top:7px;height:46%;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,.40),rgba(255,255,255,.10) 38%,rgba(255,255,255,.30) 70%,rgba(255,255,255,.05));filter:blur(10px);opacity:.8;pointer-events:none;}
+.nav > *{position:relative;z-index:1;}
+.nav-cta{box-shadow:0 10px 25px rgba(255,185,0,.26), inset 0 1px 0 rgba(255,255,255,.55);}
+.hero .copy{margin-top:148px!important;padding-top:10px;}
+.eyebrow{font-size:17px!important;letter-spacing:.22em!important;margin-bottom:24px!important;}
+.copy h1{font-size:clamp(56px,4.95vw,84px)!important;line-height:1.03!important;max-width:1360px!important;letter-spacing:-.062em!important;}
+.copy .actions{margin-top:34px!important;}
+.illustration{margin-top:20px!important;transform:translateY(-10px);filter:brightness(1.02) contrast(.93) drop-shadow(0 10px 18px rgba(0,0,0,.035));}
+.cards{margin:-6px auto 56px!important;gap:20px!important;width:calc(100% - 64px)!important;}
+.card{min-height:214px!important;padding:28px 26px 26px!important;border-radius:28px!important;background:linear-gradient(145deg,rgba(255,247,199,.94) 0%,rgba(255,225,123,.95) 55%,rgba(255,199,38,.92) 100%)!important;box-shadow:0 16px 36px rgba(145,104,25,.14), inset 0 1px 0 rgba(255,255,255,.82)!important;}
+.card:before{inset:6px!important;border-radius:23px!important;border-color:rgba(255,255,255,.34)!important;}
+.card-title{font-size:30px!important;line-height:1.02!important;max-width:none!important;padding-right:84px!important;white-space:nowrap;}
+.card p{font-size:15px!important;line-height:1.62!important;margin-top:18px!important;max-width:340px!important;}
+.ic{width:58px!important;height:58px!important;top:17px!important;right:17px!important;border-radius:18px!important;background:rgba(255,255,255,.64)!important;box-shadow:0 6px 18px rgba(122,92,18,.09), inset 0 1px 0 rgba(255,255,255,.75)!important;}
+.ic svg{width:30px!important;height:30px!important;stroke-width:1.85!important;}
+.solutions-section{padding:88px 0 92px!important;}
+.pre-line{display:none!important;}
+.solutions-heading{max-width:none!important;font-size:clamp(44px,4.4vw,68px)!important;line-height:1.02!important;letter-spacing:-.06em!important;margin:0 0 20px!important;}
+@media (min-width:1180px){.solutions-heading{white-space:nowrap;}}
+.solutions-desc{font-size:clamp(18px,1.28vw,21px)!important;line-height:1.72!important;max-width:1180px!important;margin-bottom:38px!important;}
+.office-grid{gap:22px!important;}
+.office-tile{height:338px!important;border-radius:30px!important;box-shadow:0 12px 28px rgba(30,30,30,.08)!important;}
+.office-glass{position:relative;overflow:hidden;min-height:84px!important;padding:14px 16px 14px 24px!important;border-radius:28px!important;background:linear-gradient(130deg,rgba(255,255,255,.66) 0%,rgba(255,255,255,.46) 44%,rgba(255,255,255,.28) 100%)!important;border:1px solid rgba(255,255,255,.72)!important;box-shadow:0 12px 26px rgba(22,22,22,.13), inset 0 1px 0 rgba(255,255,255,.84)!important;backdrop-filter:blur(32px) saturate(150%)!important;-webkit-backdrop-filter:blur(32px) saturate(150%)!important;}
+.office-glass::before{content:"";position:absolute;inset:2px 2px auto 2px;height:52%;border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.44),rgba(255,255,255,0));pointer-events:none;}
+.office-glass strong{font-size:clamp(21px,1.7vw,28px)!important;line-height:1.06!important;}
+.office-arrow{width:50px!important;height:50px!important;font-size:28px!important;box-shadow:0 8px 20px rgba(237,32,36,.20);}
+.office-special{box-shadow:0 14px 28px rgba(0,0,0,.12)!important;}
+.office-special .office-glass{background:linear-gradient(135deg,rgba(255,255,255,.19),rgba(255,255,255,.10))!important;border-color:rgba(255,255,255,.28)!important;}
+.benefits-lead h2,.benefits-heading,.why-content h2{letter-spacing:-.058em!important;line-height:1.04!important;}
+.benefits-lead h2{font-size:clamp(48px,4.2vw,66px)!important;}
+.why-content h2{font-size:clamp(48px,4vw,64px)!important;}
+/* Remove an extra in-between accent line look */
+.section-tag-line,.section-divider{display:none!important;}
+@media (max-width:1200px){.card-title{white-space:normal;font-size:26px!important;}.copy h1{font-size:clamp(50px,5.4vw,72px)!important;}}
+@media (max-width:980px){.nav{width:min(1550px,calc(100% - 34px))!important;} .cards{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:calc(100% - 32px)!important;} .card-title{font-size:24px!important;} .copy h1{font-size:clamp(44px,6.2vw,64px)!important;} .illustration{transform:translateY(-4px);} .solutions-heading{white-space:normal!important;font-size:clamp(38px,6vw,58px)!important;}}
+@media (max-width:740px){.hero .copy{margin-top:108px!important;padding-top:8px;} .eyebrow{font-size:12px!important;letter-spacing:.18em!important;} .copy h1{font-size:clamp(37px,8.4vw,50px)!important;line-height:1.08!important;} .illustration{width:calc(100% - 18px)!important;margin-top:16px!important;transform:none;} .cards{grid-template-columns:1fr!important;gap:14px!important;width:calc(100% - 24px)!important;margin:14px auto 34px!important;} .card{min-height:186px!important;padding:22px 20px 20px!important;} .card-title{font-size:24px!important;padding-right:72px!important;} .card p{font-size:14px!important;} .ic{width:52px!important;height:52px!important;} .ic svg{width:26px!important;height:26px!important;} .solutions-section{padding-top:56px!important;} .solutions-heading{font-size:clamp(34px,8vw,44px)!important;line-height:1.08!important;} .office-grid{grid-template-columns:1fr!important;gap:16px!important;} .office-tile,.tile-3{grid-column:auto!important;height:290px!important;} .office-glass{min-height:76px!important;} .office-glass strong{font-size:22px!important;} .benefits-lead h2,.why-content h2{font-size:clamp(36px,8vw,46px)!important;}}
+
+/* ---- liquid-glass-final-pass ---- */
+/* Workspace by Emlen — Final liquid glass and first-fold polish.
+   Preserve the source page, text, approved sections and illustrated office objects. */
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)) {
+  .nav {
+    background:
+      radial-gradient(ellipse 36% 110% at 23% -16%, rgba(255,255,255,.82) 0%, rgba(255,255,255,.03) 82%),
+      linear-gradient(106deg,rgba(220,230,236,.68) 0%,rgba(241,248,251,.44) 20%,rgba(148,166,178,.61) 49%,rgba(236,245,250,.57) 72%,rgba(163,183,194,.57) 100%) !important;
+    backdrop-filter:blur(32px) saturate(175%) contrast(1.06) !important;
+    -webkit-backdrop-filter:blur(32px) saturate(175%) contrast(1.06) !important;
+  }
+}
+.nav{
+  overflow:visible !important;
+  isolation:isolate;
+  border:1.5px solid rgba(255,255,255,.90) !important;
+  box-shadow:
+    0 14px 33px rgba(42,53,62,.18),
+    0 3px 8px rgba(37,46,54,.065),
+    inset 0 2px 0 rgba(255,255,255,.96),
+    inset 0 -2px 1px rgba(112,130,144,.26),
+    inset 0 0 0 1px rgba(255,255,255,.32) !important;
+}
+.nav::before{
+  content:"";position:absolute;inset:2px;border-radius:inherit;z-index:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.25) 20%,rgba(255,255,255,.055) 47%,rgba(96,121,139,.065) 83%,rgba(255,255,255,.23) 100%);
+  pointer-events:none;
+}
+.nav::after{
+  content:"";position:absolute;z-index:0;inset:7px 18px auto 18px;
+  height:38%;border-radius:999px;
+  background:linear-gradient(90deg,rgba(255,255,255,.68),rgba(255,255,255,.04) 22%,rgba(255,255,255,.38) 54%,rgba(255,255,255,.05) 78%,rgba(255,255,255,.42));
+  filter:blur(7px);opacity:.83;pointer-events:none;
+}
+.nav > *{position:relative;z-index:1;}
+.nav .nav-links.open{z-index:15;}
+.nav-cta{box-shadow:0 7px 20px rgba(255,185,0,.23),inset 0 1px 0 rgba(255,255,255,.46);}
+
+/* Bring the complete hero into the first desktop viewport.  No content or CTA removed. */
+.hero .copy{margin-top:110px !important;padding-top:0 !important;}
+.hero .eyebrow{margin-bottom:18px !important;}
+.hero .actions{margin-top:27px !important;}
+.hero .illustration{
+  margin-top:18px !important;
+  transform:none !important;
+  filter:none !important;
+  shape-rendering:geometricPrecision;
+  max-width:1420px;
+}
+.hero .illustration :is(path,rect,line,circle,ellipse,polygon,polyline){
+  vector-effect:non-scaling-stroke;
+  shape-rendering:geometricPrecision;
+}
+.hero .cards{margin-top:8px !important;}
+.hero .card-title{
+  font-size:clamp(18px,1.33vw,21px) !important;
+  white-space:nowrap;
+  letter-spacing:-.035em;
+  line-height:1.16 !important;
+  max-width:calc(100% - 45px) !important;
+  padding-right:0 !important;
+}
+.hero .ic{width:44px !important;height:44px !important;top:15px !important;right:15px !important;}
+.hero .ic svg{width:24px !important;height:24px !important;}
+.hero .card{min-height:185px !important;}
+
+/* Reflective translucent card labels, not opaque white/beige panels. */
+.office-glass{
+  overflow:hidden;
+  isolation:isolate;
+  background:
+    linear-gradient(115deg,rgba(249,252,253,.67),rgba(227,235,241,.56) 29%,rgba(195,209,217,.51) 72%,rgba(246,250,252,.64)) !important;
+  border:1.35px solid rgba(255,255,255,.90) !important;
+  backdrop-filter:blur(29px) saturate(165%) !important;
+  -webkit-backdrop-filter:blur(29px) saturate(165%) !important;
+  box-shadow:0 13px 27px rgba(25,34,41,.22),inset 0 2px 0 rgba(255,255,255,.87),inset 0 -1px 1px rgba(90,111,126,.17) !important;
+}
+.office-glass::before{
+  content:"";position:absolute;inset:2px 2px auto;height:45%;border-radius:24px;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));
+  pointer-events:none;z-index:0;
+}
+.office-glass > *{position:relative;z-index:1;}
+.office-special .office-glass{
+  background:linear-gradient(110deg,rgba(245,249,253,.22),rgba(227,235,242,.10) 55%,rgba(245,249,253,.20)) !important;
+  border-color:rgba(255,255,255,.47) !important;
+}
+
+/* A consistent, quiet frosted glass language beyond the hero. */
+.other-pill{
+  border-color:rgba(255,255,255,.53) !important;
+  background:linear-gradient(155deg,rgba(255,255,255,.27),rgba(72,0,0,.16) 55%,rgba(255,255,255,.12)) !important;
+  backdrop-filter:blur(22px) saturate(140%) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(140%) !important;
+  box-shadow:inset 0 1.2px 0 rgba(255,255,255,.42),0 9px 20px rgba(120,0,0,.13) !important;
+}
+.benefit-row,.metric,.testimonial,.enquiry-panel,.faq-item{
+  border-color:rgba(224,231,234,.78) !important;
+  box-shadow:0 14px 35px rgba(40,48,55,.07),inset 0 1px 0 rgba(255,255,255,.94) !important;
+  backdrop-filter:blur(21px) saturate(135%);
+  -webkit-backdrop-filter:blur(21px) saturate(135%);
+}
+/* Keep Section 6 on the approved PURE WHITE background. */
+.why-section{background:#fff !important;}
+
+@media(max-width:1250px){
+  .hero .card-title{white-space:normal;font-size:20px !important;max-width:calc(100% - 48px) !important;}
+  .hero .ic{width:42px !important;height:42px !important;}
+}
+@media(max-width:850px){
+  .hero .copy{margin-top:111px !important;}
+  .hero .illustration{margin-top:22px !important;}
+  .hero .cards{margin-top:10px !important;}
+}
+@media(max-width:600px){
+  .hero .copy{margin-top:100px !important;padding-top:0 !important;}
+  .hero .illustration{margin-top:28px !important;}
+  .hero .cards{margin-top:12px !important;}
+  .hero .card-title{font-size:20px !important;white-space:normal;max-width:calc(100% - 45px) !important;}
+}
+
+/* ---- glass-card-readability-fixes ---- */
+/* Keep the image-card titles compact inside the approved single glass label. */
+.office-glass strong{font-size:clamp(18px,1.36vw,22px)!important;line-height:1.12!important;}
+.office-special .office-glass strong{font-size:15px!important;line-height:1.27!important;font-weight:600!important;}
+.office-special .office-glass{min-height:59px!important;}
+.office-special .office-glass::before{background:linear-gradient(180deg,rgba(255,255,255,.13),transparent)!important;}
+.office-special .office-arrow{width:39px!important;height:39px!important;font-size:23px!important;}
+@media(max-width:740px){
+  /* Crop the illustration from its centre on narrow devices, not from its left edge. */
+  .hero .illustration{width:820px!important;min-width:820px!important;max-width:none!important;transform:translateX(calc((100vw - 820px)/2))!important;}
+  .office-glass strong{font-size:20px!important;}
+  .office-special .office-glass strong{font-size:15px!important;}
+}
+
+/* ---- emlen-transparent-glass-approved-hero ---- */
+/* Nov 03 selected visual — genuine translucent glass, not an opaque milky bar.
+   Keeps all previous section markup, text and working enquiry/FAQ interactions. */
+.nav {
+  height:76px!important;
+  background:linear-gradient(115deg,
+    rgba(255,255,255,.085) 0%,
+    rgba(255,255,255,.035) 31%,
+    rgba(234,242,247,.07) 56%,
+    rgba(255,255,255,.035) 82%,
+    rgba(255,255,255,.10) 100%)!important;
+  border:1.25px solid rgba(255,255,255,.82)!important;
+  outline:1px solid rgba(104,125,142,.12);
+  outline-offset:-3px;
+  backdrop-filter:blur(13px) saturate(156%) brightness(1.012)!important;
+  -webkit-backdrop-filter:blur(13px) saturate(156%) brightness(1.012)!important;
+  box-shadow:
+    0 17px 33px rgba(37,50,58,.13),
+    0 3px 8px rgba(42,46,49,.08),
+    inset 0 1px 1px rgba(255,255,255,.90),
+    inset 0 -1px 0 rgba(255,255,255,.28)!important;
+  isolation:isolate;
+  overflow:visible;
+}
+/* Very thin specular reflections — the surroundings still show through. */
+.nav::before {
+  content:""; position:absolute; pointer-events:none; z-index:0;
+  inset:1px; border-radius:inherit;
+  background:linear-gradient(177deg,
+    rgba(255,255,255,.23) 0%,
+    rgba(255,255,255,.025) 26%,
+    transparent 50%,
+    rgba(255,255,255,.07) 83%,
+    rgba(255,255,255,.13) 100%)!important;
+}
+.nav::after {
+  content:""; position:absolute; pointer-events:none; z-index:0;
+  inset:3px 25px auto 25px; height:6px; border-radius:999px;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,.62),rgba(255,255,255,.08) 32%,
+    rgba(255,255,255,.42) 62%,rgba(255,255,255,.11))!important;
+  filter:blur(2.5px)!important;
+  opacity:.78!important;
+}
+.nav>*{position:relative;z-index:2;}
+.nav .brand {gap:15px!important;min-width:255px!important;}
+.nav .brand-icon {width:49px!important;height:49px!important;}
+.nav .brand-name {font-size:31px!important;letter-spacing:-.068em!important;}
+.nav .brand-small {font-size:9px!important;letter-spacing:.28em!important;margin-top:8px!important;}
+.nav .nav-cta {box-shadow:0 8px 20px rgba(255,185,0,.21),inset 0 1px 0 rgba(255,255,255,.54)!important;}
+
+/* Match selected centered visual, but retain a sensible first-screen height. */
+.hero .copy {margin-top:134px!important;padding-top:0!important;}
+.hero .eyebrow {margin-bottom:17px!important;}
+.hero .copy h1 {font-size:clamp(44px,3.92vw,62px)!important;
+  font-weight:750!important;line-height:1.07!important;letter-spacing:-.052em!important;
+  max-width:1200px!important;}
+.hero .actions {margin-top:25px!important;gap:15px!important;}
+.hero .button,.hero .button:nth-child(2){min-height:53px!important;border-radius:16px!important;}
+.hero .illustration {margin-top:20px!important;transform:none!important;
+  filter:none!important;shape-rendering:geometricPrecision;}
+.hero .illustration :is(path,rect,line,circle,ellipse,polygon,polyline){
+  shape-rendering:geometricPrecision;vector-effect:non-scaling-stroke;}
+
+/* Four yellow highlights are TITLE + ICON only in the selected hero visual.
+   Their approved supporting paragraphs stay intact in source for the CMS. */
+.hero .cards{margin-top:8px!important;gap:16px!important;align-items:stretch;}
+.hero .card {min-height:133px!important;padding:22px 23px!important;
+  display:flex!important;align-items:center!important;
+  border-radius:27px!important;
+  background:linear-gradient(138deg,rgba(255,247,202,.91) 0%,rgba(255,222,111,.87) 50%,rgba(255,196,35,.83) 100%)!important;
+  border:1.5px solid rgba(255,255,255,.89)!important;
+  box-shadow:0 15px 28px rgba(148,95,18,.105),inset 0 1px 0 rgba(255,255,255,.73)!important;
+  backdrop-filter:blur(16px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(125%)!important;
+}
+.hero .card:before {border-radius:22px!important;}
+.hero .card-title {font-size:clamp(22px,1.75vw,28px)!important;
+  line-height:1.05!important;letter-spacing:-.045em!important;
+  font-weight:750!important;white-space:normal!important;
+  max-width:calc(100% - 69px)!important;padding-right:0!important;}
+.hero .card p {display:none!important;}
+.hero .ic {height:59px!important;width:59px!important;top:50%!important;
+  right:17px!important;transform:translateY(-50%)!important;border-radius:19px!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.74),rgba(255,255,255,.42))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 6px 14px rgba(95,74,20,.07)!important;}
+.hero .ic svg {width:31px!important;height:31px!important;stroke-width:1.9!important;}
+
+/* Bring image-card overlays into the same transparent glass family. */
+.office-glass:not(.office-special .office-glass){
+  background:linear-gradient(125deg,rgba(255,255,255,.30),rgba(241,247,251,.19) 55%,rgba(255,255,255,.26))!important;
+  border-color:rgba(255,255,255,.77)!important;
+  backdrop-filter:blur(18px) saturate(145%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(145%)!important;
+}
+.office-glass::before{background:linear-gradient(180deg,rgba(255,255,255,.27),transparent)!important;}
+
+@media(max-width:1250px){
+  .nav .brand{min-width:210px!important;gap:11px!important;}
+  .nav .brand-name{font-size:28px!important;}
+  .hero .card-title{font-size:clamp(20px,2vw,24px)!important;}
+}
+@media(max-width:1150px){
+  .nav .brand{min-width:0!important;}
+  .nav{height:70px!important;}
+  .hero .copy{margin-top:120px!important;}
+}
+@media(max-width:850px){
+  .nav .brand-icon{width:41px!important;height:41px!important;}
+  .hero .card{min-height:120px!important;}
+  .hero .card-title{font-size:23px!important;}
+  .hero .copy{margin-top:112px!important;}
+}
+@media(max-width:600px){
+  .nav{height:64px!important;}
+  .nav .brand{gap:9px!important;}
+  .nav .brand-icon{width:35px!important;height:35px!important;}
+  .nav .brand-name{font-size:23px!important;}
+  .hero .copy{margin-top:108px!important;}
+  .hero .eyebrow{font-size:12px!important;}
+  .hero .copy h1{font-size:clamp(34px,8vw,43px)!important;line-height:1.1!important;}
+  .hero .illustration{margin-top:16px!important;}
+  .hero .cards{margin-top:10px!important;}
+  .hero .card{min-height:94px!important;padding:17px 19px!important;}
+  .hero .card-title{font-size:22px!important;max-width:calc(100% - 63px)!important;}
+  .hero .ic{width:48px!important;height:48px!important;right:14px!important;border-radius:16px!important;}
+  .hero .ic svg{width:26px!important;height:26px!important;}
+}
+
+/* ---- emlen-segmented-liquid-glass-and-restored-highlights ---- */
+/* ----------------------------------------------------------
+   Workspace by Emlen — glass navigation + restored highlights
+   Designed against client's segmented optical-glass reference.
+   Other approved page sections and interactions are unchanged.
+   ---------------------------------------------------------- */
+:root { --emlen-glass-rim: rgba(255,255,255,.87); }
+
+/* Optical glass: transparent foundation, refractive rim, clear
+   floating lens, and a subtle segmented-glass navigation strip. */
+.nav {
+  height:76px !important;
+  background: linear-gradient(115deg,
+     rgba(221,240,250,.24) 0%,rgba(255,255,255,.09) 17%,
+     rgba(220,234,242,.14) 38%,rgba(255,255,255,.04) 57%,
+     rgba(247,231,224,.16) 79%,rgba(224,239,246,.22) 100%) !important;
+  border:1.5px solid rgba(255,255,255,.91) !important;
+  outline:1px solid rgba(74,96,108,.19) !important;
+  outline-offset:-3px !important;
+  border-radius:999px !important;
+  -webkit-backdrop-filter:blur(21px) saturate(190%) contrast(103%) !important;
+  backdrop-filter:blur(21px) saturate(190%) contrast(103%) !important;
+  box-shadow:
+    0 13px 30px rgba(37,42,52,.135),
+    0 1px 5px rgba(77,88,96,.15),
+    inset 0 2px 0 rgba(255,255,255,.93),
+    inset 0 -2px 0 rgba(255,255,255,.58),
+    inset 1px 0 2px rgba(255,255,255,.63),
+    inset -1px 0 3px rgba(255,255,255,.67) !important;
+  isolation:isolate !important;
+  overflow:visible !important;
+}
+.nav::before {
+  content:"" !important;position:absolute !important;inset:4px !important;
+  border-radius:inherit !important;z-index:0 !important;pointer-events:none !important;
+  border:1px solid rgba(255,255,255,.39) !important;
+  background:linear-gradient(177deg,
+    rgba(255,255,255,.37) 0%,rgba(255,255,255,.10) 22%,
+    rgba(255,255,255,.015) 49%,rgba(111,150,179,.065) 72%,
+    rgba(255,255,255,.20) 100%) !important;
+  filter:none !important;opacity:1 !important;
+}
+.nav::after {
+  content:"" !important;position:absolute !important;
+  inset:5px 34px auto 34px !important;height:10px !important;z-index:0 !important;
+  border-radius:999px !important;pointer-events:none !important;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.78) 16%,
+     rgba(255,255,255,.10) 42%,rgba(255,255,255,.55) 78%,transparent 100%) !important;
+  filter:blur(3px) !important;opacity:.73 !important;
+}
+.nav > *{position:relative;z-index:1;}
+/* True segmented, optical glass inner rail, like the supplied reference. */
+.nav .nav-links {
+  gap:2px !important;
+  flex:1 1 auto !important;
+  border:1px solid rgba(255,255,255,.30);
+  background:linear-gradient(90deg,rgba(255,255,255,.055),rgba(202,231,245,.075) 50%,rgba(255,255,255,.045));
+  border-radius:999px;
+  padding:5px 6px !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.29);
+}
+.nav .nav-links a {
+  display:flex;align-items:center;justify-content:center;
+  min-height:43px;
+  border-radius:999px;
+  padding:0 clamp(9px,1.06vw,18px);
+  font-size:clamp(12px,.90vw,14px) !important;
+  font-weight:600 !important;
+  letter-spacing:-.015em;
+  transition:background .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+.nav .nav-links a:nth-child(2) {
+  background:linear-gradient(130deg,rgba(255,255,255,.51),rgba(255,255,255,.23) 53%,rgba(196,228,246,.22));
+  border:1px solid rgba(255,255,255,.67);
+  box-shadow:0 4px 12px rgba(41,65,79,.10),inset 0 1px 0 rgba(255,255,255,.88),inset 0 -1px 0 rgba(255,255,255,.37);
+}
+.nav .nav-links a:not(:nth-child(2)):hover,
+.nav .nav-links a:focus-visible {
+  background:rgba(255,255,255,.31);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.57);
+}
+.nav .brand {min-width:238px !important;gap:13px !important;}
+.nav .brand-name {font-weight:800 !important;letter-spacing:-.065em !important;}
+.nav .brand-small {font-weight:700 !important;letter-spacing:.28em !important;}
+.nav .nav-cta {
+  border:1px solid rgba(255,255,255,.58);
+  box-shadow:0 8px 18px rgba(221,157,0,.14),inset 0 1px 0 rgba(255,255,255,.56)!important;
+}
+/* Restore EVERY approved description (not just hidden HTML content).
+   Medium weight headings, normal reading weight, quiet icon strokes. */
+.hero .cards {
+  margin-top:8px !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:15px !important;
+  align-items:stretch !important;
+}
+.hero .card {
+  display:block !important;
+  min-height:204px !important;
+  padding:23px 20px 21px !important;
+  border-radius:26px !important;
+  background:linear-gradient(133deg,rgba(255,246,190,.94),rgba(255,220,112,.93) 53%,rgba(255,193,36,.92)) !important;
+  border:1.4px solid rgba(255,255,255,.9) !important;
+  box-shadow:0 10px 22px rgba(111,74,17,.10),inset 0 1px 0 rgba(255,255,255,.78) !important;
+  -webkit-backdrop-filter:blur(13px) saturate(125%) !important;
+  backdrop-filter:blur(13px) saturate(125%) !important;
+}
+.hero .card-title {
+  font-family:var(--header) !important;
+  font-weight:700 !important;
+  font-size:clamp(19px,1.33vw,23px) !important;
+  line-height:1.2 !important;
+  letter-spacing:-.042em !important;
+  white-space:normal !important;
+  max-width:none !important;
+  padding-right:49px !important;
+}
+.hero .card p {
+  display:block !important;
+  visibility:visible !important;
+  font-family:var(--body) !important;
+  font-weight:400 !important;
+  font-size:15.5px !important;
+  line-height:1.6 !important;
+  letter-spacing:0 !important;
+  margin:19px 0 0 !important;
+  max-width:none !important;
+  color:#272321 !important;
+}
+.hero .ic {
+  width:47px !important;height:47px !important;
+  right:15px !important;top:16px !important;
+  transform:none !important;
+  border-radius:15px !important;
+  background:linear-gradient(135deg,rgba(255,255,255,.67),rgba(255,255,255,.39)) !important;
+  border:1px solid rgba(255,255,255,.87) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.87),0 4px 11px rgba(93,70,20,.07) !important;
+}
+.hero .ic svg {
+  width:25px !important;height:25px !important;
+  stroke-width:1.7 !important;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+/* Keep the liquid-glass solution overlays aligned with the new rail. */
+.office-glass:not(.office-special .office-glass) {
+  background:linear-gradient(120deg,rgba(255,255,255,.42),rgba(243,250,255,.18) 62%,rgba(255,255,255,.31)) !important;
+  border:1px solid rgba(255,255,255,.8) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(155%) !important;
+  backdrop-filter:blur(22px) saturate(155%) !important;
+  box-shadow:0 10px 23px rgba(31,45,50,.16),inset 0 1.5px 0 rgba(255,255,255,.92) !important;
+}
+@media (max-width:1240px){
+  .nav .brand{min-width:202px!important;gap:10px!important;}
+  .nav .nav-links a{padding:0 8px!important;font-size:12.5px!important;}
+  .hero .card-title{font-size:19px!important;}
+  .hero .card p{font-size:14.5px!important;}
+}
+@media (max-width:1150px){
+  /* The existing hamburger retains functional navigation on tablet. */
+  .nav .nav-links{display:none;}
+  .nav .nav-links.open{
+    display:flex;flex-direction:column;align-items:stretch;
+    background:rgba(235,242,246,.86)!important;
+    border:1px solid rgba(255,255,255,.8);
+    -webkit-backdrop-filter:blur(22px) saturate(140%);
+    backdrop-filter:blur(22px) saturate(140%);
+  }
+  .nav .nav-links.open a{justify-content:flex-start;padding:9px 14px!important;min-height:42px;}
+  .hero .cards{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  .hero .card{min-height:190px!important;}
+  .hero .card-title{font-size:22px!important;}
+  .hero .card p{font-size:15px!important;}
+}
+@media (max-width:600px){
+  .nav{height:65px!important;}
+  .nav .brand{min-width:0!important;}
+  .nav .brand-name{font-size:23px!important;}
+  .hero .cards{grid-template-columns:1fr!important;gap:12px!important;}
+  .hero .card{min-height:0!important;padding:21px 20px 19px!important;}
+  .hero .card-title{font-size:22px!important;padding-right:58px!important;}
+  .hero .card p{font-size:15px!important;margin-top:14px!important;line-height:1.58!important;}
+  .hero .ic{width:44px!important;height:44px!important;right:14px!important;top:16px!important;}
+  .hero .ic svg{width:23px!important;height:23px!important;}
+}
+@media (prefers-reduced-transparency:reduce){
+  .nav{background:rgba(244,247,249,.93)!important;}
+}
+
+/* ---- workspace-single-liquid-glass-pill ---- */
+/* One floating liquid-glass capsule only. No nested menu rail or selected menu pills. */
+.nav .nav-links,
+.nav .nav-links.open {
+  border:0 !important;
+  background:transparent !important;
+  background-image:none !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  padding:0 !important;
+  gap:clamp(13px,1.4vw,28px) !important;
+}
+.nav .nav-links a,
+.nav .nav-links a:nth-child(2),
+.nav .nav-links a:hover,
+.nav .nav-links a:focus-visible {
+  background:transparent !important;
+  background-image:none !important;
+  border:0 !important;
+  box-shadow:none !important;
+  border-radius:0 !important;
+  transform:none !important;
+  padding:0 !important;
+  min-height:auto !important;
+  white-space:nowrap;
+}
+.nav .nav-links a:hover { color:var(--red) !important; }
+.nav .nav-links a:focus-visible {outline:2px solid var(--ink);outline-offset:5px;border-radius:3px!important;}
+/* Preserve the refractive surface without drawing a second inner capsule. */
+.nav::before {
+  border:0 !important;
+  background:linear-gradient(175deg,rgba(255,255,255,.27),rgba(255,255,255,.035) 55%,rgba(255,255,255,.10)) !important;
+}
+@media(max-width:1150px) {
+  .nav .nav-links:not(.open){display:none!important;}
+  .nav .nav-links.open {
+    position:absolute!important;
+    top:calc(100% + 12px)!important;
+    left:0!important;
+    right:0!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:0!important;
+    padding:12px 18px!important;
+    border:1px solid rgba(255,255,255,.75)!important;
+    border-radius:22px!important;
+    background:rgba(237,246,252,.79)!important;
+    -webkit-backdrop-filter:blur(22px) saturate(155%);
+    backdrop-filter:blur(22px) saturate(155%);
+    box-shadow:0 18px 35px rgba(25,33,43,.14)!important;
+  }
+  .nav .nav-links.open a,
+  .nav .nav-links.open a:nth-child(2) {
+    display:block!important;
+    width:100%!important;
+    min-height:43px!important;
+    padding:11px 9px!important;
+    white-space:normal!important;
+  }
+}
+
+/* ---- emlen-seamless-spacing-glass-cta-benefits ---- */
+/* ======================================================================
+   Workspace by Emlen • Section-flow + transparent-CTA refinement
+   The selected visuals, copy, logos, photographs, and seven-section order
+   remain intact. This is a final non-destructive CSS layer.
+   ====================================================================== */
+:root{
+  --emlen-glass-border:rgba(237,32,36,.30);
+  --emlen-glass-red:#bd151a;
+}
+/* Avoid accidental internal white-band padding at section boundaries. */
+.hero{padding-bottom:0!important;}
+.hero .cards{margin-bottom:12px!important;}
+.solutions-section{padding-top:30px!important;padding-bottom:28px!important;}
+.other-wrap{padding-top:16px!important;padding-bottom:12px!important;}
+.checklist-section{padding-top:30px!important;padding-bottom:24px!important;}
+.benefits-section{padding-top:28px!important;padding-bottom:31px!important;}
+.why-section{padding-top:28px!important;padding-bottom:25px!important;}
+.faq-section{padding-top:38px!important;padding-bottom:52px!important;}
+/* No unwanted margin below the lead magnet or between the benefits intro
+   and its cards. These are separation tokens, not empty spacer sections. */
+.benefits-intro{
+  max-width:1120px!important;
+  width:100%!important;
+  margin:0 0 32px!important;
+  text-align:left!important;
+}
+.benefits-intro .kicker{display:block;text-align:left!important;margin-bottom:16px!important;}
+.benefits-intro h2{
+  max-width:1040px!important;
+  margin:0 0 22px!important;
+  font-size:clamp(44px,4.15vw,64px)!important;
+  line-height:1.075!important;
+  letter-spacing:-.052em!important;
+  font-weight:700!important;
+  text-align:left!important;
+}
+.benefits-intro p{
+  max-width:810px!important;
+  font-size:clamp(16px,1.19vw,18px)!important;
+  line-height:1.66!important;
+  margin:0!important;
+  text-align:left!important;
+  color:#514d4b!important;
+}
+.benefits-intro .callback-btn{margin-top:23px!important;}
+
+/* Actual transparent, readable optical-glass CTAs on white/cream/blush. */
+.hero .button,
+.hero .button:nth-child(2),
+.callback-btn,
+.checklist-cta,
+.form-submit,
+.modal-form .callback-btn {
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background:linear-gradient(118deg,
+    rgba(255,255,255,.68) 0%,
+    rgba(249,237,238,.36) 41%,
+    rgba(237,32,36,.075) 100%)!important;
+  border:1.3px solid var(--emlen-glass-border)!important;
+  color:var(--emlen-glass-red)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(155%)!important;
+  backdrop-filter:blur(22px) saturate(155%)!important;
+  box-shadow:0 10px 25px rgba(99,44,45,.085),
+             inset 0 1px 0 rgba(255,255,255,.96),
+             inset 0 -1px 0 rgba(255,255,255,.25)!important;
+  font-weight:700!important;
+  text-shadow:none!important;
+  transition:background .22s ease,transform .22s ease,box-shadow .22s ease!important;
+}
+.hero .button::before,
+.callback-btn::before,
+.checklist-cta::before,
+.form-submit::before {
+  content:"";
+  position:absolute;
+  inset:1px 2px auto 2px;
+  height:44%;
+  pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),transparent);
+  z-index:-1;
+}
+.hero .button:hover,.callback-btn:hover,.checklist-cta:hover,.form-submit:hover{
+  transform:translateY(-2px);
+  background:linear-gradient(118deg,rgba(255,255,255,.74),rgba(237,32,36,.14))!important;
+  box-shadow:0 14px 29px rgba(99,44,45,.13),inset 0 1px 0 #fff!important;
+}
+/* Preserve the branded yellow navigation action, but render it as tinted glass. */
+.nav .nav-cta{
+  background:linear-gradient(112deg,rgba(255,233,154,.82),rgba(255,193,38,.72))!important;
+  border:1px solid rgba(255,255,255,.78)!important;
+  color:#161616!important;
+  -webkit-backdrop-filter:blur(19px) saturate(150%)!important;
+  backdrop-filter:blur(19px) saturate(150%)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.94),0 7px 16px rgba(95,70,20,.10)!important;
+}
+/* Prevent a fixed desktop button width from introducing overflow on phones. */
+@media(max-width:980px){
+  .benefits-intro{max-width:100%!important;}
+  .benefits-intro h2{font-size:clamp(40px,5.5vw,54px)!important;}
+  .solutions-section{padding-top:30px!important;padding-bottom:38px!important;}
+  .checklist-section{padding-top:26px!important;padding-bottom:22px!important;}
+  .benefits-section{padding-top:27px!important;padding-bottom:32px!important;}
+  .why-section{padding-top:31px!important;padding-bottom:28px!important;}
+  .faq-section{padding-top:35px!important;padding-bottom:45px!important;}
+}
+@media(max-width:600px){
+  .hero .cards{margin-bottom:10px!important;}
+  .solutions-section{padding-top:24px!important;padding-bottom:30px!important;}
+  .other-wrap{padding-top:12px!important;padding-bottom:10px!important;}
+  .checklist-section{padding-top:23px!important;padding-bottom:20px!important;}
+  .benefits-section{padding-top:26px!important;padding-bottom:27px!important;}
+  .why-section{padding-top:28px!important;padding-bottom:25px!important;}
+  .faq-section{padding-top:31px!important;padding-bottom:43px!important;}
+  .benefits-intro{margin-bottom:26px!important;text-align:left!important;}
+  .benefits-intro .kicker{font-size:13px!important;margin-bottom:12px!important;}
+  .benefits-intro h2{
+    font-size:clamp(35px,9.15vw,47px)!important;
+    line-height:1.09!important;
+    margin:0 0 17px!important;
+    letter-spacing:-.048em!important;
+  }
+  .benefits-intro p{font-size:15.5px!important;line-height:1.67!important;}
+  .benefits-intro .callback-btn{margin-top:21px!important;}
+  .hero .button,.hero .button:nth-child(2),.callback-btn,.checklist-cta,.form-submit{min-height:46px;}
+}
+@media (prefers-reduced-transparency:reduce){
+  .hero .button,.callback-btn,.checklist-cta,.form-submit{
+    background:#fff2f2!important;border:1.5px solid #af1c22!important;
+  }
+}
+
+/* ---- emlen-red-cta-aligned-highlights-2026-11-03 ---- */
+/* Targeted correction: branded red CTAs and mathematically aligned highlight cards.
+   Do not change approved copy, typography family, sections or imagery. */
+:root { --emlen-action-red: #ED2024; }
+/* Primary actions regain solid red, with white text and subtle optical depth.
+   Navigation's yellow 'Enquire now' is intentionally excluded. */
+.hero .button,
+.hero .button:nth-child(2),
+.callback-btn,
+.checklist-cta,
+.subscribe-btn,
+.form-submit,
+.modal-form .callback-btn {
+  background:var(--emlen-action-red)!important;
+  background-image:none!important;
+  color:#ffffff!important;
+  border:1px solid rgba(207,20,25,.9)!important;
+  text-shadow:none!important;
+  box-shadow:0 11px 24px rgba(237,32,36,.17),inset 0 1px 0 rgba(255,255,255,.26)!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  transition:background .18s ease,transform .18s ease,box-shadow .18s ease!important;
+}
+.hero .button::before,
+.callback-btn::before,
+.checklist-cta::before,
+.form-submit::before { content:none!important; }
+.hero .button:hover,
+.callback-btn:hover,
+.checklist-cta:hover,
+.subscribe-btn:hover,
+.form-submit:hover {
+  background:#D91C20!important;
+  background-image:none!important;
+  color:#fff!important;
+  transform:translateY(-2px);
+  box-shadow:0 14px 27px rgba(237,32,36,.21),inset 0 1px 0 rgba(255,255,255,.22)!important;
+}
+.hero .button:focus-visible,
+.callback-btn:focus-visible,
+.checklist-cta:focus-visible,
+.subscribe-btn:focus-visible,
+.form-submit:focus-visible { outline:3px solid #161616;outline-offset:3px; }
+/* Consistent horizontal tracks: headings share a baseline, icons share their center,
+   and descriptions always start in exactly the same vertical position. */
+@media(min-width:1261px){
+  .hero .cards {align-items:stretch!important;}
+  .hero .card {
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:52px minmax(0,1fr)!important;
+    align-items:start!important;
+    padding:19px 18px 19px 18px!important;
+    min-height:204px!important;
+  }
+  .hero .card-title {
+    font-size:19.5px!important;
+    line-height:1.16!important;
+    font-weight:700!important;
+    letter-spacing:-.045em!important;
+    padding:5px 0 0 0!important;
+    margin:0!important;
+    max-width:calc(100% - 57px)!important;
+    white-space:nowrap!important;
+    align-self:start!important;
+  }
+  .hero .ic {
+    width:42px!important;height:42px!important;
+    right:12px!important;top:17px!important;
+    border-radius:13px!important;
+    display:grid!important;place-items:center!important;
+  }
+  .hero .ic svg { width:24px!important;height:24px!important;stroke-width:1.85!important; }
+  .hero .card p {
+    font-size:15px!important;line-height:1.52!important;
+    margin:0!important;
+    max-width:none!important;
+    padding:0!important;
+    align-self:start!important;
+  }
+}
+/* At narrow four-column desktop widths, keep the longest title on one line. */
+@media(min-width:1261px) and (max-width:1320px){
+ .hero .card-title{font-size:18px!important;}
+}
+/* Allow natural wrapping below full desktop while preserving row alignment. */
+@media(min-width:701px) and (max-width:1260px){
+  .hero .card {
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:minmax(56px,auto) 1fr!important;
+    align-items:start!important;
+    min-height:205px!important;
+    padding:18px 17px!important;
+  }
+  .hero .card-title {
+    font-size:19px!important;
+    line-height:1.16!important;
+    font-weight:700!important;
+    padding:3px 0 0!important;
+    margin:0!important;
+    max-width:calc(100% - 54px)!important;
+    white-space:normal!important;
+  }
+  .hero .ic {top:16px!important;right:13px!important;width:41px!important;height:41px!important;}
+  .hero .ic svg {width:22px!important;height:22px!important;stroke-width:1.85!important;}
+  .hero .card p {margin:0!important;font-size:15px!important;line-height:1.52!important;max-width:none!important;}
+}
+@media(max-width:700px){
+  .hero .card {display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto!important;row-gap:13px!important;align-items:start!important;}
+  .hero .card-title {max-width:calc(100% - 64px)!important;white-space:normal!important;line-height:1.17!important;}
+  .hero .card p {margin:0!important;}
+}
+
+/* ---- emlen-stacked-benefit-and-true-liquid-glass-2026-11-03 ---- */
+/* Matched to the supplied 7s video: benefit panels slide and stack on scroll.
+   Preserve all original copy, images, destination anchors and the 7 sections. */
+
+/* 2 / Solutions — Optical liquid glass with visible photography behind each label.
+   Deliberately NOT an opaque cream tint and not a separate secondary pill. */
+.office-tile:not(.office-special) .office-glass {
+  position:relative!important;
+  isolation:isolate;
+  overflow:hidden!important;
+  background:linear-gradient(135deg,
+    rgba(255,255,255,.28) 0%,
+    rgba(255,255,255,.11) 38%,
+    rgba(246,252,255,.10) 64%,
+    rgba(255,255,255,.19) 100%)!important;
+  border:1.4px solid rgba(255,255,255,.92)!important;
+  box-shadow:
+    0 12px 30px rgba(21,28,33,.13),
+    inset 0 2px 0 rgba(255,255,255,.95),
+    inset 0 -1px 0 rgba(255,255,255,.55),
+    inset 1px 0 0 rgba(255,255,255,.62),
+    inset -1px 0 0 rgba(255,255,255,.65)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(170%) brightness(1.08)!important;
+  backdrop-filter:blur(25px) saturate(170%) brightness(1.08)!important;
+  transition:box-shadow .25s ease,border-color .25s ease,background .25s ease!important;
+}
+.office-tile:not(.office-special) .office-glass::before {
+  content:""!important;pointer-events:none;position:absolute!important;
+  top:2px;left:8px;right:8px;height:42%;
+  border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0));
+  opacity:.95;
+}
+.office-tile:not(.office-special) .office-glass::after {
+  content:"";pointer-events:none;position:absolute;left:10%;right:10%;bottom:0;height:3px;
+  border-radius:99px;background:rgba(255,255,255,.75);filter:blur(2px);
+}
+.office-tile:not(.office-special) .office-glass strong {
+  position:relative;z-index:1;color:#161616;
+  text-shadow:0 1px 2px rgba(255,255,255,.28);
+}
+.office-tile:not(.office-special) .office-arrow {position:relative;z-index:2;flex:none;}
+.office-tile:not(.office-special):hover .office-glass {
+  border-color:rgba(255,255,255,.98)!important;
+  background:linear-gradient(130deg,rgba(255,255,255,.35),rgba(255,255,255,.15),rgba(255,255,255,.22))!important;
+  box-shadow:0 16px 34px rgba(21,28,33,.17),inset 0 2px 0 rgba(255,255,255,1),inset 0 -1px 0 rgba(255,255,255,.6)!important;
+}
+/* The charcoal enterprise tile should remain black with a charcoal-glass label. */
+.office-special .office-glass {
+  background:linear-gradient(140deg,rgba(255,255,255,.18),rgba(255,255,255,.07))!important;
+  border:1px solid rgba(255,255,255,.66)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(160%)!important;
+  backdrop-filter:blur(25px) saturate(160%)!important;
+  box-shadow:0 12px 25px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.67),inset 0 -1px 0 rgba(255,255,255,.26)!important;
+}
+
+/* 5 / Benefits — editorial introduction and scroll-stacking image cards. */
+.benefits-section {
+  isolation:isolate;
+  overflow:visible!important; /* sticky cannot work inside overflow:hidden */
+  background:linear-gradient(180deg,#fffaf7 0%,#fff 64%,#fff 100%)!important;
+  padding-top:55px!important;
+  padding-bottom:64px!important;
+}
+.benefits-intro {
+  text-align:left!important;
+  max-width:1100px!important;
+  margin:0 0 38px!important;
+  padding:0!important;
+}
+.benefits-intro .kicker {text-align:left!important;}
+.benefits-intro h2 {
+  max-width:1030px!important;
+  font-size:clamp(43px,4.5vw,66px)!important;
+  line-height:1.07!important;
+  letter-spacing:-.052em!important;
+  margin:10px 0 17px!important;
+}
+.benefits-intro p {
+  max-width:830px!important;
+  font-size:clamp(16px,1.18vw,18px)!important;
+  line-height:1.65!important;
+  text-align:left!important;
+}
+.benefits-intro .callback-btn {margin-top:22px!important;}
+.benefit-list {
+  position:relative;
+  display:block!important;
+  padding-bottom:30px;
+  isolation:isolate;
+}
+.benefit-row {
+  position:sticky!important;
+  top:110px;
+  z-index:31;
+  display:grid!important;
+  grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr)!important;
+  align-items:center;
+  gap:clamp(26px,3.4vw,57px)!important;
+  min-height:376px!important;
+  padding:29px 31px!important;
+  margin:0 0 23px!important;
+  border-radius:29px!important;
+  border:1px solid rgba(238,232,229,.95)!important;
+  border-left:4px solid #ED2024!important;
+  background:linear-gradient(129deg,rgba(255,255,255,.96),rgba(255,255,255,.88) 54%,rgba(251,246,243,.92))!important;
+  box-shadow:0 19px 47px rgba(61,48,43,.105),inset 0 1px 0 rgba(255,255,255,.96)!important;
+  -webkit-backdrop-filter:blur(20px) saturate(125%);
+  backdrop-filter:blur(20px) saturate(125%);
+  transform:translateY(var(--emlen-stack-shift,0px)) scale(var(--emlen-stack-scale,1));
+  transform-origin:top center;
+  will-change:transform;
+  transition:box-shadow .24s ease;
+}
+.benefit-row:nth-child(1) {top:106px;z-index:31;}
+.benefit-row:nth-child(2) {top:118px;z-index:32;border-left-color:#FFB900!important;}
+.benefit-row:nth-child(3) {top:130px;z-index:33;}
+.benefit-row:nth-child(4) {top:142px;z-index:34;border-left-color:#FFB900!important;}
+.benefit-row::before {content:none!important;}
+.benefit-row::after {
+  content:"";pointer-events:none;position:absolute;top:3px;left:18px;right:18px;height:22px;
+  border-radius:27px;background:linear-gradient(180deg,rgba(255,255,255,.67),rgba(255,255,255,0));
+}
+/* The supplied reference always has content on the left, photo on the right. */
+.benefit-row .benefit-text {
+  order:0!important;grid-column:1!important;grid-row:1!important;
+  padding:10px 8px 10px 12px!important;
+}
+.benefit-row .benefit-photo,
+.benefit-row:nth-child(odd) .benefit-photo {
+  order:0!important;grid-column:2!important;grid-row:1!important;
+  width:100%;height:306px!important;
+  border-radius:22px!important;
+  box-shadow:0 12px 30px rgba(27,22,19,.10);
+  border:1px solid rgba(255,255,255,.8);
+}
+.benefit-photo img {width:100%;height:100%;object-fit:cover;display:block;}
+.benefit-text h3 {
+  font-size:clamp(26px,2.45vw,36px)!important;
+  line-height:1.14!important;
+  letter-spacing:-.045em!important;
+  font-weight:700!important;
+  margin-bottom:13px!important;
+}
+.benefit-text p {font-size:15.5px!important;line-height:1.65!important;color:#554e4b!important;max-width:63ch;}
+.benefit-text ul {grid-template-columns:1fr!important;margin-top:17px!important;gap:9px!important;}
+.benefit-text li {font-size:15px!important;line-height:1.45!important;font-weight:500!important;}
+.benefit-text li::before {color:#ED2024!important;}
+/* Avoid any surprise clipping from glass hover transforms. */
+.benefit-row:focus-within {outline:2px solid rgba(237,32,36,.45);outline-offset:4px;}
+
+@media(max-width:1000px){
+  .benefit-row {gap:23px!important;min-height:342px!important;padding:22px!important;}
+  .benefit-row .benefit-photo,
+  .benefit-row:nth-child(odd) .benefit-photo{height:280px!important;}
+  html body .benefit-list .benefit-row .benefit-text h3{font-size:clamp(25px,2.8vw,32px)!important;}
+}
+@media(max-width:850px){
+  /* Native, comfortable linear scroll on phones and tablets, not pinned cards. */
+  .benefits-section {padding-top:41px!important;padding-bottom:39px!important;}
+  .benefits-intro{margin-bottom:28px!important;}
+  .benefits-intro h2{font-size:clamp(34px,6.5vw,48px)!important;}
+  .benefit-list{padding-bottom:0;}
+  .benefit-row,.benefit-row:nth-child(n) {
+    position:relative!important;top:auto!important;z-index:auto!important;
+    transform:none!important;min-height:0!important;margin-bottom:15px!important;
+    grid-template-columns:1fr!important;gap:18px!important;
+    padding:19px!important;
+  }
+  .benefit-row .benefit-text{grid-column:1!important;grid-row:1!important;padding:6px 4px!important;}
+  .benefit-row .benefit-photo,.benefit-row:nth-child(odd) .benefit-photo {
+    grid-column:1!important;grid-row:2!important;height:270px!important;order:0!important;
+  }
+  .benefit-text ul{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+}
+@media(max-width:600px){
+  .benefits-section{padding-top:31px!important;padding-bottom:32px!important;}
+  .benefits-intro h2{font-size:clamp(35px,8vw,44px)!important;}
+  .benefit-row,.benefit-row:nth-child(n){border-radius:23px!important;padding:16px!important;gap:16px!important;}
+  html body .benefit-list .benefit-row .benefit-text h3{font-size:clamp(25px,6.5vw,31px)!important;}
+  .benefit-text p,.benefit-text li{font-size:15px!important;}
+  .benefit-text ul{grid-template-columns:1fr!important;}
+  .benefit-row .benefit-photo,.benefit-row:nth-child(odd) .benefit-photo{height:220px!important;border-radius:17px!important;}
+}
+@media(prefers-reduced-motion:reduce){
+  .benefit-row,.benefit-row:nth-child(n){position:relative!important;top:auto!important;transform:none!important;will-change:auto;}
+  .office-tile:not(.office-special) .office-glass {transition:none!important;}
+}
+@media(prefers-reduced-transparency:reduce){
+  .office-tile:not(.office-special) .office-glass{background:rgba(255,255,255,.83)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
+  .benefit-row{background:#fff!important;-webkit-backdrop-filter:none;backdrop-filter:none;}
+}
+
+/* ---- emlen-benefits-visible-headline-stack ---- */
+/* Desktop: all benefit panels share one vertical viewing area. Each successive
+   panel slides over the preceding one while leaving its heading visible above. */
+@media (min-width: 851px) {
+  .benefits-section {
+    overflow:visible !important;
+    padding-bottom:72px !important;
+    background:linear-gradient(180deg,#fffaf7,#ffffff 55%) !important;
+  }
+  .benefits-section .frame { overflow:visible !important; }
+  .benefit-list {
+    --stack-start:104px;
+    --stack-peek:94px;
+    display:block !important;
+    position:relative !important;
+    isolation:isolate;
+    overflow:visible !important;
+    padding-bottom:46px !important;
+  }
+  .benefit-list .benefit-row,
+  .benefit-list .benefit-row:nth-child(n) {
+    position:sticky !important;
+    top:var(--stack-start) !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr) !important;
+    align-items:start !important;
+    column-gap:clamp(25px,3.1vw,48px) !important;
+    min-height:395px !important;
+    padding:25px 29px !important;
+    margin-bottom:19px !important;
+    border-radius:28px !important;
+    transform:none !important;
+    will-change:auto !important;
+    background:linear-gradient(125deg,#ffffff 4%,#ffffff 63%,#fffaf7 100%) !important;
+    box-shadow:0 -1px 0 rgba(255,255,255,.7),0 18px 48px rgba(30,25,23,.13) !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    overflow:hidden;
+  }
+  .benefit-list .benefit-row:nth-child(1) {top:var(--stack-start) !important;z-index:101 !important;}
+  .benefit-list .benefit-row:nth-child(2) {top:calc(var(--stack-start) + var(--stack-peek)) !important;z-index:102 !important;}
+  .benefit-list .benefit-row:nth-child(3) {top:calc(var(--stack-start) + var(--stack-peek)*2) !important;z-index:103 !important;}
+  .benefit-list .benefit-row:nth-child(4) {top:calc(var(--stack-start) + var(--stack-peek)*3) !important;z-index:104 !important;}
+  .benefit-row .benefit-text {align-self:start!important;padding:0 2px 0 4px!important;}
+  .benefit-list .benefit-row .benefit-text h3 {
+    font-size:clamp(26px,2.15vw,31px) !important;
+    line-height:1.11 !important;
+    letter-spacing:-.043em !important;
+    margin:0 0 17px !important;
+    min-height:62px;
+    font-weight:700 !important;
+    text-wrap:balance;
+  }
+  .benefit-row .benefit-text p{font-size:15px!important;line-height:1.63!important;}
+  .benefit-row .benefit-text ul{margin-top:17px!important;}
+  .benefit-row .benefit-text li{font-size:14px!important;line-height:1.38!important;}
+  .benefit-row .benefit-photo,.benefit-row:nth-child(odd) .benefit-photo {
+    width:100%;height:325px !important;align-self:center !important;
+    border-radius:21px!important;
+  }
+  /* Top reflected glass edge acts as the visible divider for the header slices. */
+  .benefit-list .benefit-row::after{
+    content:'';position:absolute;top:0;left:0;right:0;height:8px;
+    border-radius:28px 28px 0 0;
+    background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,0));
+    pointer-events:none;
+  }
+  /* Keep the visible strips easy to distinguish as subsequent cards climb. */
+  .benefit-list .benefit-row:nth-child(2),.benefit-list .benefit-row:nth-child(4){border-left-color:#FFB900!important;}
+  @media (max-height: 820px){
+    .benefit-list{--stack-start:89px;--stack-peek:83px;}
+    .benefit-list .benefit-row{min-height:365px!important;padding-top:22px!important;padding-bottom:22px!important;}
+    .benefit-list .benefit-row .benefit-photo{height:295px!important;}
+    .benefit-list .benefit-row html body .benefit-list .benefit-row .benefit-text h3{font-size:clamp(24px,2.1vw,29px)!important;min-height:56px;}
+  }
+}
+/* Small screens and reduced motion: readable, regular sequential cards. */
+@media (max-width:850px) {
+  .benefit-list .benefit-row,.benefit-list .benefit-row:nth-child(n){
+    position:relative!important;top:auto!important;z-index:auto!important;
+    transform:none!important;
+  }
+}
+
+/* ---- emlen-glass-pass-2026-11-09 ---- */
+/* Glass pass: extends the approved frosted-glass language to the sections that were still flat white.
+   Soft red/yellow light sits behind each surface so the blur and refraction are actually visible. */
+.why-section,.faq-section,.benefits-section{position:relative;isolation:isolate;overflow:hidden}
+.why-section::before,.faq-section::before,.benefits-section::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;
+  background:radial-gradient(420px 320px at 8% 22%,rgba(255,185,0,.20),transparent 70%),radial-gradient(520px 420px at 92% 12%,rgba(237,32,36,.15),transparent 70%),radial-gradient(460px 360px at 55% 100%,rgba(237,32,36,.10),transparent 72%)}
+.faq-section::before{background:radial-gradient(460px 360px at 6% 78%,rgba(255,185,0,.18),transparent 70%),radial-gradient(520px 420px at 96% 30%,rgba(237,32,36,.13),transparent 70%)}
+.benefits-section::before{background:radial-gradient(500px 380px at 96% 8%,rgba(237,32,36,.10),transparent 70%),radial-gradient(420px 320px at 0% 55%,rgba(255,185,0,.12),transparent 70%)}
+.metric,.testimonial,.enquiry-panel,.faq-item{position:relative;
+  background:linear-gradient(150deg,rgba(255,255,255,.74),rgba(255,255,255,.36) 55%,rgba(255,255,255,.52))!important;
+  border:1px solid rgba(255,255,255,.92)!important;
+  backdrop-filter:blur(24px) saturate(160%)!important;-webkit-backdrop-filter:blur(24px) saturate(160%)!important;
+  box-shadow:0 18px 44px rgba(90,40,30,.10),inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(237,32,36,.06)!important}
+.enquiry-panel{background:linear-gradient(150deg,rgba(255,255,255,.80),rgba(255,255,255,.44) 60%,rgba(255,255,255,.60))!important}
+.faq-item[open]{background:linear-gradient(150deg,rgba(255,255,255,.88),rgba(255,255,255,.55))!important;box-shadow:0 24px 54px rgba(90,40,30,.14),inset 0 1.5px 0 #fff!important}
+/* Benefit rows stack over each other, so keep them mostly opaque: still frosted, never see-through. */
+.benefit-row{background:linear-gradient(150deg,rgba(255,255,255,.94),rgba(255,252,248,.90))!important;border:1px solid rgba(255,255,255,.95)!important;
+  box-shadow:0 22px 50px rgba(90,40,30,.10),inset 0 1.5px 0 #fff!important}
+.field input,.field select,.field textarea{background:rgba(255,255,255,.55)!important;border:1px solid rgba(255,255,255,.95)!important;
+  box-shadow:inset 0 1px 3px rgba(90,40,30,.08),0 1px 0 rgba(255,255,255,.9)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:background .3s,box-shadow .3s,border-color .3s}
+.field input:focus,.field select:focus,.field textarea:focus{background:rgba(255,255,255,.9)!important;border-color:rgba(237,32,36,.55)!important;box-shadow:0 0 0 4px rgba(237,32,36,.12)!important;outline:none}
+.modal-panel{background:linear-gradient(150deg,rgba(255,255,255,.86),rgba(255,255,255,.6))!important;border:1px solid rgba(255,255,255,.95)!important;
+  backdrop-filter:blur(28px) saturate(160%)!important;-webkit-backdrop-filter:blur(28px) saturate(160%)!important;box-shadow:0 40px 90px rgba(40,10,10,.28),inset 0 1.5px 0 #fff!important}
+.modal-backdrop{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+/* Checklist envelope becomes a frosted glass sleeve in front of the paper. */
+.paper-envelope{background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,237,206,.40))!important;border:1px solid rgba(255,255,255,.92)!important;
+  backdrop-filter:blur(18px) saturate(150%)!important;-webkit-backdrop-filter:blur(18px) saturate(150%)!important;box-shadow:0 16px 32px rgba(102,70,45,.14),inset 0 1.5px 0 rgba(255,255,255,.95)!important}
+.envelope-fold{background:linear-gradient(115deg,rgba(255,255,255,.45),rgba(255,255,255,.12))!important}
+
+@media(prefers-reduced-transparency:reduce){.metric,.testimonial,.enquiry-panel,.faq-item,.modal-panel,.paper-envelope{background:rgba(255,255,255,.94)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}}
+
+/* ---- emlen-consult-lead-magnet ---- */
+/* Lead magnet: office consultation + 30% off ticket (replaces the checklist section). */
+.consult-section{position:relative;isolation:isolate;padding:46px 0 54px;background:radial-gradient(ellipse 50% 80% at 8% 100%,rgba(255,185,0,.10),transparent 80%),radial-gradient(ellipse 45% 70% at 95% 0%,rgba(237,32,36,.09),transparent 80%),#fffaf8}
+.consult-card{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);align-items:center;gap:clamp(20px,3vw,48px);padding:clamp(28px,4.4vw,70px) clamp(26px,5vw,96px);border-radius:48px;overflow:hidden;
+  background:linear-gradient(150deg,rgba(255,255,255,.86),rgba(255,255,255,.52));border:1px solid rgba(255,255,255,.95);
+  backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);box-shadow:0 30px 70px rgba(90,40,30,.10),inset 0 1.5px 0 #fff}
+.consult-kicker{margin:0 0 14px;font:700 15px/1.3 var(--body);letter-spacing:.2em;color:var(--red)}
+.consult-copy h2{margin:0 0 22px;font:800 clamp(38px,4.4vw,68px)/1.04 var(--header);letter-spacing:-.055em;color:var(--ink)}
+.consult-copy h2 em{font-style:normal;color:var(--red)}
+.consult-desc{margin:0 0 22px;max-width:30em;font:400 clamp(16px,1.3vw,20px)/1.7 var(--body);color:#615b57}
+.consult-points{display:flex;flex-wrap:wrap;gap:12px 28px;margin:0 0 30px;padding:0;list-style:none}
+.consult-points li{display:flex;align-items:center;gap:10px;font:600 clamp(15px,1.15vw,18px)/1.2 var(--body);color:var(--ink)}
+.consult-points li::before{content:"";width:18px;height:18px;border-radius:50%;background:var(--red) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/11px no-repeat}
+.consult-callwrap{display:inline-block;padding:14px;margin:-14px;border-radius:999px;background:rgba(237,32,36,.07);box-shadow:0 0 0 1px rgba(237,32,36,.12)}
+.consult-call{display:inline-flex;align-items:center;gap:22px;padding:0 46px;min-height:96px;border-radius:999px;text-decoration:none;color:#fff;background:var(--red);
+  font:700 clamp(18px,1.6vw,25px)/1 var(--body);box-shadow:0 20px 40px rgba(237,32,36,.32),inset 0 1.5px 0 rgba(255,255,255,.35);transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s}
+.consult-call i{width:1px;height:30px;background:rgba(255,255,255,.55)}
+.consult-call strong{font-weight:800;letter-spacing:-.02em}
+.consult-call:hover{transform:translateY(-3px);box-shadow:0 26px 48px rgba(237,32,36,.38),inset 0 1.5px 0 rgba(255,255,255,.4)}
+.consult-call:active{transform:scale(.98)}
+.consult-call:focus-visible{outline:3px solid var(--yellow);outline-offset:4px}
+.consult-art{position:relative;height:clamp(300px,28vw,430px);max-width:700px;width:100%;margin-left:auto}
+.ticket-back{position:absolute;inset:6% -3% -4% 6%;border-radius:36px;background:linear-gradient(150deg,#e3262b,#a31116);transform:rotate(3.5deg);box-shadow:0 30px 50px rgba(140,10,15,.25)}
+.ticket{position:absolute;inset:2% 3% 6% 0;border-radius:36px;padding:clamp(22px,3.2vw,46px) clamp(22px,3vw,48px);transform:rotate(-1.6deg);overflow:hidden;color:var(--ink);display:flex;flex-direction:column;
+  background:linear-gradient(160deg,#ffc61a,#ffb300 55%,#f5a400);border:1px solid rgba(255,255,255,.55);box-shadow:0 26px 50px rgba(150,90,0,.28),inset 0 2px 0 rgba(255,255,255,.55)}
+.ticket::before{content:"";position:absolute;inset:0 0 auto 0;height:42%;background:linear-gradient(180deg,rgba(255,255,255,.30),transparent);pointer-events:none}
+.ticket>*{position:relative}
+.ticket p{margin:0;font:600 clamp(15px,1.4vw,21px)/1.5 var(--body)}
+.ticket b{margin:auto 0;font:800 clamp(56px,7.2vw,112px)/1 var(--header);letter-spacing:-.06em;white-space:nowrap}
+.ticket-perf{position:relative;margin:0 calc(-1*clamp(22px,3vw,48px)) 0;border-top:2px dashed rgba(120,70,0,.55);height:0}
+.ticket-perf::before,.ticket-perf::after{content:"";position:absolute;top:-24px;width:48px;height:48px;border-radius:50%}
+.ticket-perf::before{left:-24px;background:#fff8ea;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
+.ticket-perf::after{right:-24px;background:#c8161b}
+.ticket small{margin-top:clamp(14px,2vw,26px);font:700 clamp(16px,1.5vw,22px)/1.2 var(--body)}
+@media(max-width:900px){.consult-card{grid-template-columns:1fr;border-radius:36px}.consult-art{margin:12px auto 0;max-width:560px}}
+@media(max-width:600px){.consult-section{padding:30px 0 36px}.consult-card{padding:26px 20px;border-radius:30px}.consult-call{padding:0 26px;min-height:72px;gap:14px;font-size:16px}.consult-art{height:280px}.ticket-perf::before,.ticket-perf::after{width:36px;height:36px;top:-18px}.ticket-perf::before{left:-18px}.ticket-perf::after{right:-18px}}
+@media(prefers-reduced-transparency:reduce){.consult-card{background:rgba(255,255,255,.96);backdrop-filter:none;-webkit-backdrop-filter:none}}
+@media(prefers-reduced-motion:reduce){.consult-call{transition:none}}
+
+/* ---- emlen-type-scale-guidelines ---- */
+/* Official type scale (brand system §3): Bricolage Grotesque headings, Poppins body/UI.
+   1440px: H1 ~52 · section heading ~40–44 · card heading ~19–27 · body 15–17 · button 12–15 · eyebrow 11–13 · inputs 15–16. */
+html body .hero .copy h1{font-size:clamp(34px,3.6vw,52px)!important;line-height:1.06!important}
+.hero .eyebrow,p.eyebrow{font-size:13px!important;letter-spacing:.16em!important}
+.solutions-heading,.consult-copy h2,.benefits-intro h2,.why-copy h2,.faq-copy h2,#other-title,.enquiry-panel h2{font-size:clamp(29px,3.05vw,44px)!important;line-height:1.1!important;letter-spacing:-.045em!important}
+#other-title{font-size:clamp(26px,2.8vw,40px)!important}
+.enquiry-panel h2{font-size:clamp(26px,2.6vw,36px)!important}
+.solutions-desc,.consult-desc,.benefits-intro p,.why-desc,.form-subtitle,.faq-copy p{font-size:clamp(14.5px,1.12vw,16.5px)!important;line-height:1.7!important}
+html body .benefit-list .benefit-row .benefit-text h3{font-size:clamp(20px,1.7vw,24px)!important;line-height:1.2!important}
+.benefit-text p,.benefit-text li,.faq-answer,.testimonial blockquote{font-size:clamp(14.5px,1.05vw,15.5px)!important}
+.office-tile:not(.office-special) .office-glass strong{font-size:clamp(17px,1.3vw,20px)!important}
+.faq-item summary{font-size:clamp(15px,1.2vw,17px)!important}
+.metric strong{font-size:clamp(26px,2.3vw,32px)!important}
+.metric strong .star{font-size:.62em!important}
+.kicker,.why-kicker,.form-kicker,.consult-kicker{font-size:12px!important;letter-spacing:.2em!important}
+.callback-btn,.checklist-cta{font-size:clamp(13px,1vw,15px)!important}
+.other-pill span{font-size:clamp(13px,1vw,14.5px)!important}
+.field label{font-size:13px!important}.field input,.field select,.field textarea{font-size:16px!important}.form-note{font-size:12.5px!important}
+/* Consultation lead magnet */
+.consult-points li{font-size:clamp(14px,1.05vw,15.5px)!important}
+.consult-call{font-size:clamp(14px,1.1vw,16px)!important;min-height:clamp(60px,4.6vw,68px)!important;padding:0 clamp(26px,2.4vw,34px)!important;gap:16px!important}
+.consult-call i{height:22px!important}
+.consult-callwrap{padding:10px!important;margin:-10px!important}
+.ticket p{font-size:clamp(13.5px,1.05vw,16px)!important}
+.ticket b{font-size:clamp(44px,5vw,72px)!important}
+.ticket small{font-size:clamp(14px,1.1vw,16px)!important}
+.consult-card{padding:clamp(24px,3.4vw,52px) clamp(24px,4.4vw,72px)!important}
+.consult-art{height:clamp(260px,24vw,340px)!important}
+@media(max-width:600px){.solutions-desc{font-size:15px!important}.ticket b{font-size:46px!important}.consult-call{font-size:14px!important;min-height:58px!important}}
+
+/* ---- emlen-uniform-pills ---- */
+/* Every image-card label is the same capsule: identical height, radius, padding, type and arrow. */
+html body .office-tile .office-glass,html body .office-tile.office-special .office-glass{
+  box-sizing:border-box!important;height:80px!important;min-height:80px!important;max-height:80px!important;
+  display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;
+  padding:0 15px 0 24px!important;margin:11px!important;width:calc(100% - 22px)!important;border-radius:28px!important}
+html body .office-tile .office-glass strong,html body .office-tile:not(.office-special) .office-glass strong,html body .office-tile.office-special .office-glass strong{
+  flex:1 1 auto;min-width:0;margin:0!important;font-size:clamp(15.5px,1.12vw,17px)!important;font-weight:700!important;line-height:1.2!important;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+html body .office-tile .office-arrow,html body .office-tile.office-special .office-arrow{
+  flex:none!important;width:48px!important;height:48px!important;min-width:48px!important;display:grid!important;place-items:center;border-radius:50%!important;font-size:20px!important;line-height:1!important}
+html body .office-tile.office-special .office-glass{width:calc(100% + 16px)!important;margin:auto -8px 12px!important;padding:0 12px 0 24px!important;gap:10px!important}
+@media(max-width:600px){html body .office-tile .office-glass,html body .office-tile.office-special .office-glass{height:72px!important;min-height:72px!important;max-height:72px!important;padding:0 12px 0 20px!important}
+ html body .office-tile .office-arrow,html body .office-tile.office-special .office-arrow{width:44px!important;height:44px!important;min-width:44px!important}}
+
+/* ---- emlen-rhythm-polish ---- */
+/* Final spacing + polish layer: one rhythm scale, one container, one radius set. */
+:root{--sec:96px;--blk:28px;--intro:40px;--wrap:1330px;--r-lg:32px;--r-md:22px}
+@media(max-width:1050px){:root{--sec:72px;--intro:32px}}
+@media(max-width:700px){:root{--sec:56px;--blk:20px;--intro:28px;--r-lg:26px;--r-md:18px}}
+
+/* one container width */
+html body .nav{width:min(var(--wrap),calc(100% - 32px))!important}
+html body .hero .illustration{width:min(var(--wrap),calc(100% - 32px))!important;max-width:var(--wrap)!important}
+html body .hero .cards{width:min(var(--wrap),calc(100% - 32px))!important;max-width:var(--wrap)!important}
+
+/* hero stack: 32 above / 24 below the illustration, h1 leads the hierarchy */
+html body .hero .illustration{margin:32px auto 24px!important}
+html body .hero .cards{margin:0 auto 0!important;padding-bottom:0!important}
+html body .hero{padding-bottom:0!important}
+html body .hero .copy h1{font-size:clamp(34px,4.3vw,62px)!important;line-height:1.06!important}
+html body .hero .card{min-height:0!important;padding:22px 22px 24px!important;border-radius:var(--r-md)!important}
+html body .hero .card p{margin-bottom:0!important}
+
+/* section rhythm: 96 / 72 / 56 between majors (each section carries half, so tinted backgrounds never sit flush against content) */
+html body .solutions-section{padding:calc(var(--sec)*.75) 0 calc(var(--sec)/2)!important}
+html body .other-wrap{padding:calc(var(--sec)/2) 0!important}
+html body .consult-section{padding:calc(var(--sec)/2) 0!important}
+html body .benefits-section{padding:calc(var(--sec)/2) 0!important}
+html body .why-section{padding:calc(var(--sec)/2) 0!important}
+html body .faq-section{position:relative;isolation:isolate;padding:calc(var(--sec)*.85) 0 var(--sec)!important}
+html body .solutions-heading{margin-bottom:16px!important}
+html body .solutions-desc{margin-bottom:var(--intro)!important}
+html body .benefits-intro{margin-bottom:var(--intro)!important}
+html body .benefit-list{padding-bottom:0!important}
+html body .benefit-list .benefit-row{margin-bottom:var(--blk)!important}
+html body .benefit-list .benefit-row:last-child{margin-bottom:0!important}
+html body .why-grid{align-items:start!important}
+
+/* radii + buttons */
+html body .more-solutions,html body .benefit-row,html body .enquiry-panel,html body .testimonial{border-radius:var(--r-lg)!important}
+html body .consult-card{border-radius:var(--r-lg)!important;padding:clamp(28px,4vw,56px) clamp(26px,5vw,80px)!important}
+html body .more-solutions{padding:40px 40px 44px!important}
+html body .office-tile{border-radius:var(--r-lg)!important}
+html body .office-tile .office-glass{height:66px!important;min-height:0!important}
+
+/* benefit rows: balance text vs photo */
+@media(min-width:851px){
+ html body .benefit-row .benefit-text{align-self:center!important;padding:0 8px 0 8px!important}
+ html body .benefit-row .benefit-text .copy-pending{margin-bottom:14px!important}
+}
+
+/* consult: no halo, tighter stack, real ticket cutout */
+html body .consult-callwrap{padding:0!important;margin:0!important;background:none!important;box-shadow:none!important}
+html body .consult-call{min-height:72px!important;padding:0 36px!important}
+html body .consult-copy h2{margin-bottom:16px!important}
+html body .consult-desc{margin-bottom:20px!important}
+html body .consult-points{margin-bottom:28px!important}
+html body .consult-art{height:clamp(280px,26vw,380px)!important}
+html body .ticket,html body .ticket-back{border-radius:var(--r-lg)!important}
+html body .ticket-perf::before,html body .ticket-perf::after{display:none!important}
+html body .ticket{
+ --ticket-notch:22px;
+ --perf-y:62%;
+ -webkit-mask:radial-gradient(circle var(--ticket-notch) at 0 var(--perf-y),#0000 98%,#000) left/51% 100% no-repeat,
+              radial-gradient(circle var(--ticket-notch) at 100% var(--perf-y),#0000 98%,#000) right/51% 100% no-repeat;
+ mask:radial-gradient(circle var(--ticket-notch) at 0 var(--perf-y),#0000 98%,#000) left/51% 100% no-repeat,
+      radial-gradient(circle var(--ticket-notch) at 100% var(--perf-y),#0000 98%,#000) right/51% 100% no-repeat}
+
+/* FAQ: no jump when items open; left column stays in view */
+html body .faq-grid{align-items:start!important}
+@media(min-width:901px){html body .faq-copy{position:sticky!important;top:110px!important;align-self:start!important}}
+html body .faq-section .faq-copy{margin-top:0!important}
+
+/* footer */
+.site-footer{background:#161616;color:#f4efec;padding:64px 0 28px;font-family:var(--body,'Poppins',sans-serif)}
+.site-footer .frame{max-width:var(--wrap)}
+.site-footer .ft-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:40px;padding-bottom:40px;border-bottom:1px solid rgba(255,255,255,.14)}
+.site-footer .ft-brand{font:800 26px/1 var(--header,'Bricolage Grotesque',sans-serif);letter-spacing:-.03em;margin:0 0 4px}
+.site-footer .ft-brand-sub{font-size:11px;letter-spacing:.22em;color:#FFB900;margin:0 0 18px}
+.site-footer p{margin:0;font-size:15px;line-height:1.7;color:rgba(244,239,236,.72);max-width:30em}
+.site-footer h4{margin:0 0 16px;font:700 13px/1 var(--body,'Poppins',sans-serif);letter-spacing:-.035em;text-transform:uppercase;color:#FFB900}
+.site-footer ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.site-footer a{color:rgba(244,239,236,.86);text-decoration:none;font-size:15px}
+.site-footer a:hover{color:#fff;text-decoration:underline}
+.site-footer .ft-bottom{padding-top:24px;font-size:13px;color:rgba(244,239,236,.55)}
+@media(max-width:850px){.site-footer{padding:48px 0 24px}.site-footer .ft-grid{grid-template-columns:1fr 1fr;gap:32px}.site-footer .ft-grid>div:first-child{grid-column:1/-1}}
+@media(max-width:520px){.site-footer .ft-grid{grid-template-columns:1fr}}
+
+/* ---- round 2 ---- */
+/* no red flares */
+html body .hero .accent,html body .hero .accent2{display:none!important}
+
+/* illustration: light, tucked behind the cards so the section rises */
+html body .hero .illustration{opacity:.9!important;margin-top:16px!important;margin-bottom:6px!important}
+html body .hero .cards{position:relative;z-index:2}
+
+/* cards: drop the inner box, swap icon for the plus marker */
+html body .card::before,html body .card:before{display:none!important;content:none!important}
+html body .hero .ic{background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ width:36px!important;height:36px!important;top:20px!important;right:22px!important;border-radius:0!important;display:block!important;
+ --t:var(--ink);--r:var(--ink);--b:var(--ink);--l:var(--ink)}
+html body .hero .ic svg{display:none!important}
+html body .hero .ic::before,html body .hero .ic::after{content:"";position:absolute;left:50%;top:50%;border-radius:2px;transition:transform .35s cubic-bezier(.22,1,.36,1)}
+html body .hero .ic::before{width:34px;height:3.5px;margin:-1.75px 0 0 -17px;background:linear-gradient(90deg,var(--l) 50%,var(--r) 50%)}
+html body .hero .ic::after{width:3.5px;height:34px;margin:-17px 0 0 -1.75px;background:linear-gradient(180deg,var(--t) 50%,var(--b) 50%)}
+html body .hero .card:nth-child(1) .ic{--t:var(--red)}
+html body .hero .card:nth-child(2) .ic{--r:var(--red)}
+html body .hero .card:nth-child(3) .ic{--b:var(--red)}
+html body .hero .card:nth-child(4) .ic{--l:var(--red)}
+html body .hero .card:hover .ic::before{transform:scaleX(1.1)}html body .hero .card:hover .ic::after{transform:scaleY(1.1)}
+
+/* pills: no white glare */
+html body .office-tile .office-glass{border:0!important;box-shadow:0 10px 24px rgba(20,20,20,.18)!important}
+html body .office-tile .office-glass::before,html body .office-tile .office-glass::after{display:none!important}
+html body .other-pill{border-color:rgba(255,255,255,.14)!important;box-shadow:0 9px 20px rgba(120,0,0,.14)!important}
+
+/* technical padding audit */
+html body .benefits-intro .kicker,html body .why-kicker,html body .consult-kicker{margin-top:0!important}
+html body .enquiry-panel{padding:44px 40px 44px!important;margin-top:0!important}
+html body .why-copy{padding-top:0!important}
+html body .metric{padding:22px 22px 20px!important}
+html body .testimonial{padding:28px 30px!important}
+html body .faq-item summary{padding:22px 26px!important}
+html body .faq-answer{padding:0 26px 24px!important}
+html body .more-solutions h2{margin-bottom:28px!important}
+@media(max-width:700px){html body .enquiry-panel{padding:30px 22px!important}html body .hero .ic{top:18px!important;right:18px!important}}
+
+html body .office-grid a.office-tile[class] span.office-glass,html body .office-grid a.office-tile.office-special[class] span.office-glass{border:0 none transparent!important;box-shadow:0 10px 24px rgba(20,20,20,.18)!important;background-clip:border-box!important}
+html body .office-grid a.office-tile[class] span.office-glass::before,html body .office-grid a.office-tile[class] span.office-glass::after{display:none!important;content:none!important}
+
+/* ---- round 4: seams blend, logo ---- */
+html body .hero{padding-bottom:56px!important;position:relative;z-index:3}
+html body .solutions-section{position:relative;padding-top:40px!important}
+html body .solutions-section::before{content:"";position:absolute;left:0;right:0;top:-90px;height:90px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff);pointer-events:none;z-index:0}
+html body .solutions-section .frame{position:relative;z-index:1}
+html body .benefits-section{position:relative;z-index:2;padding-bottom:calc(var(--sec)/2 + 24px)!important}
+html body .why-section,html body .consult-section{position:relative;isolation:isolate}
+html body .why-section::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,0) 180px),linear-gradient(0deg,#fff,rgba(255,255,255,0) 160px)}
+html body .consult-section::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,0) 150px),linear-gradient(0deg,#fffaf8,rgba(255,250,248,0) 150px)}
+html body .why-section>.frame,html body .consult-section>.frame{position:relative;z-index:1}
+html body .brand{min-width:0!important;gap:0!important}
+html body .brand-logo{display:block;height:38px;width:auto;transform:translateY(-18.5%)}
+html body .brand-icon,html body .brand-name,html body .brand-small{display:none!important}
+@media(max-width:850px){html body .brand-logo{height:27px}}
+.site-footer .ft-logo{display:block;height:36px;width:auto;margin:0 0 18px}
+html body .benefits-section::after{content:"";position:absolute;left:0;right:0;top:0;height:140px;pointer-events:none;z-index:0;background:linear-gradient(180deg,#fffaf8,rgba(255,250,248,0))}
+html body .benefits-section>.frame{position:relative;z-index:1}
+html body .faq-section::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,0) 200px)}
+html body .faq-section>.frame{position:relative;z-index:1}
+
+/* ---- round 6: logo alignment, outline illustration, cards up ---- */
+html body .brand-logo{transform:translateY(-7px)}
+@media(max-width:850px){html body .brand-logo{transform:translateY(-4px)}}
+html body .hero .illustration{opacity:1!important;margin-top:6px!important;margin-bottom:12px!important}
+html body .hero .illustration g[stroke="#191919"]{stroke:#6f6f6f!important;stroke-width:1.15px!important}
+html body .hero .illustration path[stroke="#FFB900"]{stroke-width:1.6px!important}
+html body .hero .illustration path[stroke="#ED2024"]{stroke-width:1.4px!important}
+html body .hero .illustration path[fill]{fill:none!important}
+html body .hero .illustration path[stroke="none"]{stroke:#FFB900!important;stroke-width:1.5px!important}
+html body .hero .illustration path[stroke-width]{stroke-width:1.15px!important}
+html body .hero .illustration path[stroke="#FFB900"]{stroke-width:1.6px!important}
+html body .hero .illustration path[stroke="#ED2024"]{stroke-width:1.4px!important}
+html body .hero .illustration g[opacity] path{stroke-width:1px!important}
+/* ===== Benefits: pinned stack with the flip (from the One Person Office page) ===== */
+#benefits{--head:var(--header);--muted:#67636a;--yellow:#FFB900;--sp-1:8px;--sp-2:16px;--sp-3:24px;--sp-4:32px;--sp-6:48px;--sp-8:64px}
+html body section#benefits.benefits-section{padding:0 !important;overflow:visible !important}
+#benefits .bn-head{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap}
+#benefits .bn-head-main{min-width:0;flex:1 1 560px}
+#benefits .bn-cta{flex:none;align-self:flex-end;margin:0 0 6px}
+#benefits.bn-live .bn-head{flex-wrap:nowrap}#benefits.bn-live .bn-head-main{flex:1 1 auto}#benefits.bn-live .bn-cta{padding:12px 20px;font-size:14px}
+#benefits .bn-title{font-size:clamp(19px,1.85vw,27px)}
+/* ===== Section 6: benefits, pinned stack of long rectangular cards ===== */
+#benefits.bn-section{position:relative;overflow:visible;background:radial-gradient(ellipse 46% 50% at 6% 30%,rgba(237,32,36,.07),transparent 72%),radial-gradient(ellipse 40% 50% at 96% 78%,rgba(255,185,0,.12),transparent 72%),#fffaf7}
+#benefits .bn-inner{padding:var(--sp-8) 0;display:flex;flex-direction:column;gap:var(--sp-4)}
+#benefits .eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:var(--sp-1);font:700 11px/1.5 var(--body);letter-spacing:.16em;color:var(--red)}
+#benefits .eyebrow::before{content:'';width:40px;height:4px;border-radius:99px;background:var(--red)}
+#benefits .bn-head h2{margin:0;font:800 clamp(34px,3.6vw,52px)/1.05 var(--head);letter-spacing:-.055em;color:var(--ink);text-wrap:balance}
+#benefits .bn-head h2 span{color:var(--red)}
+#benefits .bn-head .section-intro{margin:var(--sp-2) 0 0;max-width:46em;font:400 15px/1.7 var(--body);color:#5d5759}
+#benefits .bn-nav{display:none!important;gap:10px;margin:var(--sp-4) 0 0;padding:0;list-style:none}
+#benefits .bn-dot{display:flex;flex-direction:column;gap:8px;width:64px;padding:0;border:0;background:none;cursor:pointer;text-align:left;font:700 12px/1 var(--body);letter-spacing:.06em;color:#9a908a;transition:color .25s ease}
+#benefits .bn-dot-bar{display:block;height:4px;border-radius:99px;background:rgba(22,22,22,.12);overflow:hidden}
+#benefits .bn-dot-bar span{display:block;height:100%;width:0;background:var(--red);border-radius:inherit}
+#benefits .bn-dot.is-active,#benefits .bn-dot:hover{color:var(--ink)}
+#benefits .bn-dot:focus-visible{outline:3px solid var(--yellow);outline-offset:4px;border-radius:6px}
+
+/* card: long ivory rectangle, coloured left edge, title row that stays visible when stacked */
+#benefits .bn-stage{--strip:52px;--cardh:340px;display:grid;gap:var(--sp-2)}
+#benefits .bn-card{--ac:var(--red);--ac-ink:#fff;position:relative;border-radius:22px;transform-style:preserve-3d}
+#benefits .bn-card.is-yellow{--ac:#ffb900;--ac-ink:#161616}
+#benefits .bn-face{position:relative;overflow:hidden;border-radius:22px;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+#benefits .bn-front{display:flex;flex-direction:column;height:100%;
+ background:linear-gradient(120deg,#fff 0,color-mix(in srgb,var(--ac) 7%,#fff8f2) 100%);border:1px solid #fff;
+ box-shadow:0 22px 48px rgba(70,38,22,.14),0 4px 12px rgba(70,38,22,.08),inset 0 1px 0 #fff}
+#benefits .bn-bar{position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--ac);transform-origin:top;transform:scaleY(var(--bar,1));z-index:3}
+#benefits .bn-strip{position:relative;z-index:2;flex:none;display:flex;align-items:center;height:var(--strip);padding:0 32px 0 34px}
+#benefits .bn-title{margin:0;min-width:0;font:800 clamp(21px,2.1vw,30px)/1.1 var(--head);letter-spacing:-.04em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#benefits .bn-body{position:relative;z-index:1;flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.62fr);gap:var(--sp-4);padding:0 18px 18px 34px}
+#benefits .bn-copy{display:flex;flex-direction:column;justify-content:center;padding-bottom:4px;min-width:0;color:var(--ink)}
+#benefits .bn-text{margin:0 0 var(--sp-2);max-width:40em;font:400 16.5px/1.65 var(--body);color:#4d4647;text-wrap:pretty}
+#benefits .bn-points{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px;margin:var(--sp-1) 0 0;padding:0;list-style:none;font:600 15px/1.35 var(--body);color:var(--ink)}
+#benefits .bn-points li{position:relative;padding-left:26px}
+#benefits .bn-points li::before{content:'';position:absolute;left:0;top:.05em;width:18px;height:18px;border-radius:50%;background:var(--ac)}
+#benefits .bn-points li::after{content:'';position:absolute;left:6px;top:.3em;width:5px;height:9px;border:solid var(--ac-ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+#benefits .bn-photo{position:relative;min-height:0;border-radius:16px;overflow:hidden;background:#e8ded6;box-shadow:0 10px 24px rgba(40,20,10,.2)}
+#benefits .bn-photo img{display:block;width:100%;height:100%;object-fit:cover}
+#benefits .bn-glare{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:var(--glare-o,0);
+ background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.7) 50%,transparent 65%)}
+#benefits .bn-back{position:absolute;inset:0;transform:rotateX(180deg);display:none;align-items:center;padding:0 48px;color:#fff;
+ background:radial-gradient(ellipse 60% 120% at 0% 50%,color-mix(in srgb,var(--ac) 40%,transparent),transparent 70%),linear-gradient(120deg,#2b2321,#141211);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+#benefits .bn-back::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--ac)}
+#benefits .bn-back::after{content:attr(data-title);font:800 clamp(34px,4.6vw,64px)/1.05 var(--head);letter-spacing:-.045em;text-wrap:balance}
+
+/* alternate sides: photo left on every second card, title follows the text */
+#benefits .bn-card.is-flip .bn-body{grid-template-columns:minmax(0,.62fr) minmax(0,1fr);padding:0 34px 18px 18px}
+#benefits .bn-card.is-flip .bn-photo{order:-1}
+#benefits .bn-card.is-flip .bn-strip{padding-left:calc(18px + (100% - 84px)*.3827 + 32px)}
+/* list layout (phones, short screens): cards one after another */
+@media(max-width:700px){
+ #benefits .bn-inner{padding:var(--sp-6) 0;width:calc(100% - 32px)}
+ #benefits .bn-body{grid-template-columns:minmax(0,1fr);padding:0 20px 20px 24px}
+ #benefits .bn-strip{height:auto;min-height:var(--strip);padding:16px 20px 10px 24px}
+ #benefits .bn-title{white-space:normal;font-size:21px}
+ #benefits .bn-photo{height:200px}
+ #benefits .bn-card.is-flip .bn-body{grid-template-columns:minmax(0,1fr);padding:0 20px 20px 24px}
+ #benefits .bn-card.is-flip .bn-photo{order:0}
+ #benefits .bn-card.is-flip .bn-strip{padding:16px 20px 10px 24px}
+ #benefits .bn-points{grid-template-columns:minmax(0,1fr);margin-top:0}
+}
+
+/* live (pinned) layout */
+#benefits.bn-live .bn-pin{height:100vh;overflow:hidden}
+#benefits.bn-live .bn-inner{height:100%;padding:clamp(76px,10.5vh,96px) 0 clamp(10px,2vh,24px);gap:clamp(8px,1.6vh,18px)}
+#benefits.bn-live .eyebrow{margin-bottom:2px}
+#benefits.bn-live .bn-head h2{font-size:clamp(30px,3.2vw,46px)}
+#benefits.bn-live .bn-stage{position:relative;display:block;flex:1;min-height:0;width:100%}
+#benefits.bn-live .bn-card{position:absolute;left:0;right:0;top:0;height:var(--cardh);will-change:transform}
+#benefits.bn-live .bn-back{display:flex}
+@media(max-width:1100px){#benefits.bn-live .bn-text{font-size:14px}#benefits.bn-live .bn-body{gap:var(--sp-3)}}
+@media(max-height:800px){#benefits.bn-live .bn-head .section-intro{display:none}}
+@media(max-height:720px){
+ #benefits.bn-live .bn-text{font-size:13.5px;line-height:1.5;margin-bottom:10px}
+ #benefits.bn-live .bn-points{gap:8px 24px;font-size:13px}
+ #benefits.bn-live .bn-head h2{font-size:clamp(30px,3.1vw,42px)}
+}
+@media(max-height:620px){#benefits.bn-live .bn-text{margin-bottom:6px}#benefits.bn-live .bn-points{gap:6px 20px;font-size:12.5px}}
+
+/* v23: Benefits, cleaner. plain white cards, hairline dividers, no glare, larger type, one-line header */
+#benefits .bn-front{background:#fff;border:1px solid #f0e6e0;box-shadow:0 16px 36px rgba(70,38,22,.1),0 2px 6px rgba(70,38,22,.05)}
+#benefits .bn-card.is-yellow .bn-front{background:linear-gradient(120deg,#fff 40%,#fffaf0)}
+#benefits .bn-card.is-red .bn-front{background:linear-gradient(120deg,#fff 40%,#fff8f6)}
+#benefits .bn-strip{border-bottom:1px solid rgba(22,22,22,.07)}
+#benefits .bn-glare,#benefits .bn-dim{display:none}
+#benefits .bn-photo{border-radius:14px;box-shadow:none}
+#benefits .bn-text{font-size:clamp(15px,1.25vw,18px);line-height:1.65;margin-bottom:var(--sp-3);color:#4d4647}
+#benefits .bn-points{font-size:clamp(14px,1.1vw,16px);gap:14px 28px;margin-top:0}
+#benefits .bn-copy{justify-content:center}
+#benefits.bn-live .bn-head .section-intro{display:none}
+#benefits.bn-live .bn-head h2{font-size:clamp(30px,3vw,42px)}
+@media(max-height:720px){#benefits.bn-live .bn-text{font-size:14px;margin-bottom:12px}#benefits.bn-live .bn-points{font-size:13px;gap:8px 24px}}
+@media(max-width:700px){#benefits .bn-text{font-size:15px}#benefits .bn-points{font-size:14px;gap:10px}}
+
+
+html body #benefits.bn-live .bn-inner{padding-top:clamp(108px,14vh,128px)}
+@media(max-width:700px){#benefits .bn-cta{align-self:flex-start;margin:6px 0 0}}
+
+/* Approved Managed Offices refinements */
+/*
+ * Managed Offices: approved centred hero with an open break in the existing
+ * architectural illustration; structured yellow features; left-copy/right-image
+ * Benefits panels. This stylesheet is appended to CATEGORY CSS at build time.
+ * Never flatten the live page into a screenshot or change CTA/navigation routes.
+ */
+
+/* Actual split: two COMPLETE SVG assets, preserving original line-art
+ * geometry and 90% overall opacity. No mask/cutoff and no long ceiling. */
+html body .hero .hero-art {
+  position:relative;
+  z-index:3;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:clamp(240px,26vw,420px);
+  width:calc(100% - 32px);
+  max-width:1520px;
+  min-height:240px;
+  /* Raise the complete scenes ~28px and bring the card headers ~60px into view. */
+  margin:-79px auto 30px!important;
+  padding:0!important;
+  pointer-events:none;
+}
+html body .hero .hero-art .illustration {
+  position:relative!important;
+  display:block!important;
+  width:auto!important;
+  max-width:none!important;
+  height:auto!important;
+  margin:0!important;
+  flex-shrink:1;
+  overflow:visible!important;
+  transform:none!important;
+  filter:none!important;
+  opacity:.9!important;
+  mask-image:none!important;
+  -webkit-mask-image:none!important;
+  shape-rendering:geometricPrecision;
+}
+html body .hero .hero-art .illustration--left {flex-basis:33%;width:33%!important}
+html body .hero .hero-art .illustration--right {flex-basis:34%;width:34%!important}
+html body .hero .hero-art .illustration > g {opacity:.90}
+html body .hero .hero-art :is(path,g) {vector-effect:non-scaling-stroke}
+
+/* Red primary; quiet liquid-glass secondary, with clear hover hierarchy. */
+html body .hero .actions .button {
+  transition:transform .24s ease,box-shadow .24s ease,background .24s ease,
+    border-color .24s ease,color .24s ease!important;
+  position:relative;
+  z-index:6;
+}
+html body .hero .actions .button:first-child:hover,
+html body .hero .actions .button:first-child:focus-visible {
+  transform:translateY(-3px);
+  background:#dc1a20!important;
+  box-shadow:0 18px 34px rgba(237,32,36,.26)!important;
+}
+html body .hero .actions .button:nth-child(2) {
+  color:#161616!important;
+  background:linear-gradient(125deg,rgba(255,255,255,.85),rgba(255,249,244,.70))!important;
+  border:1px solid rgba(22,22,22,.14)!important;
+  box-shadow:0 10px 24px rgba(67,43,30,.09),inset 0 1px 0 rgba(255,255,255,.95)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(135%);
+  backdrop-filter:blur(18px) saturate(135%);
+}
+html body .hero .actions .button:nth-child(2):hover,
+html body .hero .actions .button:nth-child(2):focus-visible {
+  transform:translateY(-3px);
+  color:#ed2024!important;
+  background:rgba(255,255,255,.98)!important;
+  border-color:rgba(237,32,36,.30)!important;
+  box-shadow:0 15px 29px rgba(67,43,30,.13),inset 0 1px 0 #fff!important;
+}
+html body .hero .actions .button:focus-visible {
+  outline:3px solid #ffb900;
+  outline-offset:3px;
+}
+
+/* Follow-the-cursor spotlight from the approved red-card reference.
+ * The YELLOW fill and black/red plus symbols remain completely unchanged. */
+html body .hero .cards .card {
+  isolation:isolate;
+  overflow:hidden;
+  transition:transform .28s cubic-bezier(.22,1,.36,1),box-shadow .28s ease!important;
+}
+html body .hero .cards .card::after {
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  pointer-events:none;z-index:0;
+  background:radial-gradient(240px circle at var(--spot-x,50%) var(--spot-y,50%),
+    rgba(255,255,255,.56),rgba(255,255,255,.14) 48%,transparent 78%);
+  opacity:0;
+  transition:opacity .28s ease;
+}
+html body .hero .cards .card > :not(.ic) {position:relative;z-index:1}
+html body .hero .cards .card .ic {z-index:2}
+@media(hover:hover) and (pointer:fine) {
+  html body .hero .cards .card:hover {
+    transform:translateY(-4px);
+    box-shadow:0 21px 35px rgba(148,95,18,.15),inset 0 1px 0 rgba(255,255,255,.75)!important;
+  }
+  html body .hero .cards .card:hover::after {opacity:1}
+  html body .hero .cards .card:hover .ic::before {transform:scaleX(1.07)}
+  html body .hero .cards .card:hover .ic::after {transform:scaleY(1.07)}
+}
+html body .hero .cards {
+  position:relative;
+  z-index:4;
+  gap:16px!important;
+  align-items:stretch!important;
+}
+
+/* Same existing yellow gradient, red/black plus icon and outer radius.
+ * Only the interior follows the selected structured reference:
+ * title + icon, hairline divider, readable description. */
+html body .hero .cards .card {
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  min-height:253px!important;
+  padding:27px 27px 25px!important;
+  gap:0!important;
+}
+html body .hero .cards .card-title {
+  display:block!important;
+  min-height:2.35em;
+  max-width:calc(100% - 58px)!important;
+  padding:0!important;
+  margin:0!important;
+  white-space:normal!important;
+  text-align:left!important;
+  font-size:clamp(19px,1.45vw,24px)!important;
+  line-height:1.14!important;
+  letter-spacing:-.044em!important;
+}
+html body .hero .cards .card .ic {
+  top:27px!important;
+  right:24px!important;
+  transform:none!important;
+}
+html body .hero .cards .card p {
+  display:block!important;
+  flex:1 0 auto;
+  width:100%;
+  max-width:none!important;
+  margin:15px 0 0!important;
+  padding:18px 0 0!important;
+  border-top:1px solid rgba(22,22,22,.18);
+  color:#29231f!important;
+  font:400 clamp(14px,1.03vw,17px)/1.56 var(--body,'Poppins',sans-serif)!important;
+  text-align:left!important;
+}
+
+/* Give the Benefits heading breathing room above the existing stack. */
+html body #benefits .bn-head {
+  margin-bottom:clamp(18px,2.5vh,28px)!important;
+}
+html body #benefits .bn-inner {
+  gap:clamp(20px,2.6vh,34px)!important;
+}
+/* In pinned mode preserve the pinned stage's flexible height. */
+html body #benefits.bn-live .bn-inner {
+  gap:clamp(15px,2vh,25px)!important;
+}
+/* All four Benefits panels: headings and text on LEFT, photos on RIGHT,
+ * including the two cards previously flipped by .is-flip. */
+html body #benefits .bn-card .bn-strip,
+html body #benefits .bn-card.is-flip .bn-strip {
+  padding:0 32px 0 34px!important;
+  text-align:left!important;
+  justify-content:flex-start!important;
+}
+html body #benefits .bn-card .bn-title {
+  margin:0!important;
+  text-align:left!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font-size:clamp(19px,1.8vw,28px)!important;
+}
+html body #benefits .bn-card .bn-body,
+html body #benefits .bn-card.is-flip .bn-body {
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,.64fr)!important;
+  gap:clamp(18px,2.4vw,34px)!important;
+  padding:0 20px 20px 34px!important;
+}
+html body #benefits .bn-card .bn-copy {
+  grid-column:1;
+  grid-row:1;
+  order:0!important;
+  min-width:0;
+  text-align:left!important;
+}
+html body #benefits .bn-card .bn-photo,
+html body #benefits .bn-card.is-flip .bn-photo {
+  grid-column:2;
+  grid-row:1;
+  order:0!important;
+  min-width:0;
+  align-self:stretch;
+}
+html body #benefits .bn-card .bn-photo img {
+  width:100%;height:100%;object-fit:cover;
+}
+
+/* Longer Benefits panels without altering the GSAP stacking/flip sequence.
+ * JS adjusts height to the actual pinned viewport up to 480px. */
+html body #benefits:not(.bn-live) .bn-card {min-height:420px!important}
+html body #benefits.bn-live .bn-inner {padding-top:clamp(96px,11.5vh,112px)!important}
+html body #benefits.bn-live .bn-head {margin-bottom:clamp(20px,2.4vh,30px)!important}
+/* Tablet cards and live pinned stage retain room to breathe. */
+@media(max-width:1150px) {
+  html body .hero .cards .card {padding:24px 21px!important;min-height:260px!important;}
+  html body .hero .cards .card-title {font-size:clamp(18px,2vw,23px)!important;}
+  html body .hero .cards .card .ic {right:18px!important;top:22px!important;}
+  html body #benefits .bn-card .bn-title {font-size:clamp(18px,2.05vw,25px)!important;}
+}
+@media(max-width:760px) {
+  /* On small screens the artwork is naturally below the buttons, not
+   * compressed around them, and the yellow cards remain readable. */
+  html body .hero .actions {transform:none;}
+  html body .hero .hero-art {
+    min-height:0;
+    gap:12px;
+    margin:16px auto 22px!important;
+    width:calc(100% - 24px);
+  }
+  html body .hero .hero-art .illustration--left {flex-basis:48%;width:48%!important}
+  html body .hero .hero-art .illustration--right {flex-basis:50%;width:50%!important}
+  html body .hero .hero-art .illustration {max-height:155px!important;}
+  html body .hero .cards .card {
+    min-height:220px!important;
+    padding:23px 22px 22px!important;
+  }
+  html body .hero .cards .card-title {
+    min-height:0;
+    margin-bottom:12px!important;
+    max-width:calc(100% - 53px)!important;
+    font-size:21px!important;
+  }
+  html body .hero .cards .card p {margin-top:5px!important;padding-top:16px!important;font-size:15px!important;}
+  html body #benefits .bn-head {margin-bottom:20px!important;}
+  html body #benefits .bn-inner {gap:22px!important;}
+  html body #benefits .bn-card .bn-strip,
+  html body #benefits .bn-card.is-flip .bn-strip {
+    padding:16px 20px 12px 24px!important;
+    height:auto!important;
+    min-height:var(--strip,52px);
+  }
+  html body #benefits .bn-card .bn-title {font-size:20px!important;}
+  html body #benefits .bn-card .bn-body,
+  html body #benefits .bn-card.is-flip .bn-body {
+    grid-template-columns:minmax(0,1fr)!important;
+    padding:0 20px 20px 24px!important;
+    gap:18px!important;
+  }
+  html body #benefits .bn-card .bn-copy {grid-column:1;grid-row:1;}
+  html body #benefits .bn-card .bn-photo,
+  html body #benefits .bn-card.is-flip .bn-photo {
+    grid-column:1;grid-row:2;order:0!important;
+    height:200px;
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  html body .hero .actions {transition:none!important;}
+  html body .hero .cards .card {transition:none!important}
+  html body .hero .cards .card::after {transition:none!important}
+}
