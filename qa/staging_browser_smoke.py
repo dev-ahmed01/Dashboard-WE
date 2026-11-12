@@ -53,7 +53,18 @@ def run():
         page.screenshot(path=str(OUT/"01_admin_dashboard.png"))
 
         # First-time administrator: upload a real HTML fragment and map one variable field.
-        assert page.locator(".navigation .nav-item").count() == 1, "Category must be the only sidebar module"
+        assert page.locator(".navigation .nav-item").count() == 3, "Category, Solution and Property must be in the sidebar"
+        for label in ("Category", "Solution", "Property"):
+            assert page.locator(".navigation").get_by_role("button", name=label).count() == 1
+        # Each module reuses the approved Category tabs without losing the editor.
+        page.locator(".navigation").get_by_role("button", name="Solution").click()
+        expect(page.get_by_role("heading", name="Solution", exact=True)).to_be_visible()
+        assert page.get_by_text("1A · Hero", exact=False).count() > 0
+        page.locator(".navigation").get_by_role("button", name="Property").click()
+        expect(page.get_by_role("heading", name="Property", exact=True)).to_be_visible()
+        assert page.get_by_text("Testimonials: read-only", exact=False).count() > 0
+        page.locator(".navigation").get_by_role("button", name="Category").click()
+        expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible()
         assert page.get_by_text("CONTENT MANAGEMENT").count() == 0
         tabs = page.locator(".category-tabs").get_by_role("tab")
         assert tabs.count() == 3
