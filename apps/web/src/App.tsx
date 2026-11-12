@@ -267,7 +267,7 @@ export default function App(){
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
   const [uploaded,setUploaded]=useState<Template|null>(null)
   const [uploadName,setUploadName]=useState('')
-  const [uploadCategory,setUploadCategory]=useState('Solution Category')
+  const [,setUploadCategory]=useState('Solution Category')
   const [templateFile,setTemplateFile]=useState<File|null>(null)
   const [mappingId,setMappingId]=useState<number|null>(null)
   const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
