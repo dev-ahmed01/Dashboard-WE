@@ -28,9 +28,37 @@ type Repeater={id:string;section_id:string;kind:string;name:string;items:Repeate
 type Section={id:string;name:string;order:number;repeaters?:Repeater[]}
 type Template={id:number;name:string;category:string;approved:boolean;version:number;sections:Section[];fields:Field[]}
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;noarchive?:boolean;noimageindex?:boolean;nosnippet?:boolean;canonical_override:string;og_title?:string;og_description?:string}
-type Page={id:number;template_id:number;template_name?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
-type Nav='Category'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
+type Page={id:number;template_id:number;template_name?:string;template_category?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
+type Nav='Category'|'Solution'|'Property'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
 type Tab='All Pages'|'Add Page'|'Upload Template'
+type ModuleNav='Category'|'Solution'|'Property'
+const MODULE_INFO:Record<ModuleNav,{category:string;subtitle:string;source:string;sections:string[]}>={
+  Category:{category:'Solution Category',
+    subtitle:'Manage the approved Managed Offices category design and its pages.',
+    source:'Managed Offices in South Bangalore',
+    sections:['Hero','Office Types','Other Solutions','Guided Discovery','Benefits','Why Us','FAQs']},
+  Solution:{category:'Solution',
+    subtitle:'Build solution pages from the One Person Office design, with editable options, benefits and FAQs.',
+    source:'One Person Office',
+    sections:['1A · Hero: image, heading, description, highlights, offer tag','1B · Values: heading and description',
+      '3 · Options: up to four cards, image, name, description, CTA','4 · Customisation',
+      '6 · Benefits: heading, description, bullets, image','7 · How to Get Started',
+      '8 · Locations','9 · FAQs: questions and answers']},
+  Property:{category:'Property',
+    subtitle:'Create property pages with galleries, amenity cards, solutions and a locked Testimonials section.',
+    source:'Workspace Property',
+    sections:['1A · Hero: heading, subheading, right description','2 · Photos: featured and gallery (4 minimum)',
+      '4 · Amenities','5 · Solutions: Private Office / Coworking / Meeting Rooms / Additional',
+      '6 · Location & Landmarks: map','7 · Testimonials: read-only','9 · FAQs: questions and answers']}
+}
+const MODULE_NAV:ModuleNav[]=['Category','Solution','Property']
+const isModuleNav=(nav:Nav):nav is ModuleNav=>MODULE_NAV.includes(nav as ModuleNav)
+const moduleOfCategory=(category:string):ModuleNav=>{
+  if(category==='Property')return 'Property'
+  if(category==='Solution'||category==='Sub-solution')return 'Solution'
+  return 'Category'
+}
+
 
 let accessToken=sessionStorage.getItem('emlen_access_token')||''
 async function api<T>(path:string, options:RequestInit={}):Promise<T>{
@@ -204,6 +232,8 @@ export default function App(){
   const [message,setMessage]=useState('')
   const [nav,setNav]=useState<Nav>('Category')
   const [tab,setTab]=useState<Tab>('All Pages')
+  const officialBootstrapStarted=useRef(false)
+  const [officialSyncing,setOfficialSyncing]=useState(false)
   const [templates,setTemplates]=useState<Template[]>([])
   const [pages,setPages]=useState<Page[]>([])
   const [editor,setEditor]=useState<{page:Page;template:Template}|null>(null)
@@ -216,6 +246,7 @@ export default function App(){
   const [newPassword,setNewPassword]=useState('')
   const [archivedPages,setArchivedPages]=useState<Page[]>([])
   const [activeEditorSection,setActiveEditorSection]=useState<string|null>(null)
+  const [propertySolutionsTab,setPropertySolutionsTab]=useState('Private Office')
   useEffect(()=>{
     if(!activeEditorSection)return
     const id=activeEditorSection
@@ -237,7 +268,7 @@ export default function App(){
   const [selectedTemplate,setSelectedTemplate]=useState<number|null>(null)
   const [uploaded,setUploaded]=useState<Template|null>(null)
   const [uploadName,setUploadName]=useState('')
-  const [uploadCategory,setUploadCategory]=useState('Solution Category')
+  const [,setUploadCategory]=useState('Solution Category')
   const [templateFile,setTemplateFile]=useState<File|null>(null)
   const [mappingId,setMappingId]=useState<number|null>(null)
   const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
@@ -293,8 +324,9 @@ export default function App(){
   const visualDesign:VisualDesign=(()=>{try{return JSON.parse(editor?.page.values.__design__||'{}') as VisualDesign}catch{return {}}})()
   const selectedCanvasElement=visualDesign.elements?.find(el=>el.id===canvasSelection?.elementId)
   const hasFixedLinkOrIcon=!!editor?.template.fields.some(f=>f.mode==='static'&&(f.kind==='link'||f.kind==='icon'))
-  const editableSections=editor?editor.template.sections.filter(section=>
-    sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id)).items.length>0):[]
+  // Keep ALL mapped sections visible, including intentionally locked
+  // Property Testimonials, so section order always matches the source page.
+  const editableSections=editor?editor.template.sections:[]
   const activeSectionId=editor?(activeEditorSection===null?editableSections[0]?.id:(editableSections.some(sec=>sec.id===activeEditorSection)?activeEditorSection:'')):''
   function mayLeave(){return !dirty||window.confirm('You have unsaved page changes. Leave and discard these changes?')}
   useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty])
@@ -352,11 +384,30 @@ export default function App(){
     if(uploaded){const next=t.find(x=>x.id===uploaded.id);if(next)setUploaded(next)}
   }
   useEffect(()=>{if(!accessToken)return;api<{email:string;role:string}>('/api/auth/me').then(u=>{setUser(u);refresh().catch(showError)}).catch(()=>{accessToken='';sessionStorage.removeItem('emlen_access_token')})},[])
+  useEffect(()=>{
+    if(user?.role!=='admin'||officialBootstrapStarted.current)return
+    officialBootstrapStarted.current=true
+    preloadOfficialTemplates()
+  },[user?.role])
+  async function preloadOfficialTemplates(){
+    setOfficialSyncing(true)
+    try {
+      const result=await api<{templates_created:number;pages_created:number;existing:number;unavailable:string[]}>(
+        '/api/official/bootstrap',{method:'POST'})
+      await refresh()
+      if(result.unavailable.length){
+        setError('Could not preload: '+result.unavailable.join(', ')+'. Check public site availability, then retry.')
+      }else if(result.templates_created){
+        setMessage(result.templates_created+' official templates and draft pages are ready to edit.')
+      }
+    }catch(err){showError(err)}
+    finally{setOfficialSyncing(false)}
+  }
   useEffect(()=>{if(!user)return;setMessage('');if(nav==='Shared Content'){api<Record<string,string>>('/api/shared').then(setShared).catch(showError);api<typeof sharedUsage>('/api/shared/usage').then(setSharedUsage).catch(showError)};if(nav==='SEO')api<typeof redirects>('/api/redirects').then(setRedirects).catch(showError);if(nav==='Team Access'&&user.role==='admin')api<typeof team>('/api/users').then(setTeam).catch(showError);if(nav==='Media Library')api<typeof media>('/api/media').then(setMedia).catch(showError);if(nav==='SEO')api<typeof seoStatus>('/api/seo/status').then(setSeoStatus).catch(showError);if(nav==='Archived')api<Page[]>('/api/pages?include_archived=true').then(ps=>setArchivedPages(ps.filter(p=>p.archived))).catch(showError)},[nav,user])
   function showError(e:unknown){setError(e instanceof Error?e.message:String(e));setMessage('')}
   async function action(fn:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await fn()}catch(e){showError(e)}finally{setBusy(false)}}
   function notify(msg:string){setMessage(msg);setError('')}
-  function logout(){if(!mayLeave())return;accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null);setPublicationInfo(null);setSelectedTemplate(null);setUploaded(null);setMappingId(null);setNewName('');setNav('Category');setTab('All Pages')}
+  function logout(){if(!mayLeave())return;accessToken='';sessionStorage.removeItem('emlen_access_token');setUser(null);setEditor(null);setSavedPage(null);setPublicationInfo(null);setSelectedTemplate(null);setUploaded(null);setMappingId(null);setNewName('');setNav('Category');setTab('All Pages');officialBootstrapStarted.current=false}
   async function login(){await action(async()=>{
     const result=await api<{access_token:string;user:{email:string;role:string}}>('/api/auth/login',{method:'POST',body:json({identifier:loginIdentifier,password:loginPassword})})
     accessToken=result.access_token;sessionStorage.setItem('emlen_access_token',accessToken);setUser(result.user);await refresh()
@@ -370,7 +421,7 @@ export default function App(){
   async function uploadTemplate(){await action(async()=>{
     if(!templateFile)throw new Error('Choose an HTML template first')
     const form=new FormData();form.append('file',templateFile)
-    const params=new URLSearchParams({name:uploadName||templateFile.name.replace(/\.html$/i,''),category:uploadCategory})
+    const params=new URLSearchParams({name:uploadName||templateFile.name.replace(/\.html$/i,''),category:MODULE_INFO[activeModule].category})
     const t=await api<Template>(`/api/templates/import?${params}`,{method:'POST',body:form});setUploaded(t);setMappingId(t.id);await refresh();notify(`${t.sections.length} structural sections detected. Fields are static until you approve their mapping.`)
   })}
   async function saveMapping(t:Template){await action(async()=>{
@@ -394,7 +445,7 @@ export default function App(){
     const target=deletingTemplate
     setBusy(true);setDeleteError('');setError('')
     try{
-      const endpoint=target==='all'?'/api/templates':'/api/templates/'+target.id
+      const endpoint=target==='all'?'/api/templates?category='+encodeURIComponent(MODULE_INFO[activeModule].category):'/api/templates/'+target.id
       const result=await api<{removed:number;retained_for_pages:number;storage_cleanup_failed:number}>(endpoint,{
         method:'DELETE',body:json({confirm:true})
       })
@@ -459,8 +510,13 @@ export default function App(){
     const p=editor.page
     setPreview(await html(`/api/pages/${p.id}/preview${qs}`,{edit_version:p.edit_version,title:p.title,slug:p.slug,values:p.values,seo:p.seo}))
   })}
-  function navigate(name:Nav){if(!mayLeave())return;setEditor(null);setSavedPage(null);setNav(name);if(name==='Category')setTab('All Pages')}
-  function closeEditor(){navigate('Category')}
+  function navigate(name:Nav){
+    if(!mayLeave())return
+    setEditor(null);setSavedPage(null);setNav(name);setSelectedTemplate(null);setSelectedPageIds([])
+    setMappingId(null);setUploaded(null);setTemplateFile(null);setPageSearch('')
+    if(isModuleNav(name)){setTab('All Pages');setUploadCategory(MODULE_INFO[name].category)}
+  }
+  function closeEditor(){navigate(moduleOfCategory(editor?.template.category||'Solution Category'))}
   function modifyMapField(id:number,key:string,patch:Partial<Field>){setTemplates(prev=>prev.map(t=>t.id===id?{...t,fields:t.fields.map(f=>f.key===key?{...f,...patch}:f)}:t))}
   async function rotatePassword(){await action(async()=>{
     await api('/api/auth/change-password',{method:'POST',body:json({old_password:oldPassword,new_password:newPassword})})
@@ -1255,15 +1311,22 @@ export default function App(){
   }
 
   const mapping=templates.find(t=>t.id===mappingId)||uploaded
+  const activeModule=isModuleNav(nav)?nav:'Category'
+  const moduleTemplates=templates.filter(t=>moduleOfCategory(t.category)===activeModule)
+  const modulePages=pages.filter(p=>moduleOfCategory(
+    templates.find(t=>t.id===p.template_id)?.category||p.template_category||'Solution Category'
+  )===activeModule)
   const visiblePages=pages.filter(p=>(nav==='Saved Drafts'?(p.status==='draft'||p.has_unpublished_changes):nav==='Published'?p.status==='published':filter==='All'?true:filter==='Draft'?(p.status==='draft'||p.has_unpublished_changes):p.status==='published'))
   const categoryPages=visiblePages.filter(p=>{
+    if(!modulePages.some(modulePage=>modulePage.id===p.id))return false
     const search=pageSearch.trim().toLowerCase()
     return !search||[p.title,p.slug,templates.find(t=>t.id===p.template_id)?.name||''].some(value=>value.toLowerCase().includes(search))
   })
-  const approvedTemplates=templates.filter(t=>t.approved)
+  const approvedTemplates=moduleTemplates.filter(t=>t.approved)
+    .sort((a,b)=>Number(b.name.includes('Approved 2026'))-Number(a.name.includes('Approved 2026')))
   const selectedApprovedTemplate=approvedTemplates.find(t=>t.id===selectedTemplate)
   const allVisibleSelected=categoryPages.length>0&&categoryPages.every(p=>selectedPageIds.includes(p.id))
-  const selectedHasPublished=pages.some(p=>selectedPageIds.includes(p.id)&&!!p.published_version)
+  const selectedHasPublished=modulePages.some(p=>selectedPageIds.includes(p.id)&&!!p.published_version)
   function chooseTemplateFile(file:File|null){
     if(file&&(!file.name.toLowerCase().endsWith('.html')||file.size>8*1024*1024)){
       setTemplateFile(null);showError('Choose an HTML file (.html) up to 8 MB.');return
@@ -1351,7 +1414,10 @@ export default function App(){
   )
 
   return <div className="shell category-shell"><aside className="sidebar category-sidebar"><div className="brand"><span className="brand-mark"/> <div><strong>workspace</strong><small>BY EMLEN</small></div></div><div className="navigation">
-    <button className="nav-item active" type="button" onClick={()=>navigate('Category')} aria-current="page"><LayoutTemplate size={19}/>Category<ChevronRight className="right-chevron" size={16}/></button>
+    {MODULE_NAV.map((module,index)=><button key={module} className={'nav-item '+(nav===module?'active':'')} type="button"
+      onClick={()=>navigate(module)} aria-current={nav===module?'page':undefined}>
+      {index===0?<LayoutTemplate size={19}/>:index===1?<Layers size={19}/>:<Grid3X3 size={19}/>}
+      {module}<ChevronRight className="right-chevron" size={16}/></button>)}
   </div><button className="logout" onClick={logout}><LogOut size={17}/> Sign out</button></aside>
   <main className="main"><div className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/> <span>{editor?'Page Editor':nav}</span></div><div className="topbar-right"><button className="password-link" onClick={()=>setShowPassword(true)}>Change password</button><span className="role">{user.role}</span><div className="avatar">{user.email[0].toUpperCase()}</div></div></div>
   <div className="content">{error&&<div className="alert error"><CircleHelp size={16}/>{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}{message&&<div className="alert success"><Check size={16}/>{message}<button onClick={()=>setMessage('')}><X size={16}/></button></div>}
@@ -1392,15 +1458,30 @@ export default function App(){
       <div className="editor-content-workspace"><div className="editor-section-rows">
          {editableSections.map(section=>{
            const ordered=sourceOrderedEditor(section,editor.template.fields.filter(f=>f.section_id===section.id))
+           const propertySolutions=editor.template.category==='Property'&&/solutions/i.test(section.name)
+           const tabNames=['Private Office','Coworking','Meeting Rooms','Additional']
+           const sectionItems=propertySolutions?ordered.items.filter(part=>
+             part.kind!=='group'||!part.group||!tabNames.includes(part.group.name)||part.group.name===propertySolutionsTab
+           ):ordered.items
            const sectionOpen=section.id===activeSectionId
            return <div className="editor-section-block" key={section.id} id={'edit-section-'+section.id}>
              <button className="editor-section-toggle" type="button" aria-expanded={sectionOpen} onClick={()=>{setActiveEditorSection(sectionOpen?'':section.id);setFocusedPreviewField('')}}>
                <span className="editor-section-no">{String(section.order).padStart(2,'0')}</span>
-               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length} content {ordered.items.length===1?'group':'groups'} · Original page order</small></span>
+               <span className="editor-section-name"><strong>{section.name}</strong><small>{ordered.items.length?ordered.items.length+' content '+(ordered.items.length===1?'group':'groups'):'Read-only / Static'} · Original page order</small></span>
                <ChevronRight size={17} className={'section-chevron '+(sectionOpen?'expanded':'')}/>
              </button>
              {sectionOpen&&<div className="editor-page-ordered-list">
-               {ordered.items.map((part,i)=>part.kind==='group'&&part.group
+               {propertySolutions&&<div className="property-solutions-switch" role="tablist" aria-label="Property workspace solution types">
+                 {tabNames.map(type=><button key={type} type="button" role="tab"
+                   aria-selected={propertySolutionsTab===type}
+                   className={propertySolutionsTab===type?'selected':''}
+                   onClick={()=>setPropertySolutionsTab(type)}>{type}</button>)}
+               </div>}
+               {ordered.items.length===0&&<div className="editor-locked-section"><LockKeyhole size={17}/>
+                   {editor.template.category==='Property'&&/testimonials|reviews/i.test(section.name)
+                     ?'Testimonials are read-only to protect approved reviews.'
+                     :'This section is Static. Its original design stays in the preview.'}</div>}
+               {sectionItems.map((part,i)=>part.kind==='group'&&part.group
                  ?renderRepeaterGroup(part.group,section)
                  :part.block?editorBlockControl(part.block,i):null)}
              </div>}
@@ -1431,12 +1512,22 @@ export default function App(){
 
     </div></>:
   <>
-  {nav==='Category'&&<div className="category-page">
+  {isModuleNav(nav)&&<div className="category-page">
     <div className="category-heading">
-      <h1>Category</h1>
-      <p>Manage reusable website pages from approved templates.</p>
+      <h1>{nav}</h1>
+      <p>{MODULE_INFO[nav].subtitle}</p>
+      {user.role==='admin'&&<button className="outline module-preload" type="button" disabled={busy||officialSyncing}
+        onClick={preloadOfficialTemplates}><UploadCloud size={16}/>{officialSyncing?'Loading approved pages…':'Preload approved templates'}</button>}
     </div>
-    <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label="Category views">
+    {nav!=='Category'&&<details className="module-blueprint">
+      <summary><LayoutTemplate size={17}/> {nav} page form <span>{MODULE_INFO[nav].sections.length} sections</span><ChevronRight size={16}/></summary>
+      <div className="module-blueprint-grid">{MODULE_INFO[nav].sections.map(item=>
+        <div key={item} className="module-blueprint-item">
+          {item.toLowerCase().includes('read-only')&&<LockKeyhole size={15}/>}
+          <span>{item}</span></div>)}
+      </div>
+    </details>}
+    <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label={nav+' views'}>
       {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
         <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
       )}
@@ -1448,7 +1539,7 @@ export default function App(){
         <div className="category-filters" role="group" aria-label="Page status filter">
           {(['All','Published','Draft'] as const).map(name=>
             <button type="button" key={name} className={filter===name?'active':''} aria-pressed={filter===name} onClick={()=>{setFilter(name);setSelectedPageIds([])}}>
-              {name} <span>{name==='All'?pages.length:name==='Published'?pages.filter(p=>p.status==='published').length:pages.filter(p=>p.status==='draft'||p.has_unpublished_changes).length}</span>
+              {name} <span>{name==='All'?modulePages.length:name==='Published'?modulePages.filter(p=>p.status==='published').length:modulePages.filter(p=>p.status==='draft'||p.has_unpublished_changes).length}</span>
             </button>
           )}
         </div>
@@ -1503,7 +1594,7 @@ export default function App(){
       </div>
       <div className="category-upload-fields">
         <label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label>
-        <label>Category<select value={uploadCategory} onChange={e=>setUploadCategory(e.target.value)}>{['Solution Category','Sub-solution','Country','City','Property'].map(x=><option key={x}>{x}</option>)}</select></label>
+        <label>Category<select value={MODULE_INFO[activeModule].category} disabled><option>{MODULE_INFO[activeModule].category}</option></select></label>
         <button type="button" className="primary" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>
       </div>
       <div className="category-mapping-layout mapping-area">
@@ -1515,6 +1606,7 @@ export default function App(){
           {mapping?<div className="category-expanded-sections">
             {mapping.sections.map((sec,i)=>{
               const fields=mapping.fields.filter(f=>f.section_id===sec.id)
+              const isReadOnly=mapping.category==='Property'&&/testimonials|reviews/i.test(sec.name)
               const isStatic=fields.every(f=>f.mode==='static')
               const isOpen=(openMappingSection===null?mapping.sections[0]?.id:openMappingSection)===sec.id
               const variableCount=fields.filter(f=>f.mode==='page').length
@@ -1528,7 +1620,7 @@ export default function App(){
                   </div>
                   <label className="category-static-toggle">
                     <span>Static</span>
-                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic} disabled={!fields.length} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
+                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic||isReadOnly} disabled={!fields.length||isReadOnly} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
                     <span className="category-static-track" aria-hidden="true"/>
                   </label>
                   <button type="button" className="category-section-expand" aria-expanded={isOpen} aria-controls={'section-map-'+sec.id} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>
@@ -1572,7 +1664,7 @@ export default function App(){
                     </div>)}
                     {!fields.length&&<p className="category-no-fields">No detected fields in this section.</p>}
                   </div>
-                  {isStatic&&<div className="category-locked-note"><LockKeyhole size={14}/> This section is locked. Turn off Static to adjust links, heading levels or field behavior.</div>}
+                  {(isStatic||isReadOnly)&&<div className="category-locked-note"><LockKeyhole size={14}/>{isReadOnly?'Testimonials are permanently read-only.': 'This section is locked. Turn off Static to adjust links, heading levels or field behavior.'}</div>}
                 </div>}
               </section>
             })}
@@ -1590,16 +1682,16 @@ export default function App(){
       </div>}
       <div className="category-uploaded-list">
         <div className="category-uploaded-heading">
-          <h2>Uploaded Templates <span>({templates.length})</span></h2>
-          {templates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
+          <h2>Uploaded Templates <span>({moduleTemplates.length})</span></h2>
+          {moduleTemplates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
         </div>
         <div className="category-uploaded-table">
-          {templates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
+          {moduleTemplates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
             <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
             <span className={'category-status '+(t.approved?'category-approved':'category-draft')}>{t.approved?'Approved':'Needs mapping'}</span>
             <div className="category-template-row-actions"><button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button><button type="button" className="category-template-delete-one" onClick={()=>openDeleteDialog(t)} disabled={busy} aria-label={'Delete template '+t.name} title={'Delete '+t.name}><Trash2 size={15}/> Delete</button></div>
           </div>)}
-          {!templates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
+          {!moduleTemplates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
         </div>
       </div>
     </div>}

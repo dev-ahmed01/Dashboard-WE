@@ -2139,3 +2139,36 @@
   .we-add-actions{flex-wrap:wrap;justify-content:stretch}
   .we-add-actions button{flex:1}
 }
+
+
+/* Approved three-module editor: reuse the existing Category visual language. */
+.category-sidebar .navigation{display:flex;flex-direction:column;gap:9px;align-items:stretch}
+.category-sidebar .navigation .nav-item{width:100%;display:flex;align-items:center;gap:13px;text-align:left}
+.category-sidebar .navigation .nav-item:not(.active){color:rgba(255,255,255,.8);background:transparent;border-color:transparent}
+.category-sidebar .navigation .nav-item:not(.active):hover{background:rgba(237,32,36,.14);color:#fff}
+.category-sidebar .navigation .nav-item .right-chevron{margin-left:auto}
+.category-heading{position:relative}
+.category-heading .module-preload{margin-top:14px;display:inline-flex;align-items:center;gap:8px;border-radius:14px}
+.module-blueprint{margin:0 0 20px;padding:0;border:1px solid #e8e1de;border-radius:19px;background:linear-gradient(130deg,#fff 20%,#fffaf6 100%);box-shadow:0 5px 18px rgba(22,22,22,.03)}
+.module-blueprint summary{display:flex;align-items:center;gap:11px;padding:17px 23px;list-style:none;font-weight:700;cursor:pointer;color:#181616}
+.module-blueprint summary::-webkit-details-marker{display:none}
+.module-blueprint summary span{margin-left:auto;font-size:12px;font-weight:600;color:#7d7472}
+.module-blueprint summary svg:last-child{margin-left:8px;transition:transform .2s ease}
+.module-blueprint[open] summary svg:last-child{transform:rotate(90deg)}
+.module-blueprint-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:0 19px 19px}
+.module-blueprint-item{display:flex;align-items:center;gap:9px;min-height:43px;border-radius:12px;padding:11px 13px;background:#fff8f4;border:1px solid #f4ebe6;color:#4b403b;font-size:13px;line-height:1.48}
+.module-blueprint-item svg{flex:none;color:#ed2024}
+.editor-locked-section{display:flex;align-items:center;gap:11px;padding:20px;border-radius:14px;border:1px solid #eee7e4;background:#fff9f7;color:#6a5e59;font-size:14px;line-height:1.5}
+.editor-locked-section svg{flex:none;color:#ed2024}
+@media(max-width:780px){
+  .module-blueprint-grid{grid-template-columns:1fr}
+  .category-sidebar .navigation{gap:5px}
+  .category-heading .module-preload{margin-bottom:6px}
+}
+
+
+.property-solutions-switch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 17px;padding:8px;border-radius:18px;background:rgba(255,244,237,.76);border:1px solid #f0e5df}
+.property-solutions-switch button{padding:13px 10px;border:1px solid transparent;border-radius:12px;background:transparent;color:#5e5551;font-weight:700;font-size:13px}
+.property-solutions-switch button:hover{background:rgba(255,255,255,.8)}
+.property-solutions-switch button.selected{background:#ed2024;color:#fff;box-shadow:0 9px 19px rgba(237,32,36,.16)}
+@media(max-width:740px){.property-solutions-switch{grid-template-columns:repeat(2,minmax(0,1fr))}}
