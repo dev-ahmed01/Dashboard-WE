@@ -28,7 +28,8 @@ from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
-from .official_templates import OFFICIAL_PAGES, official_key, fetch_official, make_template, read_only_section
+from .official_templates import (OFFICIAL_PAGES, official_key, legacy_official_key,
+    fetch_official, make_template, refine_existing, read_only_section)
 
 
 @asynccontextmanager
@@ -311,16 +312,58 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
     for one source are isolated from other sources.
     """
     store=ObjectStore()
-    result={'templates_created':0,'pages_created':0,'existing':0,'unavailable':[]}
+    result={'templates_created':0,'pages_created':0,'existing':0,
+            'repaired':0,'drafts_repaired':0,'unavailable':[]}
     for item in OFFICIAL_PAGES:
         key=official_key(item.code)
-        existing=db.scalar(select(Template).where(Template.object_key==key).limit(1))
+        legacy=legacy_official_key(item.code)
+        existing=db.scalar(select(Template).where(
+            Template.object_key.in_([key,legacy])).limit(1))
         if existing:
-            result['existing']+=1
+            # One-time, additive upgrade for the previously preloaded designs.
+            # Keep old objects intact for rollback, and preserve page values,
+            # SEO, custom slugs and published snapshots.
+            if existing.object_key==key:
+                result['existing']+=1
+                continue
+            try:
+                old_source=store.get(existing.object_key).decode('utf-8')
+                upgraded,sections,fields=refine_existing(
+                    item,old_source,existing.sections,existing.fields)
+                store.put(key,upgraded.encode('utf-8'),'text/html')
+                old_key=existing.object_key
+                existing.object_key=key
+                existing.fields=fields
+                existing.sections=sections
+                existing.version+=1
+                count=0
+                for page in db.scalars(select(Page).where(
+                    Page.template_id==existing.id)).all():
+                    snapshot=page.template_snapshot or {}
+                    if (page.published_version or page.archived or
+                        snapshot.get('object_key')!=old_key):
+                        continue
+                    # Snapshot source only: user-entered text/images/options
+                    # and draft metadata are never overwritten.
+                    page.template_snapshot={
+                        **snapshot,'object_key':key,
+                        'sections':sections,'fields':fields,'version':existing.version}
+                    page.edit_version+=1
+                    page.updated_at=utcnow()
+                    count+=1
+                audit(db,user,'official_template_editor_repair',str(existing.id),
+                      {'code':item.code,'drafts':count})
+                db.commit()
+                result['repaired']+=1
+                result['drafts_repaired']+=count
+            except Exception:
+                logger.exception('Official template repair unavailable for %s',item.code)
+                db.rollback()
+                result['unavailable'].append(item.title)
             continue
         try:
             source,sections,fields=make_template(item,fetch_official(item))
-            # Preserve exactly the approved source in immutable object storage.
+            # The official source and local CSS are versioned together.
             store.put(key,source.encode('utf-8'),'text/html')
             t=Template(name=item.title,category=item.category,object_key=key,
                        fields=fields,sections=sections,version=1,approved=True)
@@ -344,7 +387,6 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
         except Exception:
             logger.exception('Official template seed unavailable for %s',item.code)
             db.rollback()
-            # Do not expose provider internals/credentials or change stored data.
             result['unavailable'].append(item.title)
     return result
 
