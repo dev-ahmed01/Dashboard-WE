@@ -1448,16 +1448,16 @@ export default function App(){
     <div className="we-editor-heading">
       <button className="backlink" onClick={closeEditor}>← All Pages</button>
       <h1>{editor.page.title}</h1>
-      <p>Edit the page content and SEO settings. Your published version stays unchanged until you publish.</p>
-      <div className="editor-signals">
+      {editor.template.category!=='Solution Category'&&<p>Edit the page content and SEO settings. Your published version stays unchanged until you publish.</p>}
+      {(editor.template.category!=='Solution Category'||dirty||editor.page.has_unpublished_changes)&&<div className="editor-signals">
         {dirty&&<span className="unsaved-pill"><AlertTriangle size={14}/> Unsaved changes</span>}
         {editor.page.has_unpublished_changes&&<span className="draft-pill">Published · Unpublished changes</span>}
-        {!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}
-      </div>
-      <div className="we-editor-jump-links" role="navigation" aria-label="Editor sections">
+        {editor.template.category!=='Solution Category'&&!dirty&&!editor.page.has_unpublished_changes&&<span className="saved-pill"><Check size={14}/> Saved</span>}
+      </div>}
+      {editor.template.category!=='Solution Category'&&<div className="we-editor-jump-links" role="navigation" aria-label="Editor sections">
         <button type="button" onClick={()=>document.getElementById('section-editing')?.scrollIntoView({behavior:'smooth',block:'start'})}>Content <ChevronRight size={13}/></button>
         <button type="button" onClick={()=>document.getElementById('seo-settings')?.scrollIntoView({behavior:'smooth',block:'start'})}>SEO <ChevronRight size={13}/></button>
-      </div>
+      </div>}
     </div>
     <div className="we-editor-actions">
       <div className="we-editor-secondary-actions">
