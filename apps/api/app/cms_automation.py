@@ -1,7 +1,8 @@
 """Private operator bridge for CMS draft automation over restricted SSH.
 
 No HTTP route, no authentication bypass on public endpoints, no publishing,
-deletion, shared content or account access. Requests enter via stdin only.
+permanent deletion, shared content or account access. A narrowly scoped review cleanup
+can archive explicitly identified never-published drafts. Requests enter via stdin only.
 Uses the same validator, preview renderer and snapshot model as the editor.
 """
 import json
@@ -107,11 +108,136 @@ def validate_patch(request, template):
     return values, {**seo, "noindex": True, "nofollow": True}
 
 
+
+# Explicitly scoped, reversible cleanup requested for the three-category review.
+# This is not a general archive, delete, title-change or design API.
+REVIEW_ARCHIVES = {
+    24: ("Category Page", 1, 10),
+    25: ("Solution Page", 1, 11),
+    28: ("Large Team Office", 1, 11),
+    29: ("Full Floor Office", 1, 11),
+    31: ("Coworking Access Plans", 1, 11),
+    32: ("Day Pass", 1, 11),
+    33: ("Meeting Rooms", 1, 11),
+    34: ("Training Rooms", 1, 11),
+    38: ("Day Office", 1, 11),
+    39: ("Event Space", 1, 11),
+    40: ("Enterprise & GCC", 1, 11),
+}
+REVIEW_KEEP = {
+    "Office Space": (10, "office-space"),
+    "Coworking": (10, "coworking"),
+    "Virtual Office": (10, "virtual-office"),
+    "One Person Office": (11, "office-space/one-person-office"),
+    "Small Team Office": (11, "small-team-office"),
+    "Dedicated Desk": (11, "dedicated-desk"),
+    "Business Address": (11, "business-address"),
+    "Register Business": (11, "register-business"),
+}
+REVIEW_CHILDREN = {
+    "Office Space": ["One Person Office", "Small Team Office"],
+    "Coworking": ["Dedicated Desk"],
+    "Virtual Office": ["Business Address", "Register Business"],
+}
+
+
+def review_category_patch(template, existing, children, other_categories):
+    from .repeaters import DESIGN_KEY, read_design
+    groups = {g["id"]: g for sec in template["sections"] for g in sec.get("repeaters", [])}
+    solutions = groups.get("section_2_repeat_1")
+    other = groups.get("section_3_repeat_1")
+    require(solutions and solutions["kind"] == "solutions" and other and other["kind"] == "other_solutions",
+            "Expected category repeater mapping is missing")
+    require(len(solutions["items"]) == 7 and len(other["items"]) == 10,
+            "Category template changed; inspect before cleanup")
+    design = read_design(existing)
+    items = design.setdefault("items", {})
+    groups_design = design.setdefault("groups", {})
+    fields = {}
+    for group, entries in [(solutions, children), (other, other_categories)]:
+        for i, item in enumerate(group["items"]):
+            item_design = items.setdefault(item["id"], {})
+            item_design["hidden"] = i >= len(entries)
+            if i < len(entries):
+                label, slug = entries[i]
+                keys = item["field_keys"]
+                require(len(keys) >= 2, "Missing category card link")
+                fields[keys[0]] = label
+                fields[keys[1]] = "/" + slug + "/"
+    groups_design.setdefault(solutions["id"], {})["columns"] = 2
+    clean, _ = validate_patch({"values": fields}, template)
+    clean[DESIGN_KEY] = json.dumps(design, ensure_ascii=True)
+    return clean
+
+
+def curate_review_drafts(db, request):
+    from bs4 import BeautifulSoup
+    require(type(request.get("dry_run")) is bool, "Explicit dry_run is required")
+    dry_run = request["dry_run"]
+    keep = {}
+    for title, (tid, slug) in REVIEW_KEEP.items():
+        pid = db.scalar(select(Page.id).where(Page.slug == slug, *draft_filter()))
+        require(pid is not None, "Required review draft missing: " + title)
+        page = get_draft(db, {"page_id": pid}, lock=True)
+        require(page.title == title and page.template_id == tid, "Review draft identity changed: " + title)
+        keep[title] = page
+    archived = []
+    for pid, (title, version, tid) in REVIEW_ARCHIVES.items():
+        p = get_draft(db, {"page_id": pid}, lock=True)
+        require(p.title == title and p.edit_version == version and p.template_id == tid,
+                "Archive target changed: " + title)
+        archived.append(p)
+    changes = []
+    for name, names in REVIEW_CHILDREN.items():
+        p = keep[name]
+        t = page_template_with_repeaters(db, p)
+        children = [("Registration Address" if x == "Register Business" else x, keep[x].slug) for x in names]
+        others = [(x, keep[x].slug) for x in REVIEW_CHILDREN if x != name]
+        patch = review_category_patch(t, p.values or {}, children, others)
+        update = validated_page_changes(p, PageUpdate(edit_version=p.edit_version, values=patch), db)
+        candidate = SimpleNamespace(template_id=p.template_id, template_snapshot=p.template_snapshot,
+                                    title=p.title, values=update["values"])
+        html = compiled(db, candidate)
+        soup = BeautifulSoup(html, "html.parser")
+        for gid, entries in [("section_2_repeat_1", children), ("section_3_repeat_1", others)]:
+            group = soup.find(attrs={"data-we-repeat-group": gid})
+            require(group is not None, "Category card preview mapping missing")
+            cards = group.find_all(attrs={"data-we-repeat-item": True}, recursive=False)
+            visible = [node for node in cards if "display:none!important" not in node.get("style", "")]
+            require(len(visible) == len(entries), "Unexpected visible category cards")
+            for node, (_, slug) in zip(visible, entries):
+                require(node.get("href") == "/" + slug + "/", "Category link preview mismatch")
+        changes.append((p, update))
+    result = {"operation": "curate_three_category_review", "dry_run": dry_run,
+              "retained": [draft_summary(p) for p in keep.values()],
+              "archived": [{"id": p.id, "title": p.title} for p in archived]}
+    if dry_run:
+        db.rollback()
+        return result
+    for p, update in changes:
+        p.values = update["values"]
+        p.edit_version += 1
+        p.updated_at = utcnow()
+        db.add(AuditLog(actor_id=None, action="cms_review_category_links", subject=str(p.id),
+                        details={"channel": "restricted_github_ssh"}))
+    for p in archived:
+        p.archived = True
+        p.edit_version += 1
+        p.updated_at = utcnow()
+        db.add(AuditLog(actor_id=None, action="cms_review_archive", subject=str(p.id),
+                        details={"title": p.title, "channel": "restricted_github_ssh"}))
+    db.flush()
+    result["retained"] = [draft_summary(p) for p in keep.values()]
+    db.commit()
+    return result
+
+
 def apply_request(db, request):
     require(isinstance(request, dict), "Request must be a JSON object")
     op = request.get("operation")
     schemas = {
         "list": {"operation"},
+        "curate_three_category_review": {"operation", "dry_run"},
         "inspect": {"operation", "page_id"},
         "inspect_template": {"operation", "template_id"},
         "update": {"operation", "page_id", "edit_version", "values", "seo", "dry_run"},
@@ -119,6 +245,8 @@ def apply_request(db, request):
     }
     require(isinstance(op, str) and op in schemas, "Unsupported operation")
     require(set(request).issubset(schemas[op]), "Unexpected request fields")
+    if op == "curate_three_category_review":
+        return curate_review_drafts(db, request)
     if op == "list":
         pages = db.scalars(select(Page).where(*draft_filter()).order_by(Page.id).limit(500)).all()
         templates = db.scalars(select(Template).where(Template.is_deleted == False,
