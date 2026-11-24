@@ -1,7 +1,11 @@
 name: Deploy Dashboard-WE to Contabo
-# Manual commissioning only. Automatic release will be enabled after the
-# restricted server-side release and rollback checks have been verified.
+# Release only validated pushes to the repository's own main branch.
+# No upstream artifacts or code are executed on the credentialed runner.
 on:
+  workflow_run:
+    workflows: ["Contabo production recovery rehearsal"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,29 +15,46 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: production
     steps:
       - name: Require successful main CI and recovery rehearsal for this SHA
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          REVISION: ${{ github.sha }}
+          REVISION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          [[ "$tip" == "$REVISION" ]] || { echo 'Revision superseded; deployment blocked'; exit 1; }
           for workflow in ci.yml contabo-release.yml; do
-            status="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" -f head_sha="$REVISION" -f event=push -f branch=main --jq '.workflow_runs[0].conclusion // "pending"')"
-            [[ "$status" == success ]] || { echo "$workflow: $status; deployment blocked"; exit 1; }
+            status=pending
+            for attempt in $(seq 1 60); do
+              status="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" -f head_sha="$REVISION" -f event=push -f branch=main --jq '.workflow_runs[0].conclusion // "pending"')"
+              if [[ "$status" == success ]]; then break; fi
+              [[ "$status" == pending ]] || { echo "$workflow: $status; deployment blocked"; exit 1; }
+              sleep 15
+            done
+            [[ "$status" == success ]] || { echo "$workflow: validation timed out"; exit 1; }
+            echo "$workflow: success"
           done
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          [[ "$tip" == "$REVISION" ]] || { echo 'Revision superseded; deployment blocked'; exit 1; }
       - name: Deploy exact validated main SHA using restricted SSH
         shell: bash
         env:
           DEPLOY_KEY: ${{ secrets.WE_ADMIN_DEPLOY_KEY }}
           KNOWN_HOSTS: ${{ secrets.WE_ADMIN_SSH_KNOWN_HOSTS }}
-          REVISION: ${{ github.sha }}
+          REVISION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           test -n "$DEPLOY_KEY"
