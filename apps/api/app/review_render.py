@@ -69,7 +69,103 @@ html.we-review-static body #benefits .bn-row{grid-template-columns:minmax(0,1fr)
 html.we-review-static body #benefits .bn-row-photo{grid-column:1!important;grid-row:2!important;height:190px!important}
 html.we-review-static body #benefits .bn-row-points{grid-template-columns:minmax(0,1fr)!important}
 }
+
+/* Normal-flow preview: captured pin spacers and viewport-height animation
+   shells must never determine section spacing in a script-free document. */
+html.we-review-static body #benefits.bn-section,
+html.we-review-static body #offices.solutions-section,
+html.we-review-static body .other-wrap,
+html.we-review-static body #office-checklist.consult-section,
+html.we-review-static body #why-us.why-section,
+html.we-review-static body #faq.faq-section,
+html.we-review-static body #values.values-section,
+html.we-review-static body #options.options-section,
+html.we-review-static body #customise.cz-section,
+html.we-review-static body #consultation.lm-section,
+html.we-review-static body #locations.locations-section,
+html.we-review-static body #faqs.faq-section {
+  height:auto!important;min-height:0!important;margin-block:0!important;padding-block:45px!important;
+}
+html.we-review-static body #benefits .bn-inner{padding-block:0!important}
+html.we-review-static body #benefits .bn-pin{width:100%!important;max-width:100%!important;margin:0!important;padding:0!important;transform:none!important;inset:auto!important}
+html.we-review-static body #benefits .bn-stage,html.we-review-static body #benefits .bn-rows{padding-bottom:0!important;margin-bottom:0!important}
+html.we-review-static body #how-it-works.steps-section{height:auto!important;min-height:0!important;margin-block:0!important;padding-block:45px!important}
+html.we-review-static body #how-it-works .hs-inner{padding-block:0!important}
+html.we-review-static body #how-it-works .hs-step,html.we-review-static body #how-it-works .hs-cta{opacity:1!important;visibility:visible!important;transform:none!important}
+html.we-review-static body #how-it-works .hs-stage{height:clamp(140px,18vw,260px)!important;margin-top:24px!important}
+html.we-review-static body #values.values-section>.container{position:relative!important;top:auto!important}
+html.we-review-static body #values .value-card{transform:none!important;opacity:1!important}
+html.we-review-static body #values .value-card p{opacity:1!important;transform:none!important}
+html.we-review-static body .after-section:empty{display:none!important;height:0!important;margin:0!important;padding:0!important}
+html.we-review-static body .bn-stage .bn-card[aria-hidden="true"]{visibility:visible!important}
+html.we-review-static body .frame,html.we-review-static body .container{max-width:100%;min-width:0}
+@media(max-width:760px){
+html.we-review-static body #benefits.bn-section,
+html.we-review-static body #offices.solutions-section,
+html.we-review-static body .other-wrap,
+html.we-review-static body #office-checklist.consult-section,
+html.we-review-static body #why-us.why-section,
+html.we-review-static body #faq.faq-section,
+html.we-review-static body #values.values-section,
+html.we-review-static body #options.options-section,
+html.we-review-static body #customise.cz-section,
+html.we-review-static body #consultation.lm-section,
+html.we-review-static body #locations.locations-section,
+html.we-review-static body #faqs.faq-section,
+html.we-review-static body #how-it-works.steps-section{padding-block:32px!important}
+}
 """
+
+
+
+# GSAP mutates the captured DOM by inserting a pin-spacer and inline pixel
+# heights/padding. Sanitizing scripts alone cannot remove that reserved scroll
+# distance. Normalize the captured source BEFORE applying saved design values.
+_CAPTURE_LAYOUT_PROPERTIES = {
+    "position", "inset", "top", "right", "bottom", "left", "width", "min-width",
+    "max-width", "height", "min-height", "max-height", "margin", "margin-top",
+    "margin-right", "margin-bottom", "margin-left", "padding", "padding-top",
+    "padding-right", "padding-bottom", "padding-left", "transform", "translate",
+    "rotate", "scale", "box-sizing", "flex-basis", "opacity", "visibility",
+    "overflow", "overflow-x", "overflow-y", "will-change", "z-index",
+    "clip-path", "perspective", "transform-origin",
+}
+
+
+def _strip_capture_style(node):
+    style = node.get("style", "")
+    kept = [part for part in style.split(";")
+            if part.strip() and part.partition(":")[0].strip().lower() not in _CAPTURE_LAYOUT_PROPERTIES]
+    if kept:
+        node["style"] = ";".join(kept)
+    else:
+        node.attrs.pop("style", None)
+
+
+def normalize_review_capture(source, category, title):
+    if not ((category == "Solution Category" and title in CATEGORY) or
+            (category == "Solution" and title in PARENT)):
+        return source
+    soup = BeautifulSoup(source, "html.parser")
+    removed = 0
+    # Only the ScrollTrigger-generated class, never generic layout wrappers.
+    for spacer in list(soup.select(".pin-spacer")):
+        if spacer.find_parent("nav") or spacer.find_parent("footer"):
+            continue
+        for child in spacer.find_all(recursive=False):
+            _strip_capture_style(child)
+        spacer.unwrap()
+        removed += 1
+    for node in soup.select("#benefits .bn-pin, #benefits .bn-stage, #benefits .bn-card, #benefits .bn-front, #benefits .bn-row, #values .value-card, #how-it-works .hs-step, #how-it-works .hs-cta"):
+        _strip_capture_style(node)
+        if node.has_attr("aria-hidden") and ("bn-card" in node.get("class", []) or "bn-row" in node.get("class", [])):
+            node.attrs.pop("aria-hidden", None)
+    for spacer in list(soup.select(".after-section")):
+        if not spacer.get_text(strip=True) and not spacer.find(["img", "svg", "a", "input", "button"]) and not spacer.get("data-we-section"):
+            spacer.decompose()
+    if soup.html:
+        soup.html["data-we-removed-pin-spacers"] = str(removed)
+    return str(soup)
 
 
 def benefit_cards(soup):
@@ -112,6 +208,7 @@ def render_review_page(html, category, title):
     if not soup.html or not soup.head or not soup.body:
         return html
     soup.html["class"] = list(dict.fromkeys([*soup.html.get("class", []), "we-review-static"]))
+    soup.html["data-we-layout-revision"] = "3"
     style = soup.new_tag("style", id="we-review-static-layout")
     style.string = STYLE
     soup.head.append(style)

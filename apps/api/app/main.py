@@ -825,6 +825,8 @@ def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:Use
 def compiled(db,p:Page,section_id=None):
     t=p.template_snapshot or {**template_json(get_template(db,p.template_id)),'object_key':get_template(db,p.template_id).object_key}
     source=ObjectStore().get(t['object_key']).decode('utf-8')
+    from .review_render import normalize_review_capture
+    source=normalize_review_capture(source,t.get('category'),getattr(p,'title',''))
     source,t=solution_mapping(source,t,p.values or {})
     output=render(source,t['fields'],p.values or {},globals_dict(db),section_id)
     if t.get('category')=='Solution':

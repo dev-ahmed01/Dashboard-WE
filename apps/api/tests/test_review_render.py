@@ -32,3 +32,23 @@ def test_benefit_audit_supports_both_approved_markup_variants():
         assert [benefit_heading(c).get_text(strip=True) for c in cards] == [f"Benefit {i}" for i in range(4)]
         assert all(benefit_description(c) and benefit_image(c) for c in cards)
         assert benefit_image(cards[0])["alt"] == "Workspace by Emlen — Benefit 0"
+
+
+def test_normalize_capture_removes_pin_spacing_preserving_fields_and_content():
+    from app.review_render import normalize_review_capture
+    html = """<html><head></head><body><main><section id="benefits" data-we-section="section_5">
+    <div class="pin-spacer" style="height:2400px;padding-bottom:1800px">
+    <div class="bn-pin" style="position:fixed;height:900px;width:1440px;color:red">
+    <div class="bn-stage"><article class="bn-card" aria-hidden="true" style="transform:translateY(800px);opacity:0">
+    <h3 data-we-field="section_5_field_15">Benefit</h3></article></div></div></div></section>
+    <div class="after-section" aria-hidden="true"></div><section id="why-us"><h2>Why us</h2></section></main></body></html>"""
+    result = normalize_review_capture(html, "Solution Category", "Virtual Office")
+    soup = BeautifulSoup(result, "html.parser")
+    assert not soup.select(".pin-spacer, .after-section")
+    assert soup.html["data-we-removed-pin-spacers"] == "1"
+    assert soup.select_one(".bn-pin")["style"] == "color:red"
+    assert not soup.select_one(".bn-card").has_attr("style")
+    assert not soup.select_one(".bn-card").has_attr("aria-hidden")
+    assert soup.select_one('[data-we-field="section_5_field_15"]').get_text() == "Benefit"
+    assert soup.select_one("#why-us h2").get_text() == "Why us"
+    assert normalize_review_capture(html, "Property", "Property Page") == html

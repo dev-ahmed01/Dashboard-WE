@@ -319,6 +319,32 @@ def audit_review_drafts(db, request):
     return {"operation":"audit_review_drafts","dry_run":dry_run,"pages":rows,"categories_updated":len(updates)}
 
 
+
+def inspect_review_layout(db):
+    """Read-only browser-QA export of the eight explicitly retained drafts.
+
+    Only private runner data; workflow prints measurements, never HTML.
+    No publication, credentials, shared values outside the rendered page or writes.
+    """
+    from bs4 import BeautifulSoup
+    from .review_render import benefit_cards
+    pages = []
+    for title, (tid, slug) in REVIEW_KEEP.items():
+        pid = db.scalar(select(Page.id).where(Page.slug == slug, *draft_filter()))
+        require(pid is not None, "Required review draft missing: " + title)
+        p = get_draft(db, {"page_id": pid})
+        require(p.title == title and p.template_id == tid, "Review draft identity changed: " + title)
+        html = compiled(db, p)
+        soup = BeautifulSoup(html, "html.parser")
+        require(soup.html and soup.html.get("data-we-layout-revision") == "3", "Review layout revision not active")
+        require(not soup.select(".pin-spacer"), "Captured pin spacer remains: " + title)
+        require(len(benefit_cards(soup)) == 4, "Missing benefit cards: " + title)
+        pages.append({"id": p.id, "title": title, "status": p.status,
+                      "removed_pin_spacers": int(soup.html.get("data-we-removed-pin-spacers", "0")),
+                      "html": html})
+    return {"operation":"inspect_review_layout","pages":pages}
+
+
 def apply_request(db, request):
     require(isinstance(request, dict), "Request must be a JSON object")
     op = request.get("operation")
@@ -326,6 +352,7 @@ def apply_request(db, request):
         "list": {"operation"},
         "curate_three_category_review": {"operation", "dry_run"},
         "audit_review_drafts": {"operation", "dry_run"},
+        "inspect_review_layout": {"operation"},
         "inspect": {"operation", "page_id"},
         "inspect_template": {"operation", "template_id"},
         "update": {"operation", "page_id", "edit_version", "values", "seo", "dry_run"},
@@ -333,6 +360,8 @@ def apply_request(db, request):
     }
     require(isinstance(op, str) and op in schemas, "Unsupported operation")
     require(set(request).issubset(schemas[op]), "Unexpected request fields")
+    if op == "inspect_review_layout":
+        return inspect_review_layout(db)
     if op == "audit_review_drafts":
         return audit_review_drafts(db, request)
     if op == "curate_three_category_review":

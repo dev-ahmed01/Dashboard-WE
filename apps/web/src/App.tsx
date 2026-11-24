@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3} from 'lucide-react'
+import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3, Download} from 'lucide-react'
 import SeoSettings from './SeoSettings'
 import AddPageWorkspace from './AddPageWorkspace'
 
@@ -510,6 +510,33 @@ export default function App(){
     const p=editor.page
     setPreview(await html(`/api/pages/${p.id}/preview${qs}`,{edit_version:p.edit_version,title:p.title,slug:p.slug,values:p.values,seo:p.seo}))
   })}
+
+  async function downloadDraftHtml(){
+    if(!editor)return
+    await action(async()=>{
+      const p=editor.page
+      // Always export the complete current draft, even if the preview was
+      // opened for one section. The authenticated preview POST never saves.
+      const source=await html(`/api/pages/${p.id}/preview`,{edit_version:p.edit_version,title:p.title,slug:p.slug,values:p.values,seo:p.seo})
+      const doc=new DOMParser().parseFromString(source,'text/html')
+      const policy=doc.createElement('meta')
+      policy.httpEquiv='Content-Security-Policy'
+      policy.content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline' https:; img-src https: data:; font-src https: data:; form-action 'none'; base-uri 'none'; object-src 'none'; connect-src 'none'"
+      doc.head.prepend(policy)
+      const robots=doc.createElement('meta');robots.name='robots';robots.content='noindex,nofollow'
+      doc.head.prepend(robots)
+      // Private media remains subject to server authentication. No token is
+      // embedded in the file; public https assets already use absolute URLs.
+      const blob=new Blob(['<!doctype html>\n'+doc.documentElement.outerHTML],{type:'text/html;charset=utf-8'})
+      const url=URL.createObjectURL(blob)
+      const anchor=document.createElement('a')
+      anchor.href=url
+      anchor.download=(p.slug.replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'')||'workspace-draft')+'.html'
+      document.body.appendChild(anchor);anchor.click();anchor.remove()
+      window.setTimeout(()=>URL.revokeObjectURL(url),30000)
+      notify('Draft HTML downloaded. No changes saved.')
+    })
+  }
   function navigate(name:Nav){
     if(!mayLeave())return
     setEditor(null);setSavedPage(null);setNav(name);setSelectedTemplate(null);setSelectedPageIds([])
@@ -1462,6 +1489,7 @@ export default function App(){
     <div className="we-editor-actions">
       <div className="we-editor-secondary-actions">
         <button className="outline" onClick={()=>fullPreview()} disabled={busy}>Full-page preview <ArrowUpRight size={16}/></button>
+        <button type="button" className="outline" onClick={downloadDraftHtml} disabled={busy}><Download size={15}/> Download HTML</button>
         <button className="outline" onClick={enableRepeatersOnThisPage} disabled={busy||dirty}><Plus size={15}/> Enable / refresh repeaters</button>
         {hasFixedLinkOrIcon&&user.role==='admin'&&<button className="outline" onClick={enableLinksAndIconsOnThisPage} disabled={busy||dirty}><LockKeyhole size={15}/> Enable links & icons</button>}
       </div>
@@ -1773,6 +1801,7 @@ export default function App(){
             {[50,75,90,100,125,150].map(v=><option key={v} value={v}>{v}%</option>)}
           </select>
         </>}
+        <button type="button" onClick={downloadDraftHtml} disabled={busy||!editor} title="Download the complete current draft HTML"><Download size={16}/><span>Download HTML</span></button>
         <button type="button" className={canvasMode?'visual-mode-on':'visual-mode-off'} onClick={()=>{
           setCanvasMode(mode=>!mode);setCanvasSelection(null);setCanvasGroupId('');previewScrollRef.current=0
         }}><Eye size={16}/>{canvasMode?'Exit editor':'Edit design'}</button>
