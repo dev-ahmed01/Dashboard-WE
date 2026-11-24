@@ -1,0 +1,52 @@
+name: Deploy Dashboard-WE to Contabo
+# Manual commissioning only. Automatic release will be enabled after the
+# restricted server-side release and rollback checks have been verified.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dashboard-we-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Require successful main CI and recovery rehearsal for this SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          for workflow in ci.yml contabo-release.yml; do
+            status="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" -f head_sha="$REVISION" -f event=push -f branch=main --jq '.workflow_runs[0].conclusion // "pending"')"
+            [[ "$status" == success ]] || { echo "$workflow: $status; deployment blocked"; exit 1; }
+          done
+      - name: Deploy exact validated main SHA using restricted SSH
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.WE_ADMIN_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.WE_ADMIN_SSH_KNOWN_HOSTS }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/we_admin"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/we_admin_known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/we_admin" >/dev/null
+          ssh-keygen -F 91.90.83.21 -f "$HOME/.ssh/we_admin_known_hosts" >/dev/null
+          ssh -i "$HOME/.ssh/we_admin" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o PasswordAuthentication=no -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/we_admin_known_hosts" \
+            -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
+            -T we-admin-actions@91.90.83.21 "deploy $REVISION"
