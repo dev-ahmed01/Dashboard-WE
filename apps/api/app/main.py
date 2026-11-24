@@ -28,6 +28,7 @@ from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
+from .solution_mapping import solution_mapping, select_solution_office
 from .official_templates import (OFFICIAL_PAGES, official_key, legacy_official_key,
     fetch_official, make_template, refine_existing, read_only_section)
 
@@ -578,6 +579,7 @@ def page_template_with_repeaters(db:Session,p:Page):
     # metadata even though their HTML has legitimate card and FAQ groups.
     source_key=stored.get('object_key') or get_template(db,p.template_id).object_key
     source=ObjectStore().get(source_key).decode('utf-8')
+    source,stored=solution_mapping(source,stored,p.values or {})
     _,sections=overlay_metadata(source,stored['sections'],stored['fields'])
     return {**stored,'sections':sections}
 
@@ -823,7 +825,10 @@ def save_page(page_id:int,payload:PageUpdate,db:Session=Depends(get_db),user:Use
 def compiled(db,p:Page,section_id=None):
     t=p.template_snapshot or {**template_json(get_template(db,p.template_id)),'object_key':get_template(db,p.template_id).object_key}
     source=ObjectStore().get(t['object_key']).decode('utf-8')
+    source,t=solution_mapping(source,t,p.values or {})
     output=render(source,t['fields'],p.values or {},globals_dict(db),section_id)
+    if t.get('category')=='Solution':
+        output=select_solution_office(output,getattr(p,'title',''))
     # Media selection in page-variable image fields retains the actual media
     # record's alternative text. Published HTML stays immutable after snapshot.
     if '/api/media/' in output:
@@ -862,7 +867,7 @@ def preview_unsaved(page_id:int,payload:PageUpdate,section_id:str|None=None,
     if section_id and section_id not in {x['id'] for x in t['sections']}:fail(404,'Unknown section')
     from types import SimpleNamespace
     draft=SimpleNamespace(template_id=p.template_id,template_snapshot=p.template_snapshot,
-                          values=changes.get('values',p.values or {}))
+                          title=changes.get('title',p.title),values=changes.get('values',p.values or {}))
     rendered=compiled(db,draft,section_id)
     if not section_id:
         try:

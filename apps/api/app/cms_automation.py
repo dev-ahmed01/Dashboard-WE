@@ -19,6 +19,8 @@ from .models import Page, Template, Publication, Redirect, AuditLog, utcnow
 from .main import (PageUpdate, validated_page_changes, page_template_with_repeaters,
                    template_json, compiled)
 from .seo import safe_slug
+from .solution_mapping import solution_mapping
+from .storage import ObjectStore
 
 MAX_REQUEST = 512 * 1024
 MAX_RESPONSE = 8 * 1024 * 1024
@@ -128,6 +130,7 @@ def apply_request(db, request):
     if op == "inspect_template":
         t = get_active_template(db, request.get("template_id"))
         data = template_json(t)
+        _, data = solution_mapping(ObjectStore().get(t.object_key).decode('utf-8'), data)
         return {"id": t.id, "name": t.name, "category": t.category,
                 "sections": data["sections"], "fields": public_fields(data)}
     if op == "inspect":
@@ -164,7 +167,7 @@ def apply_request(db, request):
     changes = validated_page_changes(p, payload, db)
     # Render exactly as the CMS does before any mutation is committed.
     candidate = SimpleNamespace(template_id=p.template_id, template_snapshot=p.template_snapshot,
-                                values=changes.get("values", p.values or {}))
+                                title=p.title, values=changes.get("values", p.values or {}))
     html = compiled(db, candidate)
     require("<html" in html.lower(), "Preview failed")
     result = {"operation": op, "dry_run": dry_run, "page": draft_summary(p),
