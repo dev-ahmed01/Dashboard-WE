@@ -66,8 +66,22 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/we_admin_known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/we_admin" >/dev/null
           ssh-keygen -F 91.90.83.21 -f "$HOME/.ssh/we_admin_known_hosts" >/dev/null
-          ssh -i "$HOME/.ssh/we_admin" -o IdentitiesOnly=yes -o BatchMode=yes \
-            -o PasswordAuthentication=no -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/we_admin_known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
-            -T we-admin-actions@91.90.83.21 "deploy $REVISION"
+          for attempt in $(seq 1 30); do
+            rc=0
+            ssh -i "$HOME/.ssh/we_admin" -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o PasswordAuthentication=no -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/we_admin_known_hosts" \
+              -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
+              -T we-admin-actions@91.90.83.21 "deploy $REVISION" > "$RUNNER_TEMP/release-output.txt" 2>&1 || rc=$?
+            cat "$RUNNER_TEMP/release-output.txt"
+            if [[ "$rc" == 0 ]]; then exit 0; fi
+            # Only retry an explicit pre-release lock refusal. Never retry
+            # an ambiguous SSH failure, failed build, migration or rollback.
+            if [[ "$rc" != 1 ]] || [[ "$(cat "$RUNNER_TEMP/release-output.txt")" != "Another dashboard maintenance operation is active" ]]; then
+              exit "$rc"
+            fi
+            echo "Maintenance lock busy ($attempt/30); retrying before any release work."
+            sleep 20
+          done
+          echo "Maintenance lock remained busy; no deployment performed."
+          exit 1
