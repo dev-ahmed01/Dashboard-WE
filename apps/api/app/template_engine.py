@@ -166,7 +166,7 @@ def get_sections(root):
     return selected
 
 
-def extract(source: str):
+def extract(source: str, max_fields_per_section: int = 160):
     soup = sanitize(source)
     main = soup.body.find('main')
     root = main or soup.body
@@ -218,7 +218,7 @@ def extract(source: str):
 
         def add_field(tag, kind, attr, default, prefix, marker='data-we-field'):
             nonlocal count
-            if count >= 160:
+            if count >= max_fields_per_section:
                 return
             count += 1
             previous = str(tag.get(marker) or '').strip()
@@ -247,7 +247,7 @@ def extract(source: str):
             })
 
         for tag in node.find_all(True):
-            if count >= 160:
+            if count >= max_fields_per_section:
                 break
             if tag.name in SKIP_CONTAINERS or tag.find_parent(list(SKIP_CONTAINERS)):
                 continue

@@ -14,6 +14,7 @@ GROUPS = (
     ('solutions', 'Office options', '.options-grid', 'article'),
     ('solutions', 'Office options', '.sol-grid', 'li'),
     ('solutions', 'Property solutions', '.property-tab-cards', 'article'),
+    ('solutions', 'Property solutions', '.we-cms-solution-panel', 'article'),
     ('solutions', 'Solutions cards', '.office-grid', 'a'),
     ('other_solutions', 'Other solutions', '.other-pill-grid', 'a'),
     ('benefits', 'Benefit cards', '.benefit-list', 'article'),
