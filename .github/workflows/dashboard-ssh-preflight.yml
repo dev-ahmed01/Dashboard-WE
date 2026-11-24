@@ -1,0 +1,35 @@
+name: Dashboard Contabo SSH preflight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ssh-preflight:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify dedicated SSH identity and pinned host
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.WE_ADMIN_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.WE_ADMIN_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY" || { echo 'Missing WE_ADMIN_DEPLOY_KEY'; exit 1; }
+          test -n "$KNOWN_HOSTS" || { echo 'Missing WE_ADMIN_SSH_KNOWN_HOSTS'; exit 1; }
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/we_admin"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/we_admin_known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/we_admin" >/dev/null
+          ssh-keygen -F 91.90.83.21 -f "$HOME/.ssh/we_admin_known_hosts" >/dev/null
+          ssh_opts=(-i "$HOME/.ssh/we_admin" -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/we_admin_known_hosts" -o ConnectTimeout=20 -T we-admin-actions@91.90.83.21)
+          result="$(ssh "${ssh_opts[@]}" check)"
+          [[ "$result" == "Dashboard-WE SSH ready" ]] || { echo 'Unexpected preflight response'; exit 1; }
+          if result="$(ssh "${ssh_opts[@]}" whoami 2>&1)"; then
+            echo 'Arbitrary command unexpectedly succeeded'
+            exit 1
+          fi
+          [[ "$result" == "Denied: unsupported Dashboard-WE command" ]] || { echo 'Unexpected denial response'; exit 1; }
+          echo 'PASS: authenticated with pinned host key; arbitrary commands denied; no deployment attempted.'
