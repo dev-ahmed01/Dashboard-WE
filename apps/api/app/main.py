@@ -315,6 +315,13 @@ def bootstrap_official(db:Session=Depends(get_db),user:User=Depends(admin)):
     result={'templates_created':0,'pages_created':0,'existing':0,
             'repaired':0,'drafts_repaired':0,'unavailable':[]}
     for item in OFFICIAL_PAGES:
+        # An operator refresh supersedes bundled historical snapshots. Respect
+        # later removal too: login must not recreate an obsolete template.
+        refreshed=db.scalar(select(Template.id).where(Template.object_key.like(
+            f'templates/official-workspace-{item.code}-refresh-%')).limit(1))
+        if refreshed:
+            result['existing']+=1
+            continue
         key=official_key(item.code)
         legacy=legacy_official_key(item.code)
         existing=db.scalar(select(Template).where(
