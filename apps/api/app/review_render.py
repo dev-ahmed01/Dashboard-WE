@@ -114,8 +114,17 @@ html.we-review-static body #locations.locations-section,
 html.we-review-static body #faqs.faq-section,
 html.we-review-static body #how-it-works.steps-section{padding-block:32px!important}
 }
-"""
 
+/* Mobile-only: the captured Solution hero's decorative ticket shade used
+   inset:-40px. At a 390px viewport its measured box was -13px..403px.
+   Keep the soft shadow but give its element the ticket's actual bounds. */
+@media(max-width:760px){
+html.we-review-static body #home .hero-ticket{max-width:calc(100% - 20px)!important;min-width:0!important}
+html.we-review-static body #home .hero-ticket .ticket-shade{inset:0!important;width:100%!important;max-width:100%!important;transform:none!important}
+html.we-review-static body #home .hero-ticket .ticket-shade::before{inset:10px 12px 2px!important;filter:blur(12px)!important}
+html.we-review-static body #home .hero-photo img{left:0!important;top:0!important;width:100%!important;max-width:100%!important;height:100%!important;transform:none!important;object-fit:cover!important}
+}
+"""
 
 
 # GSAP mutates the captured DOM by inserting a pin-spacer and inline pixel
@@ -208,7 +217,7 @@ def render_review_page(html, category, title):
     if not soup.html or not soup.head or not soup.body:
         return html
     soup.html["class"] = list(dict.fromkeys([*soup.html.get("class", []), "we-review-static"]))
-    soup.html["data-we-layout-revision"] = "3"
+    soup.html["data-we-layout-revision"] = "4"
     style = soup.new_tag("style", id="we-review-static-layout")
     style.string = STYLE
     soup.head.append(style)

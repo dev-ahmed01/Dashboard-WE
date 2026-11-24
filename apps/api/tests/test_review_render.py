@@ -52,3 +52,14 @@ def test_normalize_capture_removes_pin_spacing_preserving_fields_and_content():
     assert soup.select_one('[data-we-field="section_5_field_15"]').get_text() == "Benefit"
     assert soup.select_one("#why-us h2").get_text() == "Why us"
     assert normalize_review_capture(html, "Property", "Property Page") == html
+
+
+def test_mobile_hero_ticket_shadow_is_contained_without_removing_offer():
+    html = """<html><head></head><body><section id="home"><div class="hero-ticket"><span class="ticket-shade" aria-hidden="true"></span><div class="ticket-body"><a href="#enquiry">Unlock offer</a></div></div></section></body></html>"""
+    soup = BeautifulSoup(render_review_page(html, "Solution", "Dedicated Desk"), "html.parser")
+    assert soup.html["data-we-layout-revision"] == "4"
+    css = soup.find(id="we-review-static-layout").string
+    assert "#home .hero-ticket .ticket-shade{inset:0!important" in css
+    assert "#home .hero-ticket .ticket-shade::before{inset:10px 12px 2px!important" in css
+    assert soup.select_one(".ticket-shade")["aria-hidden"] == "true"
+    assert soup.select_one(".ticket-body a").get_text() == "Unlock offer"

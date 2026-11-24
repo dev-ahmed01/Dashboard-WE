@@ -336,13 +336,13 @@ def inspect_review_layout(db):
         require(p.title == title and p.template_id == tid, "Review draft identity changed: " + title)
         html = compiled(db, p)
         soup = BeautifulSoup(html, "html.parser")
-        require(soup.html and soup.html.get("data-we-layout-revision") == "3", "Review layout revision not active")
+        require(soup.html and soup.html.get("data-we-layout-revision") == "4", "Review layout revision not active")
         require(not soup.select(".pin-spacer"), "Captured pin spacer remains: " + title)
         require(len(benefit_cards(soup)) == 4, "Missing benefit cards: " + title)
         pages.append({"id": p.id, "title": title, "status": p.status,
                       "removed_pin_spacers": int(soup.html.get("data-we-removed-pin-spacers", "0")),
                       "html": html})
-    return {"operation":"inspect_review_layout","pages":pages}
+    return {"operation":"inspect_review_layout","layout_revision":4,"pages":pages}
 
 
 def apply_request(db, request):
