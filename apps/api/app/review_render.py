@@ -54,7 +54,39 @@ html.we-review-static body #benefits .bn-photo,html.we-review-static body #benef
 html.we-review-static body #benefits .bn-points{grid-template-columns:minmax(0,1fr)!important}
 html.we-review-static body .other-pill-grid{grid-template-columns:minmax(0,1fr)!important}
 }
+
+/* The captured Solution template has the newer four-row benefit design. */
+html.we-review-static body #benefits .bn-rows{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:auto!important;gap:24px!important;height:auto!important;min-height:0!important;max-width:100%!important;overflow:visible!important}
+html.we-review-static body #benefits .bn-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,.65fr)!important;gap:24px!important;position:relative!important;inset:auto!important;transform:none!important;translate:none!important;opacity:1!important;visibility:visible!important;clip-path:none!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;align-items:center!important;padding:24px!important}
+html.we-review-static body #benefits .bn-row-text{grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;opacity:1!important;transform:none!important;overflow-wrap:anywhere}
+html.we-review-static body #benefits .bn-row-heading{font-size:21px!important;line-height:1.3!important;white-space:normal!important}
+html.we-review-static body #benefits .bn-row-photo{grid-column:2!important;grid-row:1!important;min-width:0!important;width:100%!important;max-width:100%!important;height:clamp(180px,20vw,260px)!important;margin:0!important;overflow:hidden!important;opacity:1!important;transform:none!important}
+html.we-review-static body #benefits .bn-row-photo img{width:100%!important;height:100%!important;object-fit:cover!important;max-width:100%!important}
+html.we-review-static body #benefits .bn-row-points{grid-template-columns:repeat(2,minmax(0,1fr))!important;opacity:1!important;transform:none!important;height:auto!important}
+html.we-review-static body #benefits .bn-row-num{display:none!important}
+@media(max-width:760px){
+html.we-review-static body #benefits .bn-row{grid-template-columns:minmax(0,1fr)!important;padding:18px!important;gap:16px!important}
+html.we-review-static body #benefits .bn-row-photo{grid-column:1!important;grid-row:2!important;height:190px!important}
+html.we-review-static body #benefits .bn-row-points{grid-template-columns:minmax(0,1fr)!important}
+}
 """
+
+
+def benefit_cards(soup):
+    """Both approved Benefits layouts; do not count animation clone faces."""
+    return soup.select("#benefits .bn-stage > article.bn-card, #benefits .bn-rows > article.bn-row")
+
+
+def benefit_heading(card):
+    return card.select_one(".bn-title, .bn-row-heading")
+
+
+def benefit_description(card):
+    return card.select_one(".bn-text, .bn-row-desc")
+
+
+def benefit_image(card):
+    return card.select_one(".bn-photo img[src], .bn-row-photo img[src]")
 
 
 def _set_options(soup, select, labels, selected):
@@ -86,15 +118,15 @@ def render_review_page(html, category, title):
     benefits = soup.select_one("#benefits")
     if benefits:
         benefits["class"] = [x for x in benefits.get("class", []) if x != "bn-live"]
-        for card in benefits.select(".bn-card"):
-            heading = card.select_one(".bn-title")
+        for card in benefit_cards(soup):
+            heading = benefit_heading(card)
             if heading:
                 name = heading.get_text(" ", strip=True)
                 card["aria-label"] = name
                 back = card.select_one(".bn-back")
                 if back:
                     back["data-title"] = name
-                image = card.select_one(".bn-photo img")
+                image = benefit_image(card)
                 if image:
                     image["alt"] = "Workspace by Emlen — " + name
     for item in soup.select(".faq-list article.faq-item"):

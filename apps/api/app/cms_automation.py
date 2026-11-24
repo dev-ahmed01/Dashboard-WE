@@ -249,6 +249,7 @@ REVIEW_OTHER_SERVICES = {
 def audit_review_drafts(db, request):
     from bs4 import BeautifulSoup
     from .repeaters import DESIGN_KEY, read_design
+    from .review_render import benefit_cards, benefit_heading, benefit_description, benefit_image
     require(type(request.get("dry_run")) is bool, "Explicit dry_run is required")
     dry_run = request["dry_run"]
     rows = []
@@ -286,9 +287,9 @@ def audit_review_drafts(db, request):
         candidate = SimpleNamespace(template_id=p.template_id, template_snapshot=p.template_snapshot, title=p.title, values=values)
         soup = BeautifulSoup(compiled(db, candidate), "html.parser")
         require(soup.find(id="we-review-static-layout") is not None, "Review layout not active")
-        cards = soup.select("#benefits .bn-stage > .bn-card")
-        require(len(cards) == 4, "Expected four benefit cards: " + title)
-        require(all(card.select_one(".bn-title") and card.select_one(".bn-text") and card.select_one(".bn-photo img[src]") for card in cards),
+        cards = benefit_cards(soup)
+        require(len(cards) == 4, f"Expected four benefit cards: {title} (found {len(cards)})")
+        require(all(benefit_heading(card) and benefit_description(card) and benefit_image(card) for card in cards),
                 "Benefit content missing: " + title)
         faq = soup.select(".faq-list details")
         require(len(faq) == 5 and all(x.select_one("summary") and x.select_one(".faq-answer") for x in faq),
@@ -300,7 +301,7 @@ def audit_review_drafts(db, request):
             require(all(x.get("href") == "#enquiry" or x.get("href") in {"/"+p.slug+"/" for p in targets.values()} for x in shown),
                     "Invalid service destination")
         rows.append({"id": p.id, "title": title, "benefits": len(cards), "faq_entries": len(faq),
-                     "benefit_titles": [x.select_one(".bn-title").get_text(" ", strip=True) for x in cards],
+                     "benefit_titles": [benefit_heading(x).get_text(" ", strip=True) for x in cards],
                      "related_services_before": len([x for x in before.select(".other-pill-grid > a") if "display:none!important" not in x.get("style", "")]),
                      "related_services_after": len(shown), "solution_options": len(soup.select(".sol-grid > li")),
                      "form_options": [x.get_text(" ", strip=True) for x in soup.select("form select#officeSelect option, form select#interest option")],
