@@ -829,6 +829,8 @@ def compiled(db,p:Page,section_id=None):
     output=render(source,t['fields'],p.values or {},globals_dict(db),section_id)
     if t.get('category')=='Solution':
         output=select_solution_office(output,getattr(p,'title',''))
+    from .review_render import render_review_page
+    output=render_review_page(output,t.get('category'),getattr(p,'title',''))
     # Media selection in page-variable image fields retains the actual media
     # record's alternative text. Published HTML stays immutable after snapshot.
     if '/api/media/' in output:

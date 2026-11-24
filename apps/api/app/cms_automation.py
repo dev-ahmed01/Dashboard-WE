@@ -232,12 +232,99 @@ def curate_review_drafts(db, request):
     return result
 
 
+
+# Second pass: restore the broader service catalogue without restoring any
+# archived standalone landing pages. Enquiry-only services never link to an
+# archived URL. Only the three named category drafts can receive this patch.
+REVIEW_OTHER_SERVICES = {
+    "Office Space": ["Dedicated Desk", "Coworking Access Plans", "Day Pass", "Meeting Rooms",
+                     "Training Rooms", "Business Address", "Registration Address", "Day Office", "Event Space", "Enterprise & GCC"],
+    "Coworking": ["One Person Office", "Small Team Office", "Large Team Office", "Full Floor Office",
+                  "Day Office", "Meeting Rooms", "Training Rooms", "Business Address", "Registration Address", "Event Space"],
+    "Virtual Office": ["One Person Office", "Small Team Office", "Large Team Office", "Dedicated Desk",
+                       "Coworking Access Plans", "Day Pass", "Meeting Rooms", "Training Rooms", "Day Office", "Event Space"],
+}
+
+
+def audit_review_drafts(db, request):
+    from bs4 import BeautifulSoup
+    from .repeaters import DESIGN_KEY, read_design
+    require(type(request.get("dry_run")) is bool, "Explicit dry_run is required")
+    dry_run = request["dry_run"]
+    rows = []
+    updates = []
+    targets = {}
+    for title, (tid, slug) in REVIEW_KEEP.items():
+        pid = db.scalar(select(Page.id).where(Page.slug == slug, *draft_filter()))
+        require(pid is not None, "Required review draft missing: " + title)
+        p = get_draft(db, {"page_id": pid}, lock=True)
+        require(p.title == title and p.template_id == tid, "Review draft identity changed: " + title)
+        targets[title] = p
+    for title, p in targets.items():
+        t = page_template_with_repeaters(db, p)
+        values = p.values or {}
+        patch = {}
+        before = BeautifulSoup(compiled(db, p), "html.parser")
+        if title in REVIEW_OTHER_SERVICES:
+            groups = {g["id"]: g for sec in t["sections"] for g in sec.get("repeaters", [])}
+            group = groups.get("section_3_repeat_1")
+            require(group and len(group["items"]) == 10, "Unexpected other services mapping")
+            design = read_design(values)
+            items = design.setdefault("items", {})
+            for item, label in zip(group["items"], REVIEW_OTHER_SERVICES[title]):
+                items.setdefault(item["id"], {})["hidden"] = False
+                name = "Register Business" if label == "Registration Address" else label
+                dest = "/" + targets[name].slug + "/" if name in targets else "#enquiry"
+                a, b = item["field_keys"][:2]
+                patch[a], patch[b] = label, dest
+            patch["section_3_field_1"] = "Looking for another workspace solution?"
+            patch, _ = validate_patch({"values": patch}, t)
+            patch[DESIGN_KEY] = json.dumps(design, ensure_ascii=True)
+            changes = validated_page_changes(p, PageUpdate(edit_version=p.edit_version, values=patch), db)
+            values = changes["values"]
+            updates.append((p, values))
+        candidate = SimpleNamespace(template_id=p.template_id, template_snapshot=p.template_snapshot, title=p.title, values=values)
+        soup = BeautifulSoup(compiled(db, candidate), "html.parser")
+        require(soup.find(id="we-review-static-layout") is not None, "Review layout not active")
+        cards = soup.select("#benefits .bn-stage > .bn-card")
+        require(len(cards) == 4, "Expected four benefit cards: " + title)
+        require(all(card.select_one(".bn-title") and card.select_one(".bn-text") and card.select_one(".bn-photo img[src]") for card in cards),
+                "Benefit content missing: " + title)
+        faq = soup.select(".faq-list details")
+        require(len(faq) == 5 and all(x.select_one("summary") and x.select_one(".faq-answer") for x in faq),
+                "Expected five usable FAQ entries: " + title)
+        services = soup.select(".other-pill-grid > a")
+        shown = [x for x in services if "display:none!important" not in x.get("style", "")]
+        if title in REVIEW_OTHER_SERVICES:
+            require(len(shown) == 10, "Expected ten related service cards: " + title)
+            require(all(x.get("href") == "#enquiry" or x.get("href") in {"/"+p.slug+"/" for p in targets.values()} for x in shown),
+                    "Invalid service destination")
+        rows.append({"id": p.id, "title": title, "benefits": len(cards), "faq_entries": len(faq),
+                     "benefit_titles": [x.select_one(".bn-title").get_text(" ", strip=True) for x in cards],
+                     "related_services_before": len([x for x in before.select(".other-pill-grid > a") if "display:none!important" not in x.get("style", "")]),
+                     "related_services_after": len(shown), "solution_options": len(soup.select(".sol-grid > li")),
+                     "form_options": [x.get_text(" ", strip=True) for x in soup.select("form select#officeSelect option, form select#interest option")],
+                     "status": p.status})
+    if dry_run:
+        db.rollback()
+    else:
+        for p, values in updates:
+            p.values = values
+            p.edit_version += 1
+            p.updated_at = utcnow()
+            db.add(AuditLog(actor_id=None, action="cms_review_restore_other_services", subject=str(p.id),
+                            details={"channel": "restricted_github_ssh", "count": 10}))
+        db.commit()
+    return {"operation":"audit_review_drafts","dry_run":dry_run,"pages":rows,"categories_updated":len(updates)}
+
+
 def apply_request(db, request):
     require(isinstance(request, dict), "Request must be a JSON object")
     op = request.get("operation")
     schemas = {
         "list": {"operation"},
         "curate_three_category_review": {"operation", "dry_run"},
+        "audit_review_drafts": {"operation", "dry_run"},
         "inspect": {"operation", "page_id"},
         "inspect_template": {"operation", "template_id"},
         "update": {"operation", "page_id", "edit_version", "values", "seo", "dry_run"},
@@ -245,6 +332,8 @@ def apply_request(db, request):
     }
     require(isinstance(op, str) and op in schemas, "Unsupported operation")
     require(set(request).issubset(schemas[op]), "Unexpected request fields")
+    if op == "audit_review_drafts":
+        return audit_review_drafts(db, request)
     if op == "curate_three_category_review":
         return curate_review_drafts(db, request)
     if op == "list":
