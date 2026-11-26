@@ -45,7 +45,9 @@ def test_cross_template_import_api(client):
     assert len({f['key'] for f in edited['fields']})==len(edited['fields'])
     assert any(f['default']=='Distinct content' and f['mode']=='page' for f in edited['fields'])
     assert 'Distinct content' in client.get(f"/api/templates/{target['id']}/preview",headers=auth).text
-    assert client.get('/api/templates',headers=auth).json()[1]['version']==donor['version']
+    unchanged=next(t for t in client.get('/api/templates',headers=auth).json() if t['id']==donor['id'])
+    assert unchanged['version']==donor['version']
+    assert unchanged['sections']==donor['sections'] and unchanged['fields']==donor['fields']
 
 def test_reorder_section_html_and_snapshot(client):
     auth=login(client)
