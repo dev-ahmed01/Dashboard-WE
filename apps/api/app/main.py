@@ -26,6 +26,7 @@ from .models import User, Template, Page, Publication, SharedContent, Redirect, 
 from .security import admin, current_user, issue_token, verify_password, seed_admin
 from .storage import ObjectStore
 from .template_engine import extract, render, SAFE_URL, SAFE_CLASS, is_safe_link, is_safe_icon_value, HEADINGS
+from .section_editor import edit_sections
 from .repeaters import overlay_metadata, PREFIX as REPEAT_PREFIX, VARIANT_PREFIX, MAX_ADDITIONS, VARIANTS, DESIGN_KEY, validate_design
 from .seo import metadata_html, safe_slug
 from .solution_mapping import solution_mapping, select_solution_office
@@ -479,6 +480,47 @@ def save_mapping(template_id:int,payload:TemplateMapping,db:Session=Depends(get_
     t.approved=payload.approved
     t.version+=1
     audit(db,user,'mapping_update',str(t.id),{'approved':t.approved})
+    db.commit()
+    return template_json(t)
+
+
+class SectionEdit(BaseModel):
+    operation: str = Field(pattern='^(delete|import|reorder)$')
+    section_id: str = ''
+    ordered_section_ids: list[str] | None = None
+    source_template_id: int | None = None
+    version: int
+
+
+@app.post('/api/templates/{template_id}/sections')
+def edit_template_sections(template_id:int,payload:SectionEdit,db:Session=Depends(get_db),user:User=Depends(admin)):
+    t=db.scalar(select(Template).where(Template.id==template_id).with_for_update())
+    if not t or t.is_deleted:fail(404,'Template not found')
+    if t.version!=payload.version:fail(409,'Template changed. Reload before editing sections.')
+    store=ObjectStore()
+    donor=None
+    if payload.operation=='import':
+        source=get_template(db,payload.source_template_id) if payload.source_template_id else None
+        if not source or source.is_deleted or source.id==t.id or source.category==t.category:
+            fail(422,'Select a section from another page template')
+        donor=(store.get(source.object_key).decode('utf-8'),source.sections,source.fields)
+    try:
+        updated,sections,fields=edit_sections(store.get(t.object_key).decode('utf-8'),
+            t.sections,t.fields,payload.operation,payload.section_id,donor,payload.ordered_section_ids)
+    except (ValueError,KeyError) as exc:
+        fail(422,str(exc))
+    for field in fields:
+        name=next(s['name'] for s in sections if s['id']==field['section_id'])
+        if read_only_section(t.category,name):
+            field['mode']='static';field['global_key']=None
+    # Preserve the official-template lineage so login does not re-seed it.
+    code=next((item.code for item in OFFICIAL_PAGES
+               if t.object_key.startswith(f'templates/official-workspace-{item.code}-')),None)
+    key=(f'templates/official-workspace-{code}-refresh-{uuid4().hex}.html' if code
+         else f'templates/{uuid4().hex}.html')
+    store.put(key,updated.encode('utf-8'),'text/html')
+    t.object_key=key;t.sections=sections;t.fields=fields;t.version+=1
+    audit(db,user,'template_section_'+payload.operation,str(t.id),{'section_id':payload.section_id,'source_template_id':payload.source_template_id,'ordered_section_ids':payload.ordered_section_ids})
     db.commit()
     return template_json(t)
 

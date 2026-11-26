@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, FileCode2, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3, Download} from 'lucide-react'
+import {GripVertical, ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3, Download} from 'lucide-react'
 import SeoSettings from './SeoSettings'
 import AddPageWorkspace from './AddPageWorkspace'
 
@@ -30,7 +30,7 @@ type Template={id:number;name:string;category:string;approved:boolean;version:nu
 type SEO={seo_title:string;description:string;noindex:boolean;nofollow:boolean;noarchive?:boolean;noimageindex?:boolean;nosnippet?:boolean;canonical_override:string;og_title?:string;og_description?:string}
 type Page={id:number;template_id:number;template_name?:string;template_category?:string;title:string;slug:string;values:Record<string,string>;seo:SEO;status:'draft'|'published';published_version:number;edit_version:number;updated_at:string;has_unpublished_changes:boolean;archived:boolean}
 type Nav='Category'|'Solution'|'Property'|'Templates'|'Saved Drafts'|'Published'|'Archived'|'Shared Content'|'SEO'|'Team Access'|'Media Library'
-type Tab='All Pages'|'Add Page'|'Upload Template'
+type Tab='All Pages'|'Add Page'|'Edit Template'
 type ModuleNav='Category'|'Solution'|'Property'
 const MODULE_INFO:Record<ModuleNav,{category:string;subtitle:string;source:string;sections:string[]}>={
   Category:{category:'Solution Category',
@@ -268,7 +268,12 @@ export default function App(){
   const [,setUploadCategory]=useState('Solution Category')
   const [templateFile,setTemplateFile]=useState<File|null>(null)
   const [mappingId,setMappingId]=useState<number|null>(null)
-  const [openMappingSection,setOpenMappingSection]=useState<string|null>(null)
+  const [openMappingSection,setOpenMappingSection]=useState<string|null>('')
+  const [dragSection,setDragSection]=useState<string|null>(null)
+  const [dropSection,setDropSection]=useState<{id:string;after:boolean}|null>(null)
+  const [importSource,setImportSource]=useState<number|null>(null)
+  const [importSection,setImportSection]=useState('')
+  const [templatePreviewOpen,setTemplatePreviewOpen]=useState(false)
   const [sectionModeBackups,setSectionModeBackups]=useState<Record<string,Record<string,{mode:Mode;global_key:string|null}>>>({})
   const [preview,setPreview]=useState<string|null>(null)
   const [canvasMode,setCanvasMode]=useState(false)
@@ -372,8 +377,10 @@ export default function App(){
       .catch(()=>{if(active)setSelectedTemplatePreview('')})
     return()=>{active=false}
   },[selectedTemplate])
-  useEffect(()=>{setOpenMappingSection(null);setSectionModeBackups({})},[mappingId])
-  useEffect(()=>{if(!mappingId)return;let active=true;const query=focusField?'?focus_field='+encodeURIComponent(focusField):'';html(`/api/templates/${mappingId}/preview${query}`).then(r=>{if(active)setMapPreview(r)}).catch(e=>{if(active)showError(e)});return()=>{active=false}},[mappingId,focusField])
+  useEffect(()=>{setOpenMappingSection('');setSectionModeBackups({});setImportSource(null);setImportSection('');setTemplatePreviewOpen(false)},[mappingId])
+  useEffect(()=>{if(tab!=='Edit Template'||!isModuleNav(nav))return;const choices=templates.filter(t=>moduleOfCategory(t.category)===nav);if(!choices.some(t=>t.id===mappingId)){setUploaded(null);setMappingId(choices.find(t=>t.approved)?.id??choices[0]?.id??null)}},[tab,nav,templates,mappingId])
+  const mappingVersion=templates.find(t=>t.id===mappingId)?.version
+  useEffect(()=>{if(!mappingId)return;let active=true;const query=focusField?'?focus_field='+encodeURIComponent(focusField):'';html(`/api/templates/${mappingId}/preview${query}`).then(r=>{if(active)setMapPreview(r)}).catch(e=>{if(active)showError(e)});return()=>{active=false}},[mappingId,focusField,mappingVersion])
 
   async function refresh(){
     const [t,p]=await Promise.all([api<Template[]>('/api/templates'),api<Page[]>('/api/pages')])
@@ -436,6 +443,28 @@ export default function App(){
     setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u)
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
+  async function changeTemplateSection(t:Template,operation:'delete'|'import'|'reorder',sectionId:string,sourceId?:number,orderedIds?:string[]){
+    if(operation==='delete'&&!window.confirm('Delete this section from the template? Existing pages will remain unchanged.'))return
+    await action(async()=>{
+      const updated=await api<Template>('/api/templates/'+t.id+'/sections',{method:'POST',body:json({operation,section_id:sectionId,source_template_id:sourceId,ordered_section_ids:orderedIds,version:t.version})})
+      // Retain unsaved mapping changes for the surviving fields.
+      const previous=new Map(t.fields.map(f=>[f.key,f]))
+      const merged={...updated,approved:t.approved,fields:updated.fields.map(f=>previous.get(f.key)||f)}
+      setTemplates(items=>items.map(item=>item.id===t.id?merged:item));setUploaded(merged)
+      setOpenMappingSection('');setImportSection('')
+      notify(operation==='delete'?'Section deleted':operation==='import'?'Section imported':'Section order saved')
+    })
+  }
+  function moveTemplateSection(t:Template,from:string,to:string,after:boolean){
+    setDragSection(null);setDropSection(null)
+    if(busy||from===to)return
+    const ids=t.sections.map(s=>s.id).filter(id=>id!==from)
+    const at=ids.indexOf(to)
+    if(at<0||!t.sections.some(s=>s.id===from))return
+    ids.splice(at+(after?1:0),0,from)
+    if(ids.every((id,i)=>id===t.sections[i].id))return
+    void changeTemplateSection(t,'reorder','',undefined,ids)
+  }
   function openDeleteDialog(target:Template|'all'){
     setDeletingTemplate(target);setDeleteError('')
   }
@@ -1567,7 +1596,7 @@ export default function App(){
       <h1>{nav}</h1>
     </div>
     <div className={'tabs category-tabs '+(user.role==='admin'?'':'category-tabs-two')} role="tablist" aria-label={nav+' views'}>
-      {(['All Pages','Add Page',...(user.role==='admin'?['Upload Template' as const]:[])] as Tab[]).map(name=>
+      {(['All Pages','Add Page',...(user.role==='admin'?['Edit Template' as const]:[])] as Tab[]).map(name=>
         <button key={name} type="button" role="tab" aria-selected={tab===name} className={tab===name?'active':''} onClick={()=>setTab(name)}>{name}</button>
       )}
     </div>
@@ -1611,7 +1640,7 @@ export default function App(){
           <strong>{pageSearch||filter!=='All'?'No matching pages':'No pages yet'}</strong>
           {pageSearch||filter!=='All'
             ?<button type="button" className="outline" onClick={()=>{setPageSearch('');setFilter('All')}}>Clear filters</button>
-            :<button type="button" className="primary" onClick={()=>setTab(user.role==='admin'?'Upload Template':'Add Page')}>{user.role==='admin'?'Upload a template':'Add a page'} <ArrowUpRight size={16}/></button>}
+            :<button type="button" className="primary" onClick={()=>setTab(user.role==='admin'?'Edit Template':'Add Page')}>{user.role==='admin'?'Edit template':'Add a page'} <ArrowUpRight size={16}/></button>}
         </div>}
       </div>
     </div>}
@@ -1621,52 +1650,49 @@ export default function App(){
       busy={busy} isAdmin={user.role==='admin'} onNameChange={setNewName}
       onSelect={setSelectedTemplate} onSubmit={createPage}
       onCancel={()=>{setNewName('');setSelectedTemplate(null);setTab('All Pages')}}
-      onUpload={()=>setTab('Upload Template')}/>}
+      onUpload={()=>setTab('Edit Template')}/>}
 
-    {tab==='Upload Template'&&user.role==='admin'&&<div className="category-upload-screen" role="tabpanel">
-      <div className={'category-upload-dropzone '+(templateDragActive?'drag-active':'')} onDragOver={e=>{e.preventDefault();setTemplateDragActive(true)}} onDragLeave={e=>{e.preventDefault();setTemplateDragActive(false)}} onDrop={e=>{e.preventDefault();setTemplateDragActive(false);chooseTemplateFile(e.dataTransfer.files?.[0]||null)}}>
-        <UploadCloud size={29}/>
-        <strong>{templateFile?templateFile.name:'Upload an HTML template'}</strong>
-        <span>Drag and drop an HTML file here, or</span>
-        <label className="category-upload-browse">Browse files<input type="file" accept=".html,text/html" onChange={e=>chooseTemplateFile(e.target.files?.[0]||null)}/></label>
-        <small>HTML (.html) · Maximum 8 MB</small>
+    {tab==='Edit Template'&&user.role==='admin'&&<div className="we-template-editor" role="tabpanel">
+      <div className="we-template-toolbar">
+        <label>Template<select aria-label="Template" value={mapping?.id||''} onChange={e=>{setUploaded(null);setMappingId(Number(e.target.value));setFocusField('')}}>
+          {!moduleTemplates.length&&<option value="">No templates</option>}
+          {moduleTemplates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+        </select></label>
+        {mapping&&<div className="we-template-toolbar-actions">
+          <button className="outline compact" type="button" onClick={()=>setTemplatePreviewOpen(v=>!v)}><Eye size={16}/> {templatePreviewOpen?'Hide preview':'Preview'}</button>
+          <button className="primary" type="button" disabled={busy} onClick={()=>saveMapping(mapping)}><Save size={16}/> Save changes</button>
+        </div>}
       </div>
-      <div className="category-upload-fields">
-        <label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label>
-        <label>Category<select value={MODULE_INFO[activeModule].category} disabled><option>{MODULE_INFO[activeModule].category}</option></select></label>
-        <button type="button" className="primary" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>
-      </div>
-      <div className="category-mapping-layout mapping-area">
-        <section className="category-mapping-card category-mapping-fullwidth">
-          <div className="category-panel-header category-fullwidth-header">
-            <div><h2>Section Mapping</h2><p>{mapping?(mapping.sections.length+' detected sections · '+mapping.fields.length+' field candidates'):'Upload an HTML template to inspect all sections.'}</p></div>
-            {mapping&&<button type="button" className="outline compact" disabled={busy} onClick={()=>redetectTemplate(mapping)}>Re-detect sections</button>}
-          </div>
-          {mapping?<div className="category-expanded-sections">
-            {mapping.sections.map((sec,i)=>{
-              const fields=mapping.fields.filter(f=>f.section_id===sec.id)
-              const isReadOnly=mapping.category==='Property'&&/testimonials|reviews/i.test(sec.name)
-              const isStatic=fields.every(f=>f.mode==='static')
-              const isOpen=(openMappingSection===null?mapping.sections[0]?.id:openMappingSection)===sec.id
-              const variableCount=fields.filter(f=>f.mode==='page').length
-              const sharedCount=fields.filter(f=>f.mode==='global').length
-              return <section key={sec.id} className={'category-section-card '+(isOpen?'is-open':'')+(isStatic?' is-static':'')}>
-                <div className="category-section-card-header">
-                  <span className="category-section-number">{String(i+1).padStart(2,'0')}</span>
-                  <div className="category-section-summary">
-                    <h3>{sec.name}</h3>
-                    <small>{fields.length} fields <span aria-hidden="true">·</span> {isStatic?'Static, locked':variableCount+' variable'+(sharedCount?' · '+sharedCount+' shared':'')}</small>
-                  </div>
-                  <label className="category-static-toggle">
-                    <span>Static</span>
-                    <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic||isReadOnly} disabled={!fields.length||isReadOnly} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
-                    <span className="category-static-track" aria-hidden="true"/>
-                  </label>
-                  <button type="button" className="category-section-expand" aria-expanded={isOpen} aria-controls={'section-map-'+sec.id} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>
-                    {isOpen?'Show less':'View more'}<ChevronRight size={16} aria-hidden="true"/>
-                  </button>
-                </div>
-                {isOpen&&<div id={'section-map-'+sec.id} className="category-section-card-content">
+      {mapping&&<>
+        <div className="we-template-sections-heading">
+          <h2>Sections <small>({mapping.sections.length})</small></h2>
+          <label className="approve"><input type="checkbox" checked={mapping.approved} onChange={e=>setTemplates(items=>items.map(t=>t.id===mapping.id?{...t,approved:e.target.checked}:t))}/> Approved</label>
+        </div>
+        <div className="category-expanded-sections we-template-sections">
+          {mapping.sections.map((sec,i)=>{
+            const fields=mapping.fields.filter(f=>f.section_id===sec.id)
+            const isReadOnly=(mapping.category==='Property'&&/testimonials|reviews/i.test(sec.name))||(['Solution','Solution Category'].includes(mapping.category)&&/consultation|why us/i.test(sec.name))
+            const isStatic=isReadOnly||fields.every(f=>f.mode==='static')
+            const isOpen=openMappingSection===sec.id
+            return <section key={sec.id} className={'category-section-card '+(isOpen?'is-open':'')+(isStatic?' is-static':'')+(dragSection===sec.id?' we-section-dragging':'')+(dropSection?.id===sec.id&&dragSection!==sec.id?(dropSection.after?' we-section-drop-after':' we-section-drop-before'):'')}
+              onDragOver={e=>{if(!dragSection||busy)return;e.preventDefault();e.dataTransfer.dropEffect='move';const bounds=e.currentTarget.getBoundingClientRect();setDropSection({id:sec.id,after:e.clientY>bounds.top+bounds.height/2})}}
+              onDrop={e=>{if(!dragSection||busy)return;e.preventDefault();const bounds=e.currentTarget.getBoundingClientRect();moveTemplateSection(mapping,dragSection,sec.id,e.clientY>bounds.top+bounds.height/2)}}
+              >
+              <div className="category-section-card-header we-template-section-row">
+                <button type="button" className="we-template-drag" draggable={!busy} disabled={busy} aria-label={'Reorder section '+(i+1)+': '+sec.name} title="Drag to reorder · use Up/Down keys"
+                  onDragStart={e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',sec.id);setDragSection(sec.id)}}
+                  onDragEnd={()=>{setDragSection(null);setDropSection(null)}}
+                  onKeyDown={e=>{if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;e.preventDefault();const next=mapping.sections[i+(e.key==='ArrowUp'?-1:1)];if(next)moveTemplateSection(mapping,sec.id,next.id,e.key==='ArrowDown')}}><GripVertical size={18}/></button>
+                <span className="category-section-number">{String(i+1).padStart(2,'0')}</span>
+                <button type="button" className="we-template-section-name" aria-expanded={isOpen} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>{sec.name.replace(/^\s*\d+[A-Za-z]?\s*[·.:-]\s*/,'')}<ChevronRight size={16}/></button>
+                <label className="category-static-toggle we-template-toggle">
+                  <span>{isStatic?'Static':'Editable'}</span>
+                  <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic} disabled={busy||!fields.length||isReadOnly} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>
+                  <span className="category-static-track" aria-hidden="true"/>
+                </label>
+                <button className="we-template-delete" type="button" title={'Delete '+sec.name} aria-label={'Delete '+sec.name} disabled={busy||mapping.sections.length<=1} onClick={()=>changeTemplateSection(mapping,'delete',sec.id)}><Trash2 size={17}/></button>
+              </div>
+              {isOpen&&<div id={'section-map-'+sec.id} className="category-section-card-content">
                   <div className="category-map-table">
                     <div className="category-map-table-head"><span>Detected field</span><span>Current content / link</span><span>Heading level</span><span>Behavior</span></div>
                     {fields.map(f=><div key={f.key} className="category-map-row map-field">
@@ -1703,36 +1729,44 @@ export default function App(){
                     </div>)}
                     {!fields.length&&<p className="category-no-fields">No detected fields in this section.</p>}
                   </div>
-                  {(isStatic||isReadOnly)&&<div className="category-locked-note"><LockKeyhole size={14}/>{isReadOnly?'Testimonials are permanently read-only.': 'This section is locked. Turn off Static to adjust links, heading levels or field behavior.'}</div>}
-                </div>}
-              </section>
-            })}
-          </div>:<div className="category-upload-placeholder"><LayoutTemplate size={23}/><p>Upload or select an HTML template to detect all sections and editable fields.</p></div>}
-        </section>
-        <section className="category-mapping-card category-preview-card category-preview-below">
-          <div className="category-panel-header"><div><h2>Visual Preview</h2><p>Full template preview · scripts disabled</p></div></div>
-          {mapping?<div className="category-browser-frame"><div className="category-browser-bar"><span/><span/><span/><div>{mapping.name}</div></div><iframe title="Mapped template preview" sandbox="" srcDoc={mapPreview}/></div>
-          :<div className="category-upload-placeholder category-preview-placeholder"><Eye size={25}/><p>The complete uploaded design will appear here after detection.</p></div>}
-        </section>
-      </div>
-      {mapping&&<div className="category-map-actions">
-        <label className="approve"><input type="checkbox" checked={mapping.approved} onChange={e=>setTemplates(items=>items.map(t=>t.id===mapping.id?{...t,approved:e.target.checked}:t))}/> Approve template</label>
-        <button className="primary" type="button" disabled={busy} onClick={()=>saveMapping(mapping)}>Save template configuration <ArrowUpRight size={17}/></button>
-      </div>}
-      <div className="category-uploaded-list">
-        <div className="category-uploaded-heading">
-          <h2>Uploaded Templates <span>({moduleTemplates.length})</span></h2>
-          {moduleTemplates.length>0&&<button type="button" className="outline category-delete-templates" disabled={busy} onClick={()=>openDeleteDialog('all')}><Trash2 size={15}/> Delete all templates</button>}
+              </div>}
+            </section>
+          })}
         </div>
-        <div className="category-uploaded-table">
-          {moduleTemplates.map(t=><div className={'category-uploaded-row '+(mappingId===t.id?'selected':'')} key={t.id}>
-            <div className="category-uploaded-file"><FileCode2 size={20}/><div><strong>{t.name}</strong><small>{t.category} · {t.sections.length} sections</small></div></div>
-            <span className={'category-status '+(t.approved?'category-approved':'category-draft')}>{t.approved?'Approved':'Needs mapping'}</span>
-            <div className="category-template-row-actions"><button type="button" className="outline" onClick={()=>{setMappingId(t.id);setFocusField('');setUploaded(t)}}>Configure <ArrowUpRight size={15}/></button><button type="button" className="category-template-delete-one" onClick={()=>openDeleteDialog(t)} disabled={busy} aria-label={'Delete template '+t.name} title={'Delete '+t.name}><Trash2 size={15}/> Delete</button></div>
-          </div>)}
-          {!moduleTemplates.length&&<div className="category-empty category-empty-templates"><strong>No templates uploaded yet</strong></div>}
+        <div className="we-template-import">
+          <h2>Import section</h2>
+          <div className="we-template-import-controls">
+            <label>From template<select value={importSource||''} onChange={e=>{setImportSource(Number(e.target.value)||null);setImportSection('')}}>
+              <option value="">Select page template</option>
+              {templates.filter(t=>t.id!==mapping.id&&moduleOfCategory(t.category)!==activeModule).map(t=><option key={t.id} value={t.id}>{moduleOfCategory(t.category)} — {t.name}</option>)}
+            </select></label>
+            <label>Section<select disabled={!importSource} value={importSection} onChange={e=>setImportSection(e.target.value)}>
+              <option value="">Select section</option>
+              {(templates.find(t=>t.id===importSource)?.sections||[]).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></label>
+            <button className="outline" type="button" disabled={busy||!importSource||!importSection} onClick={()=>changeTemplateSection(mapping,'import',importSection,importSource||undefined)}><Plus size={16}/> Import</button>
+          </div>
         </div>
+        {templatePreviewOpen&&<div className="category-browser-frame we-template-preview"><iframe title="Mapped template preview" sandbox="" srcDoc={mapPreview}/></div>}
+      </>}
+      <details className="we-template-advanced"><summary>Template management</summary>
+        <div className="we-template-toolbar-actions">
+          {mapping&&<button type="button" className="outline compact" disabled={busy} onClick={()=>redetectTemplate(mapping)}>Re-detect sections</button>}
+          {mapping&&<button type="button" className="outline compact" disabled={busy} aria-label={'Delete template '+mapping.name} onClick={()=>openDeleteDialog(mapping)}><Trash2 size={15}/> Delete template</button>}
+        </div>
+      <div className={'category-upload-dropzone '+(templateDragActive?'drag-active':'')} onDragOver={e=>{e.preventDefault();setTemplateDragActive(true)}} onDragLeave={e=>{e.preventDefault();setTemplateDragActive(false)}} onDrop={e=>{e.preventDefault();setTemplateDragActive(false);chooseTemplateFile(e.dataTransfer.files?.[0]||null)}}>
+        <UploadCloud size={29}/>
+        <strong>{templateFile?templateFile.name:'Upload an HTML template'}</strong>
+        <span>Drag and drop an HTML file here, or</span>
+        <label className="category-upload-browse">Browse files<input type="file" accept=".html,text/html" onChange={e=>chooseTemplateFile(e.target.files?.[0]||null)}/></label>
+        <small>HTML (.html) · Maximum 8 MB</small>
       </div>
+      <div className="category-upload-fields">
+        <label>Template name<input value={uploadName} onChange={e=>setUploadName(e.target.value)} placeholder="e.g. Managed Office Category"/></label>
+        <label>Category<select value={MODULE_INFO[activeModule].category} disabled><option>{MODULE_INFO[activeModule].category}</option></select></label>
+        <button type="button" className="primary" onClick={uploadTemplate} disabled={!templateFile||busy}>Detect and map sections <ArrowUpRight size={17}/></button>
+      </div>
+      </details>
     </div>}
   </div>}
 
