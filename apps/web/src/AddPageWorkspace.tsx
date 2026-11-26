@@ -70,7 +70,7 @@ export default function AddPageWorkspace({
           <LayoutTemplate size={24}/>
           <strong>No approved templates yet</strong>
           <p>Approve a template first to create a page.</p>
-          {isAdmin&&<button type="button" className="outline compact" onClick={onUpload}>Upload template <ArrowUpRight size={14}/></button>}
+          {isAdmin&&<button type="button" className="outline compact" onClick={onUpload}>Edit template <ArrowUpRight size={14}/></button>}
         </div>}
       </div>
 
