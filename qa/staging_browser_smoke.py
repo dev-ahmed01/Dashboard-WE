@@ -81,7 +81,8 @@ def run():
         assert tabs.count() == 3
         widths = [tabs.nth(i).bounding_box()["width"] for i in range(3)]
         assert max(widths) - min(widths) < 3, f"Unequal category tabs: {widths}"
-        page.locator(".tabs").get_by_role("tab", name="Upload Template").click()
+        page.locator(".tabs").get_by_role("tab", name="Edit Template").click()
+        page.locator(".we-template-advanced summary").click()
         assert px(".category-upload-dropzone", "minHeight") == 139, "Upload panel should be compact"
         page.screenshot(path=str(OUT/"02_upload_screen.png"))
         html = """<!doctype html><html><head><style>body{font-family:Arial}
@@ -103,25 +104,20 @@ def run():
         page.get_by_placeholder("e.g. Managed Office Category").fill("Staging Template")
         page.get_by_role("button", name="Detect and map sections").click()
         expect(page.get_by_text("3 structural sections detected", exact=False)).to_be_visible(timeout=15000)
-        expect(page.get_by_role("heading", name="Section Mapping")).to_be_visible()
-        expect(page.get_by_role("heading", name="Visual Preview")).to_be_visible()
-        assert px(".category-panel-header h2") == 18, "Upload panels should use 18px section titles"
+        expect(page.get_by_role("heading", name="Sections", exact=False)).to_be_visible()
         cards = page.locator(".category-section-card")
         expect(cards).to_have_count(3)
-        assert page.locator(".category-mapping-fullwidth").bounding_box()["width"] > page.locator(".category-page").bounding_box()["width"] * .95
-        mapping_bounds = page.locator(".category-mapping-fullwidth").bounding_box()
-        preview_bounds = page.locator(".category-preview-below").bounding_box()
-        assert preview_bounds["y"] >= mapping_bounds["y"] + mapping_bounds["height"] - 2, "Preview must appear below section mapping"
-        assert page.locator(".category-mapping-fullwidth").get_by_role("button", name="Locate").count() == 0
-        # One section is initially expanded. Remaining rectangular cards stay collapsed.
-        expect(cards.first.get_by_role("button", name="Show less")).to_be_visible()
-        assert cards.first.locator(".map-field").count() > 0
-        expect(cards.nth(1).get_by_role("button", name="View more")).to_be_visible()
-        expect(cards.nth(1).locator(".map-field")).to_have_count(0)
-        cards.nth(1).get_by_role("button", name="View more").click()
+        expect(page.get_by_role("button", name="Preview", exact=True)).to_be_visible()
+        page.get_by_role("button", name="Preview", exact=True).click()
+        expect(page.locator('iframe[title="Mapped template preview"]')).to_be_visible()
+        page.get_by_role("button", name="Hide preview").click()
+        expect(cards.first.locator(".map-field")).to_have_count(0)
+        cards.first.locator(".we-template-section-name").click()
+        expect(cards.first.locator(".map-field").first).to_be_visible()
+        cards.nth(1).locator(".we-template-section-name").click()
         expect(cards.first.locator(".map-field")).to_have_count(0)
         expect(cards.nth(1).locator(".map-field").first).to_be_visible()
-        cards.first.get_by_role("button", name="View more").click()
+        cards.first.locator(".we-template-section-name").click()
         expect(cards.nth(1).locator(".map-field")).to_have_count(0)
         expect(cards.first.locator(".map-field").first).to_be_visible()
         # Detected names/content are informative text, not editable mapping fields.
@@ -160,12 +156,12 @@ def run():
         assert svg_fields.count()>=3
         svg_fields.last.locator("select[aria-label^='Behavior:']").select_option("page")
         # Keep the FAQs section fully Static, but make Benefits editable.
-        cards.nth(1).get_by_role("button", name="View more").click()
+        cards.nth(1).locator(".we-template-section-name").click()
         cards.nth(1).get_by_role("switch", name="Keep Benefits static").uncheck()
-        cards.first.get_by_role("button", name="View more").click()
+        cards.first.locator(".we-template-section-name").click()
         page.locator(".approve input[type=checkbox]").check()
         page.screenshot(path=str(OUT/"02_template_mapping.png"))
-        page.get_by_role("button", name="Save template configuration").click()
+        page.get_by_role("button", name="Save changes").click()
         expect(page.get_by_text("Template mapping saved", exact=False)).to_be_visible()
         # Deletion is a straightforward yes/no confirmation, no typing.
         page.get_by_role("button", name="Delete template Staging Template").click()
@@ -377,7 +373,9 @@ def run():
 
         # Remove a referenced template without losing its published page or edit form.
         page.locator(".page-top .backlink").click()
-        page.locator(".tabs").get_by_role("tab", name="Upload Template").click()
+        page.locator(".tabs").get_by_role("tab", name="Edit Template").click()
+        page.get_by_label("Template", exact=True).select_option(label="Staging Template")
+        page.locator(".we-template-advanced summary").click()
         page.get_by_role("button", name="Delete template Staging Template").click()
         page.get_by_role("dialog", name="Delete this template?").get_by_role("button", name="Remove template").click()
         expect(page.get_by_text("removed from your library", exact=False)).to_be_visible()
@@ -397,7 +395,7 @@ def run():
         page.get_by_placeholder("Your password").fill("Smoke-Editor-Password-2026")
         page.get_by_role("button", name="Sign in").click()
         expect(page.get_by_role("heading", name="Category", exact=True)).to_be_visible(timeout=15000)
-        assert page.locator(".tabs").get_by_role("tab",name="Upload Template").count()==0
+        assert page.locator(".tabs").get_by_role("tab",name="Edit Template").count()==0
         assert page.locator(".navigation").get_by_role("button",name="Templates").count()==0
         page.locator(".category-table-row").first.locator(".category-actions summary").click()
         page.locator(".category-table-row").first.get_by_role("button",name="Edit page").click()

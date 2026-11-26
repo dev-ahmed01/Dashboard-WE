@@ -1733,7 +1733,7 @@ export default function App(){
       <details className="we-template-advanced"><summary>Template management</summary>
         <div className="we-template-toolbar-actions">
           {mapping&&<button type="button" className="outline compact" disabled={busy} onClick={()=>redetectTemplate(mapping)}>Re-detect sections</button>}
-          {mapping&&<button type="button" className="outline compact" disabled={busy} onClick={()=>openDeleteDialog(mapping)}><Trash2 size={15}/> Delete template</button>}
+          {mapping&&<button type="button" className="outline compact" disabled={busy} aria-label={'Delete template '+mapping.name} onClick={()=>openDeleteDialog(mapping)}><Trash2 size={15}/> Delete template</button>}
         </div>
       <div className={'category-upload-dropzone '+(templateDragActive?'drag-active':'')} onDragOver={e=>{e.preventDefault();setTemplateDragActive(true)}} onDragLeave={e=>{e.preventDefault();setTemplateDragActive(false)}} onDrop={e=>{e.preventDefault();setTemplateDragActive(false);chooseTemplateFile(e.dataTransfer.files?.[0]||null)}}>
         <UploadCloud size={29}/>
