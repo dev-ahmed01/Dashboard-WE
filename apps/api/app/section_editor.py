@@ -2,14 +2,40 @@
 from copy import deepcopy
 import re
 from uuid import uuid4
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from .template_engine import sanitize
 
-def edit_sections(html, sections, fields, operation, section_id, source=None):
+def edit_sections(html, sections, fields, operation, section_id='', source=None, ordered_section_ids=None):
     soup = BeautifulSoup(html, 'html.parser')
     sections = deepcopy(sections)
     fields = deepcopy(fields)
-    if operation == 'delete':
+    if operation == 'reorder':
+        ids = [s['id'] for s in sections]
+        if (not ordered_section_ids or len(ordered_section_ids) != len(ids)
+                or set(ordered_section_ids) != set(ids)):
+            raise ValueError('Section order must contain every section exactly once')
+        nodes = [node for node in soup.find_all(attrs={'data-we-section': True})
+                 if node.get('data-we-section') in ids]
+        if len(nodes) != len(ids) or {n['data-we-section'] for n in nodes} != set(ids):
+            raise ValueError('Template sections could not be located')
+        if any(any(parent.get('data-we-section') in ids for parent in node.parents
+                   if hasattr(parent, 'get')) for node in nodes):
+            raise ValueError('Nested template sections cannot be reordered safely')
+        # Replace the original structural slots, preserving navigation, footer,
+        # wrappers, unmapped content, field identities and repeater metadata.
+        by_id = {node['data-we-section']: node for node in nodes}
+        slots = []
+        for node in nodes:
+            slot = Comment('we-section-slot')
+            node.replace_with(slot)
+            slots.append(slot)
+        for slot, sid in zip(slots, ordered_section_ids):
+            slot.replace_with(by_id[sid])
+        by_meta = {s['id']:s for s in sections}
+        sections = [by_meta[sid] for sid in ordered_section_ids]
+        # Preserve the existing field order inside each section.
+        fields = [f for sec in sections for f in fields if f['section_id']==sec['id']]
+    elif operation == 'delete':
         if len(sections) <= 1:
             raise ValueError('Keep at least one section in the template')
         node = soup.find(attrs={'data-we-section': section_id})

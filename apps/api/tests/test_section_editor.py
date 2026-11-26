@@ -46,3 +46,25 @@ def test_cross_template_import_api(client):
     assert any(f['default']=='Distinct content' and f['mode']=='page' for f in edited['fields'])
     assert 'Distinct content' in client.get(f"/api/templates/{target['id']}/preview",headers=auth).text
     assert client.get('/api/templates',headers=auth).json()[1]['version']==donor['version']
+
+def test_reorder_section_html_and_snapshot(client):
+    auth=login(client)
+    target=approve(client,auth,imported(client,auth),{'Private workspace':'page'})
+    existing=page(client,auth,target,name='Before reorder')
+    order=[s['id'] for s in target['sections']][::-1]
+    url=f"/api/templates/{target['id']}/sections"
+    invalid=client.post(url,headers=auth,json={'operation':'reorder','ordered_section_ids':[order[0],order[0]],'version':target['version']})
+    assert invalid.status_code==422
+    result=client.post(url,headers=auth,json={'operation':'reorder','ordered_section_ids':order,'version':target['version']})
+    assert result.status_code==200,result.text
+    updated=result.json()
+    assert [s['id'] for s in updated['sections']]==order
+    assert [s['order'] for s in updated['sections']]==[1,2]
+    assert {f['key']:f['mode'] for f in updated['fields']}=={f['key']:f['mode'] for f in target['fields']}
+    new_html=client.get(f"/api/templates/{target['id']}/preview",headers=auth).text
+    assert new_html.index('Fixed benefits title')<new_html.index('Private workspace')
+    old=client.get(f"/api/pages/{existing['id']}",headers=auth).json()['template']
+    assert [s['id'] for s in old['sections']]==order[::-1]
+    new_page=page(client,auth,updated,name='After reorder')
+    snapshot=client.get(f"/api/pages/{new_page['id']}",headers=auth).json()['template']
+    assert [s['id'] for s in snapshot['sections']]==order

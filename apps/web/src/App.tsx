@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
-import {ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3, Download} from 'lucide-react'
+import {GripVertical, ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, LayoutTemplate, LockKeyhole, EyeOff, LogOut, Plus, Search, ShieldCheck, UploadCloud, X, Eye, Save, AlertTriangle, MoreHorizontal, Trash2, Undo2, Redo2, Type, Image, Square, Link2, Layers, MousePointer2, Move, RotateCw, ArrowUp, ArrowDown, Grid3X3, Download} from 'lucide-react'
 import SeoSettings from './SeoSettings'
 import AddPageWorkspace from './AddPageWorkspace'
 
@@ -269,6 +269,8 @@ export default function App(){
   const [templateFile,setTemplateFile]=useState<File|null>(null)
   const [mappingId,setMappingId]=useState<number|null>(null)
   const [openMappingSection,setOpenMappingSection]=useState<string|null>('')
+  const [dragSection,setDragSection]=useState<string|null>(null)
+  const [dropSection,setDropSection]=useState<{id:string;after:boolean}|null>(null)
   const [importSource,setImportSource]=useState<number|null>(null)
   const [importSection,setImportSection]=useState('')
   const [templatePreviewOpen,setTemplatePreviewOpen]=useState(false)
@@ -441,17 +443,27 @@ export default function App(){
     setTemplates(prev=>prev.map(x=>x.id===t.id?updated:x));setUploaded(u=>u?.id===t.id?updated:u)
     notify('Template mapping saved. Static sections stay locked; page-variable fields will be editable.')
   })}
-  async function changeTemplateSection(t:Template,operation:'delete'|'import',sectionId:string,sourceId?:number){
+  async function changeTemplateSection(t:Template,operation:'delete'|'import'|'reorder',sectionId:string,sourceId?:number,orderedIds?:string[]){
     if(operation==='delete'&&!window.confirm('Delete this section from the template? Existing pages will remain unchanged.'))return
     await action(async()=>{
-      const updated=await api<Template>('/api/templates/'+t.id+'/sections',{method:'POST',body:json({operation,section_id:sectionId,source_template_id:sourceId,version:t.version})})
+      const updated=await api<Template>('/api/templates/'+t.id+'/sections',{method:'POST',body:json({operation,section_id:sectionId,source_template_id:sourceId,ordered_section_ids:orderedIds,version:t.version})})
       // Retain unsaved mapping changes for the surviving fields.
       const previous=new Map(t.fields.map(f=>[f.key,f]))
       const merged={...updated,approved:t.approved,fields:updated.fields.map(f=>previous.get(f.key)||f)}
       setTemplates(items=>items.map(item=>item.id===t.id?merged:item));setUploaded(merged)
       setOpenMappingSection('');setImportSection('')
-      notify(operation==='delete'?'Section deleted':'Section imported')
+      notify(operation==='delete'?'Section deleted':operation==='import'?'Section imported':'Section order saved')
     })
+  }
+  function moveTemplateSection(t:Template,from:string,to:string,after:boolean){
+    setDragSection(null);setDropSection(null)
+    if(busy||from===to)return
+    const ids=t.sections.map(s=>s.id).filter(id=>id!==from)
+    const at=ids.indexOf(to)
+    if(at<0||!t.sections.some(s=>s.id===from))return
+    ids.splice(at+(after?1:0),0,from)
+    if(ids.every((id,i)=>id===t.sections[i].id))return
+    void changeTemplateSection(t,'reorder','',undefined,ids)
   }
   function openDeleteDialog(target:Template|'all'){
     setDeletingTemplate(target);setDeleteError('')
@@ -1662,10 +1674,17 @@ export default function App(){
             const isReadOnly=(mapping.category==='Property'&&/testimonials|reviews/i.test(sec.name))||(['Solution','Solution Category'].includes(mapping.category)&&/consultation|why us/i.test(sec.name))
             const isStatic=isReadOnly||fields.every(f=>f.mode==='static')
             const isOpen=openMappingSection===sec.id
-            return <section key={sec.id} className={'category-section-card '+(isOpen?'is-open':'')+(isStatic?' is-static':'')}>
+            return <section key={sec.id} className={'category-section-card '+(isOpen?'is-open':'')+(isStatic?' is-static':'')+(dragSection===sec.id?' we-section-dragging':'')+(dropSection?.id===sec.id&&dragSection!==sec.id?(dropSection.after?' we-section-drop-after':' we-section-drop-before'):'')}
+              onDragOver={e=>{if(!dragSection||busy)return;e.preventDefault();e.dataTransfer.dropEffect='move';const bounds=e.currentTarget.getBoundingClientRect();setDropSection({id:sec.id,after:e.clientY>bounds.top+bounds.height/2})}}
+              onDrop={e=>{if(!dragSection||busy)return;e.preventDefault();const bounds=e.currentTarget.getBoundingClientRect();moveTemplateSection(mapping,dragSection,sec.id,e.clientY>bounds.top+bounds.height/2)}}
+              >
               <div className="category-section-card-header we-template-section-row">
+                <button type="button" className="we-template-drag" draggable={!busy} disabled={busy} aria-label={'Reorder section '+(i+1)+': '+sec.name} title="Drag to reorder · use Up/Down keys"
+                  onDragStart={e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',sec.id);setDragSection(sec.id)}}
+                  onDragEnd={()=>{setDragSection(null);setDropSection(null)}}
+                  onKeyDown={e=>{if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;e.preventDefault();const next=mapping.sections[i+(e.key==='ArrowUp'?-1:1)];if(next)moveTemplateSection(mapping,sec.id,next.id,e.key==='ArrowDown')}}><GripVertical size={18}/></button>
                 <span className="category-section-number">{String(i+1).padStart(2,'0')}</span>
-                <button type="button" className="we-template-section-name" aria-expanded={isOpen} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>{sec.name}<ChevronRight size={16}/></button>
+                <button type="button" className="we-template-section-name" aria-expanded={isOpen} onClick={()=>setOpenMappingSection(isOpen?'':sec.id)}>{sec.name.replace(/^\s*\d+[A-Za-z]?\s*[·.:-]\s*/,'')}<ChevronRight size={16}/></button>
                 <label className="category-static-toggle we-template-toggle">
                   <span>{isStatic?'Static':'Editable'}</span>
                   <input type="checkbox" role="switch" aria-label={'Keep '+sec.name+' static'} checked={isStatic} disabled={busy||!fields.length||isReadOnly} onChange={e=>toggleSectionStatic(mapping.id,sec.id,e.target.checked)}/>

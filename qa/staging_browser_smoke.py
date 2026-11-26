@@ -107,6 +107,11 @@ def run():
         expect(page.get_by_role("heading", name="Sections", exact=False)).to_be_visible()
         cards = page.locator(".category-section-card")
         expect(cards).to_have_count(3)
+        # Keyboard alternative to dragging uses the same persisted reorder endpoint.
+        cards.nth(1).locator(".we-template-drag").press("ArrowUp")
+        expect(cards.first.locator(".we-template-section-name")).to_contain_text("Benefits")
+        cards.first.locator(".we-template-drag").press("ArrowDown")
+        expect(cards.first.locator(".we-template-section-name")).to_contain_text("Hero")
         expect(page.get_by_role("button", name="Preview", exact=True)).to_be_visible()
         page.get_by_role("button", name="Preview", exact=True).click()
         expect(page.locator('iframe[title="Mapped template preview"]')).to_be_visible()
