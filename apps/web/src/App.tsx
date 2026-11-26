@@ -429,7 +429,7 @@ export default function App(){
     if(!templateFile)throw new Error('Choose an HTML template first')
     const form=new FormData();form.append('file',templateFile)
     const params=new URLSearchParams({name:uploadName||templateFile.name.replace(/\.html$/i,''),category:MODULE_INFO[activeModule].category})
-    const t=await api<Template>(`/api/templates/import?${params}`,{method:'POST',body:form});setUploaded(t);setMappingId(t.id);await refresh();notify(`${t.sections.length} structural sections detected. Fields are static until you approve their mapping.`)
+    const t=await api<Template>(`/api/templates/import?${params}`,{method:'POST',body:form});await refresh();setTemplates(items=>items.some(item=>item.id===t.id)?items:[...items,t]);setUploaded(t);setMappingId(t.id);notify(`${t.sections.length} structural sections detected. Fields are static until you approve their mapping.`)
   })}
   async function saveMapping(t:Template){await action(async()=>{
     const updated=await api<Template>(`/api/templates/${t.id}/mapping`,{method:'PUT',body:json({
